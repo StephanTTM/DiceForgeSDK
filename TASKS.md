@@ -16,7 +16,7 @@
 Remaining before tagging 0.1.0:
 
 - [x] Push to a Git host and verify the CI workflow runs green on Node 20 and 24. (github.com/StephanTTM/DiceForgeSDK, private until release readiness)
-- [ ] Publish to npm — folded into the publish task under "Next" so both packages ship together.
+- [x] Publish to npm — shipped with the 0.1.0 release (see "Next" section).
 
 ## Web proof of integration (complete)
 
@@ -29,7 +29,7 @@ Remaining before tagging 0.1.0:
 
 - [x] Add one popular-framework example (React) consuming `@diceforge-sdk/renderer-web`. (`examples/react-demo`)
 - [ ] Theme/asset loading as an optional presentation concern (with the licensing checklist below).
-- [ ] Publish 0.1.0: pipeline and scaffolding are in place (ADR-0009); the two `npm publish` commands need a maintainer's interactive 2FA approval. Afterwards: tag `v0.1.0`, configure npm trusted publishing for both packages, and check this off.
+- [x] Publish 0.1.0 to npm. (`@diceforge-sdk/core` + `@diceforge-sdk/renderer-web` live 2026-07-25; `v0.1.0` tagged; trusted publishing configured; release workflow verified green and idempotent — ADR-0009)
 
 ## Backlog
 
