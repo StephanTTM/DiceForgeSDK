@@ -236,6 +236,23 @@ const BUILDERS: Record<ShapedDieSides, () => PolyhedronData> = {
 
 const cache = new Map<ShapedDieSides, PolyhedronData>();
 
+/**
+ * Largest dimension of a die, shared by procedural and themed models so a d6
+ * and a d20 sit side by side at comparable size.
+ */
+export const DIE_SIZE = 2.1;
+
+/** Scales a solid so its bounding box measures `DIE_SIZE` on its longest axis. */
+function normalizeSize(data: PolyhedronData): PolyhedronData {
+  let extent = 0;
+  for (const vertex of data.vertices) {
+    extent = Math.max(extent, Math.abs(vertex[0]), Math.abs(vertex[1]), Math.abs(vertex[2]));
+  }
+  if (extent === 0) return data;
+  const factor = DIE_SIZE / (2 * extent);
+  return { vertices: data.vertices.map((vertex) => scale(vertex, factor)), faces: data.faces };
+}
+
 /** Geometry for a physical die shape. d100 has no shape of its own: present it as two d10s. */
 export function dieGeometry(sides: ShapedDieSides): PolyhedronData {
   const cached = cache.get(sides);
@@ -244,7 +261,7 @@ export function dieGeometry(sides: ShapedDieSides): PolyhedronData {
   if (!builder) {
     throw new DiceForgeError("invalid-argument", `no die geometry for d${sides}`);
   }
-  const data = builder();
+  const data = normalizeSize(builder());
   cache.set(sides, data);
   return data;
 }

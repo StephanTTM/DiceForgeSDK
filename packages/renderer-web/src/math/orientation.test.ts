@@ -60,6 +60,26 @@ describe("faceUpQuaternion", () => {
     }
   });
 
+  /**
+   * The rendering contract: after orienting for a value, that value's face must
+   * be the highest one on the die — what a player reads from above. Aligning
+   * the normal to +Y is not enough on its own, since a normal could be flipped.
+   */
+  it("puts the value's own face on top, above every other face", () => {
+    for (const sides of ALL_SHAPES) {
+      const data = dieGeometry(sides);
+      for (let value = 1; value <= sides; value++) {
+        const quaternion = faceUpQuaternion(sides, value);
+        const heights = data.faces.map(
+          (_, faceIndex) =>
+            new Vector3(...faceCentroid(data, faceIndex)).applyQuaternion(quaternion).y,
+        );
+        const winner = heights.indexOf(Math.max(...heights));
+        expect(winner, `d${sides} value ${value} showed face ${winner + 1}`).toBe(value - 1);
+      }
+    }
+  });
+
   it("rejects values without a face", () => {
     expect(() => faceUpQuaternion(6, 0)).toThrowError(/no face for value 0/);
     expect(() => faceUpQuaternion(6, 7)).toThrowError(/no face for value 7/);

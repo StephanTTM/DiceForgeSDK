@@ -39,6 +39,19 @@ export type KayKitColor = "red" | "blue" | "green" | "yellow";
 
 export const KAYKIT_COLORS: readonly KayKitColor[] = ["red", "blue", "green", "yellow"];
 
+/**
+ * d6 face style in the KayKit pack: `numerals` uses the printed-number die,
+ * `pips-a` and `pips-b` use the two modeled-pip dice. Only the d6 has styles;
+ * every other shape is unaffected.
+ */
+export type KayKitD6Style = "numerals" | "pips-a" | "pips-b";
+
+const KAYKIT_D6_FILE: Record<KayKitD6Style, string> = {
+  numerals: "D6_C",
+  "pips-a": "D6_A",
+  "pips-b": "D6_B",
+};
+
 const KAYKIT_ACCENTS: Record<KayKitColor, { die: string; label: string }> = {
   red: { die: "#a63c3c", label: "#f6ecec" },
   blue: { die: "#3c5aa6", label: "#ecf0f6" },
@@ -111,25 +124,47 @@ export const KAYKIT_FACE_ROTATIONS: Partial<Record<ShapedDieSides, readonly Quat
 };
 
 /**
+ * The pip d6 models (`D6_A`, `D6_B`) carry their own face layout, so they need
+ * a table of their own; the numeral die's does not transfer.
+ */
+export const KAYKIT_PIP_D6_ROTATIONS: readonly QuaternionTuple[] = [
+  [0, 0, -1, 0],
+  [0, 0, Q, Q],
+  [-Q, 0, 0, Q],
+  [Q, 0, 0, Q],
+  [0, 0, -Q, Q],
+  [0, 0, 0, 1],
+];
+
+/**
  * Built-in theme for the KayKit dice models (d4, d6, d8, d20; other shapes
  * render procedurally in the theme's colors). `baseUrl` is wherever the
  * assets directory is served from, e.g. "/": the files themselves stay out
  * of the npm package.
  */
-export function kayKitTheme(options: { baseUrl: string; color?: KayKitColor }): DiceTheme {
+export function kayKitTheme(options: {
+  baseUrl: string;
+  color?: KayKitColor;
+  /** d6 face style; defaults to printed numerals. */
+  d6Style?: KayKitD6Style;
+}): DiceTheme {
   const color = options.color ?? "red";
+  const d6Style = options.d6Style ?? "numerals";
   const base = options.baseUrl.replace(/\/+$/, "");
   return {
-    name: `kaykit-${color}`,
+    name: d6Style === "numerals" ? `kaykit-${color}` : `kaykit-${color}-${d6Style}`,
     colors: KAYKIT_ACCENTS[color],
     models: {
       urls: {
         4: `${base}/D4_${color}.gltf`,
-        6: `${base}/D6_C_${color}.gltf`,
+        6: `${base}/${KAYKIT_D6_FILE[d6Style]}_${color}.gltf`,
         8: `${base}/D8_${color}.gltf`,
         20: `${base}/D20_${color}.gltf`,
       },
-      faceRotations: KAYKIT_FACE_ROTATIONS,
+      faceRotations:
+        d6Style === "numerals"
+          ? KAYKIT_FACE_ROTATIONS
+          : { ...KAYKIT_FACE_ROTATIONS, 6: KAYKIT_PIP_D6_ROTATIONS },
     },
   };
 }

@@ -13,10 +13,17 @@ export {
 } from "./capabilities.js";
 export type { DicePresenter, DicePresenterOptions } from "./presenter.js";
 export { createDicePresenter } from "./presenter.js";
-export type { DiceTheme, DieModelSet, KayKitColor, QuaternionTuple } from "./theme.js";
+export type {
+  DiceTheme,
+  DieModelSet,
+  KayKitColor,
+  KayKitD6Style,
+  QuaternionTuple,
+} from "./theme.js";
 export {
   hasCalibratedModel,
   KAYKIT_COLORS,
   KAYKIT_FACE_ROTATIONS,
+  KAYKIT_PIP_D6_ROTATIONS,
   kayKitTheme,
 } from "./theme.js";

@@ -92,6 +92,39 @@ describe("createDicePresenter (DOM backend)", () => {
     presenter.dispose();
   });
 
+  it("does not mark dropped dice until the roll has landed", async () => {
+    const container = makeContainer();
+    const presenter = createDicePresenter({ container, reducedMotion: "animate" });
+    const engine = createDiceEngine({ random: createSeededRandomSource("table-42") });
+    const pending = presenter.present(engine.roll("2d20kh1"));
+    // Mid-flight: both dice are on screen and look identical, so the outcome
+    // is not given away before they settle.
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    const midFlight = [...container.querySelectorAll<HTMLElement>('[data-diceforge="die"]')];
+    expect(midFlight).toHaveLength(2);
+    expect(midFlight.map((tile) => tile.style.opacity)).toEqual(["", ""]);
+    expect(midFlight.map((tile) => tile.style.filter)).toEqual(["", ""]);
+    await pending;
+    const settled = [...container.querySelectorAll<HTMLElement>('[data-diceforge="die"]')];
+    const dropped = settled.find((tile) => tile.dataset.dropped === "true");
+    const kept = settled.find((tile) => tile.dataset.dropped !== "true");
+    expect(dropped?.style.opacity).toBe("0.55");
+    expect(dropped?.style.filter).toContain("brightness");
+    expect(kept?.style.opacity).toBe("");
+    presenter.dispose();
+  });
+
+  it("shows the dropped state immediately under reduced motion", async () => {
+    const container = makeContainer();
+    const presenter = createDicePresenter({ container, reducedMotion: "reduce" });
+    const engine = createDiceEngine({ random: createSeededRandomSource("table-42") });
+    await presenter.present(engine.roll("2d20kh1"));
+    const dropped = container.querySelector<HTMLElement>('[data-dropped="true"]');
+    expect(dropped?.style.opacity).toBe("0.55");
+    expect(dropped?.style.transition).toBe("");
+    presenter.dispose();
+  });
+
   it("plays the entry animation when motion is allowed", async () => {
     const container = makeContainer();
     const presenter = createDicePresenter({ container, reducedMotion: "animate" });

@@ -58,7 +58,15 @@ const presenter = createDicePresenter({
 
 Coverage is per shape: KayKit provides d4, d6, d8, and d20. A d10, d12, or percentile die in the same roll renders with the built-in procedural geometry in the theme's colors — mixed presentation is expected, not an error.
 
+The d6 comes in three styles — `numerals` (default), `pips-a`, and `pips-b` — selected with `kayKitTheme({ baseUrl, color, d6Style })`. The pip dice take their color from the pack's shared palette texture, so all four colors need `boardgame_bits_texture.png` present alongside the models.
+
 Custom model sets implement `DieModelSet`. A model is used only when its shape has both a URL **and** a rotation table of exactly `shape` entries; anything else falls back to procedural dice, as does any load or parse failure. That rule is what keeps a model from ever showing a face the core did not resolve. To calibrate a new pack, use the maintainer tool at `examples/web-demo/calibrate.html` — it derives the table from the mesh, and `?verify=1` re-renders straight from the shipped table so each cell can be checked against its expected value.
+
+## How a roll is presented
+
+Dice tumble in, then settle into the orientation that shows each resolved face. The camera frames the whole layout automatically and looks down from a steep angle, so the face that counts is the one facing the viewer. A roll made entirely of d4s is the exception: those are read from the side, so they get a lower, angled view.
+
+**Dropped dice are revealed only after the roll lands.** Every die looks identical while it is in motion; once all of them have settled, a short pause passes and then dice excluded by a keep/drop selection dim, desaturate, and shrink slightly. They stay on the table so the whole roll can still be read — nothing disappears, and nothing gives the outcome away early. Under reduced motion there is no animation at all: the final state, dimming included, appears immediately.
 
 ## Fallback tiers
 
@@ -74,10 +82,11 @@ A `role="status"` / `aria-live="polite"` region announces results in plain langu
 
 ## Known presentation limitations (v0.2 scope)
 
-- Dice float and present the resolved face toward the camera; they are stylized, not physically simulated resting dice (a physics presenter is a future plugin category).
-- Built-in procedural dice use the classic 1/6-opposite layout on the d6 only; other shapes number faces in construction order.
-- Non-top face labels may appear rotated relative to their faces; the landing face is always yawed to read upright.
-- The KayKit d4 is read from the numeral at the base of the camera-facing side, the convention those models are numbered for.
+- Dice are stylized rather than physically simulated: they tumble toward the resolved face instead of bouncing to it (a physics presenter is a future plugin category).
+- Built-in procedural dice have sharp edges — no bevels or rounded corners. They are meant as a clean, dependency-free default and as the fallback for shapes a theme does not cover; a model set looks better where one exists.
+- Procedural dice use the classic 1/6-opposite layout on the d6 only; other shapes number faces in construction order.
+- Labels on non-top faces may appear rotated; only the landing face is yawed to read upright.
+- A roll mixing d4s with other shapes uses the top-down camera, which is the harder angle for reading a d4.
 
 ## Compatibility
 

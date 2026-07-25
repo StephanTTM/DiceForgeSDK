@@ -13,5 +13,5 @@ packages** (see ADR-0010 and CONTRIBUTING.md).
 - **Retrieved:** 2026-07-25
 - **Notes:**
   - The pack covers d4, d6, d8, and d20. Other die shapes (d10, d12, percentile) always render with DiceForge's built-in procedural geometry.
-  - `D6_A_*` and `D6_B_*` reference `boardgame_bits_texture.png`, which is not included in this drop; the built-in KayKit theme uses the self-contained `D6_C_*` models. Add that texture if you want the A/B pip styles.
+  - Three d6 styles are available: `D6_C_*` printed numerals (default), and the `D6_A_*` / `D6_B_*` modeled-pip dice, which take their color from `boardgame_bits_texture.png` rather than a per-color texture.
   - Do not resell unmodified copies of these assets or claim them as your own (per the author's request on the source page).

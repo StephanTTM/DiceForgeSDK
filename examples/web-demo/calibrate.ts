@@ -3,7 +3,15 @@
 // touching the public API. See packages/renderer-web/src/theme.ts for where
 // the calibrated tables live.
 
-import { KAYKIT_FACE_ROTATIONS } from "@diceforge-sdk/renderer-web";
+import { createDiceEngine, createSeededRandomSource } from "@diceforge-sdk/core";
+import {
+  createDicePresenter,
+  KAYKIT_FACE_ROTATIONS,
+  KAYKIT_PIP_D6_ROTATIONS,
+  type KayKitColor,
+  type KayKitD6Style,
+  kayKitTheme,
+} from "@diceforge-sdk/renderer-web";
 import {
   AmbientLight,
   Box3,
@@ -24,7 +32,8 @@ const params = new URLSearchParams(location.search);
 const shape = Number(params.get("shape") ?? "20");
 const color = params.get("color") ?? "red";
 const mode = params.get("mode") ?? "face";
-const fileName = shape === 6 ? `D6_C_${color}.gltf` : `D${shape}_${color}.gltf`;
+const d6 = params.get("d6") ?? "C";
+const fileName = shape === 6 ? `D6_${d6}_${color}.gltf` : `D${shape}_${color}.gltf`;
 
 const CELL = Number(params.get("cell") ?? "150");
 const COLS = 5;
@@ -108,7 +117,55 @@ function vertexDirections(root: Object3D, expected: number): Vector3[] {
   return top;
 }
 
+/**
+ * Renders one roll through the real presenter and captures the canvas, so the
+ * shipped look can be reviewed without watching the demo by hand. Reduced
+ * motion makes the presenter draw synchronously, which is what lets the frame
+ * be read back.
+ */
+async function preview(): Promise<void> {
+  const host = document.querySelector("#out");
+  if (!host) throw new Error("no #out");
+  const stage = document.createElement("div");
+  stage.style.width = `${Number(params.get("w") ?? "760")}px`;
+  stage.style.height = `${Number(params.get("h") ?? "420")}px`;
+  host.append(stage);
+
+  const themeColor = params.get("theme") as KayKitColor | null;
+  const presenter = createDicePresenter({
+    container: stage,
+    renderMode: "webgl",
+    reducedMotion: "reduce",
+    ...(themeColor
+      ? {
+          theme: kayKitTheme({
+            baseUrl: "/",
+            color: themeColor,
+            d6Style: (params.get("d6style") ?? "numerals") as KayKitD6Style,
+          }),
+        }
+      : {}),
+  });
+  const engine = createDiceEngine({
+    random: createSeededRandomSource(params.get("seed") ?? "table-42"),
+  });
+  const event = engine.roll(params.get("notation") ?? "4d6dl1");
+  await presenter.present(event);
+  const canvas = stage.querySelector("canvas");
+  (window as { __calibration?: unknown }).__calibration = {
+    preview: true,
+    expression: event.expression,
+    dice: event.groups.flatMap((g) => g.dice.map((d) => `${d.value}${d.kept ? "" : " (dropped)"}`)),
+    total: event.total,
+    count: 0,
+    // Read back immediately: the drawing buffer is cleared once composited.
+    dataUrl: canvas?.toDataURL("image/jpeg", 0.88) ?? null,
+  };
+  console.log("preview ready");
+}
+
 async function main(): Promise<void> {
+  if (params.get("preview") === "1") return preview();
   const gltf = await new GLTFLoader().loadAsync(`/${fileName}`);
   const model = gltf.scene;
   const box = new Box3().setFromObject(model);
@@ -129,9 +186,11 @@ async function main(): Promise<void> {
     .split(",")
     .filter(Boolean)
     .map((entry) => Number(entry));
-  const table = (KAYKIT_FACE_ROTATIONS[shape as 4 | 6 | 8 | 20] ?? []).map(
-    (q) => new Quaternion(q[0], q[1], q[2], q[3]),
-  );
+  const source =
+    shape === 6 && d6 !== "C"
+      ? KAYKIT_PIP_D6_ROTATIONS
+      : (KAYKIT_FACE_ROTATIONS[shape as 4 | 6 | 8 | 20] ?? []);
+  const table = source.map((q) => new Quaternion(q[0], q[1], q[2], q[3]));
   const quaternions = values.length
     ? values.map((value) => table[value - 1] ?? new Quaternion())
     : verify

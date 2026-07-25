@@ -46,8 +46,9 @@ export function createDicePresenter(options: DicePresenterOptions): DicePresente
   }
   const doc = container.ownerDocument;
   const mode = resolveRenderMode(options.renderMode ?? "auto", doc);
-  const dieColor = options.colors?.die ?? options.theme?.colors.die ?? "#2b2d42";
-  const labelColor = options.colors?.label ?? options.theme?.colors.label ?? "#f8f9fa";
+  // Light body with dark numerals: the classic dice look, and legible small.
+  const dieColor = options.colors?.die ?? options.theme?.colors.die ?? "#edf0f5";
+  const labelColor = options.colors?.label ?? options.theme?.colors.label ?? "#1d2230";
   const backend =
     mode === "webgl"
       ? createWebglBackend({ container, dieColor, labelColor, models: options.theme?.models })

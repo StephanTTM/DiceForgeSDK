@@ -8,6 +8,9 @@ export type DomBackendOptions = {
 };
 
 const ENTER_MS = 320;
+/** Matches the WebGL backend: dropped dice are revealed only after landing. */
+const REVEAL_HOLD_MS = 220;
+const REVEAL_MS = 420;
 
 function abortError(): Error {
   const error = new Error("presentation aborted");
@@ -55,7 +58,6 @@ export function createDomBackend(options: DomBackendOptions): PresenterBackend {
       color: labelColor,
       fontFamily: "system-ui, sans-serif",
       fontWeight: "700",
-      opacity: kept ? "1" : "0.4",
     });
     const value = doc.createElement("div");
     value.dataset.diceforge = "die-value";
@@ -70,20 +72,42 @@ export function createDomBackend(options: DomBackendOptions): PresenterBackend {
     return tile;
   }
 
+  /** Dims a dropped tile without hiding it, so the roll can still be read. */
+  function revealDropped(tiles: readonly HTMLElement[], animated: boolean): void {
+    for (const tile of tiles) {
+      if (tile.dataset.dropped !== "true") continue;
+      tile.style.transition = animated
+        ? `opacity ${REVEAL_MS}ms ease-out, transform ${REVEAL_MS}ms ease-out, filter ${REVEAL_MS}ms ease-out`
+        : "";
+      tile.style.opacity = "0.55";
+      tile.style.filter = "grayscale(0.7) brightness(0.62)";
+      tile.style.transform = "scale(0.84)";
+    }
+  }
+
   async function show(tiles: readonly HTMLElement[], context: PresentContext): Promise<void> {
     if (context.signal?.aborted) throw abortError();
     root.replaceChildren(...tiles);
-    if (context.motion === "animate") {
-      for (const tile of tiles) {
-        tile.style.transition = `transform ${ENTER_MS}ms ease-out, opacity ${ENTER_MS}ms ease-out`;
-        tile.style.transform = "scale(0.4)";
-      }
-      // Next macrotask lets the initial transform apply before transitioning.
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      for (const tile of tiles) {
-        tile.style.transform = "scale(1)";
-      }
-      await new Promise((resolve) => setTimeout(resolve, ENTER_MS));
+    if (context.motion !== "animate") {
+      revealDropped(tiles, false);
+      return;
+    }
+    for (const tile of tiles) {
+      tile.style.transition = `transform ${ENTER_MS}ms ease-out, opacity ${ENTER_MS}ms ease-out`;
+      tile.style.transform = "scale(0.4)";
+    }
+    // Next macrotask lets the initial transform apply before transitioning.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    for (const tile of tiles) {
+      tile.style.transform = "scale(1)";
+    }
+    await new Promise((resolve) => setTimeout(resolve, ENTER_MS));
+    if (context.signal?.aborted) throw abortError();
+    // Every die has landed and been seen before any of them is marked dropped.
+    if (tiles.some((tile) => tile.dataset.dropped === "true")) {
+      await new Promise((resolve) => setTimeout(resolve, REVEAL_HOLD_MS));
+      revealDropped(tiles, true);
+      await new Promise((resolve) => setTimeout(resolve, REVEAL_MS));
     }
     if (context.signal?.aborted) throw abortError();
   }

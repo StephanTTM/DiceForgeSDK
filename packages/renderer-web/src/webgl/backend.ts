@@ -2,18 +2,23 @@ import {
   AmbientLight,
   BufferGeometry,
   CanvasTexture,
+  Color,
   CylinderGeometry,
   DirectionalLight,
   DoubleSide,
   Float32BufferAttribute,
   Group,
-  type Material,
+  HemisphereLight,
   Mesh,
+  MeshPhysicalMaterial,
   MeshStandardMaterial,
   type Object3D,
+  PCFSoftShadowMap,
   PerspectiveCamera,
+  PlaneGeometry,
   Quaternion,
   Scene,
+  ShadowMaterial,
   SRGBColorSpace,
   Vector3,
   WebGLRenderer,
@@ -33,14 +38,27 @@ export type WebglBackendOptions = {
   readonly models?: DieModelSet | undefined;
 };
 
-const TUMBLE_PORTION = 0.6;
-const BASE_DURATION_MS = 1100;
-const STAGGER_MS = 90;
-const DIE_SPACING = 2.6;
+const TUMBLE_PORTION = 0.62;
+const BASE_DURATION_MS = 1000;
+const STAGGER_MS = 80;
+const SETTLE_TAIL_MS = 120;
+/** Dropped dice stay indistinguishable until the whole roll has landed. */
+const REVEAL_HOLD_MS = 220;
+const REVEAL_MS = 420;
+const DIE_SPACING = 2.4;
 const DICE_PER_ROW = 6;
+const DIE_RADIUS = 1.25;
+/** Elevation of the camera above the table: near top-down reads the up face. */
+const TOP_DOWN_ELEVATION = 80;
+/** A d4 is read from its side, so an all-d4 roll gets a lower, angled view. */
+const ANGLED_ELEVATION = 38;
 
 function easeOutCubic(t: number): number {
   return 1 - (1 - t) ** 3;
+}
+
+function clamp01(value: number): number {
+  return Math.min(Math.max(value, 0), 1);
 }
 
 function abortError(): Error {
@@ -49,38 +67,100 @@ function abortError(): Error {
   return error;
 }
 
-function labelTexture(text: string, dieColor: string, labelColor: string): CanvasTexture {
+const textureCache = new Map<string, CanvasTexture>();
+
+/**
+ * Numeral on a die face. Textures are cached across dice and never disposed:
+ * the set of labels is small and bounded, and sharing keeps a 20-face die from
+ * allocating twenty canvases per roll.
+ */
+function labelTexture(
+  text: string,
+  dieColor: string,
+  labelColor: string,
+  fit: number,
+): CanvasTexture {
+  const key = `${text}|${dieColor}|${labelColor}|${fit.toFixed(2)}`;
+  const cached = textureCache.get(key);
+  if (cached) return cached;
+  const size = 512;
   const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 256;
+  canvas.width = size;
+  canvas.height = size;
   const ctx = canvas.getContext("2d");
   if (ctx) {
-    ctx.fillStyle = dieColor;
-    ctx.fillRect(0, 0, 256, 256);
-    ctx.fillStyle = labelColor;
-    ctx.font = "bold 96px system-ui, sans-serif";
+    // Soft vertical gradient reads as a curved, moulded face rather than a decal.
+    const base = new Color(dieColor);
+    const light = base.clone().lerp(new Color("#ffffff"), 0.1);
+    const dark = base.clone().lerp(new Color("#000000"), 0.12);
+    const gradient = ctx.createLinearGradient(0, 0, 0, size);
+    gradient.addColorStop(0, `#${light.getHexString()}`);
+    gradient.addColorStop(1, `#${dark.getHexString()}`);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, size, size);
+
+    const centre = size / 2;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(text, 128, 128);
+    // UVs map a face's corner distance to 0.5, so its inscribed circle has
+    // radius `0.5 * fit`. Keep the numeral inside that circle: triangles get a
+    // smaller numeral than squares, and it never spills over an edge.
+    const room = size * fit;
+    const fontSize = text.length > 1 ? room * 0.6 : room * 0.85;
+    ctx.font = `600 ${fontSize}px "Segoe UI", system-ui, sans-serif`;
+    ctx.fillStyle = labelColor;
+    ctx.fillText(text, centre, centre);
     if (text === "6" || text === "9") {
-      // Underline distinguishes 6 from 9 on tumbling dice.
-      ctx.fillRect(96, 196, 64, 10);
+      ctx.fillRect(
+        centre - fontSize * 0.28,
+        centre + fontSize * 0.44,
+        fontSize * 0.56,
+        size * 0.02,
+      );
     }
   }
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;
+  texture.anisotropy = 4;
+  textureCache.set(key, texture);
   return texture;
+}
+
+function dieMaterial(map: CanvasTexture): MeshPhysicalMaterial {
+  return new MeshPhysicalMaterial({
+    map,
+    roughness: 0.42,
+    metalness: 0,
+    clearcoat: 0.55,
+    clearcoatRoughness: 0.35,
+    side: DoubleSide,
+  });
 }
 
 /**
  * Builds a die mesh from the shared polyhedron data: one material group per
- * face, each mapped to a numbered canvas texture, with UVs projected onto the
- * face plane so labels sit centered on their faces.
+ * face, each mapped to a numbered texture, with UVs projected onto the face
+ * plane so labels sit centered on their faces.
  */
+type Point2 = { u: number; v: number };
+
+/** Distance from a point to a line segment, used to find a face's inradius. */
+function distanceToEdge(point: Point2, a: Point2, b: Point2): number {
+  const edgeU = b.u - a.u;
+  const edgeV = b.v - a.v;
+  const lengthSq = edgeU * edgeU + edgeV * edgeV;
+  const t =
+    lengthSq === 0
+      ? 0
+      : Math.min(1, Math.max(0, ((point.u - a.u) * edgeU + (point.v - a.v) * edgeV) / lengthSq));
+  return Math.hypot(a.u + t * edgeU - point.u, a.v + t * edgeV - point.v);
+}
+
 function buildDieMesh(die: VisualDie, dieColor: string, labelColor: string): Mesh {
   const data = dieGeometry(die.shape);
   const positions: number[] = [];
   const uvs: number[] = [];
+  const fits: number[] = [];
   const geometry = new BufferGeometry();
   let vertexCursor = 0;
   data.faces.forEach((face, faceIndex) => {
@@ -92,21 +172,29 @@ function buildDieMesh(die: VisualDie, dieColor: string, labelColor: string): Mes
       const offset = subtract(corner as [number, number, number], origin);
       return { u: dot(offset, basis.u), v: dot(offset, basis.v) };
     });
-    const uMin = Math.min(...projected.map((p) => p.u));
-    const uMax = Math.max(...projected.map((p) => p.u));
-    const vMin = Math.min(...projected.map((p) => p.v));
-    const vMax = Math.max(...projected.map((p) => p.v));
-    const span = Math.max(uMax - uMin, vMax - vMin) || 1;
-    // Shrink toward the face center so the label stays inside the face.
-    const toUv = (p: { u: number; v: number }): [number, number] => [
-      0.5 + (0.7 * (p.u - (uMin + uMax) / 2)) / span,
-      0.5 + (0.7 * (p.v - (vMin + vMax) / 2)) / span,
+    // Centre on the polygon's centroid, not its bounding box: on a triangle
+    // those differ, and the numeral would drift off the face.
+    const centroid: Point2 = {
+      u: projected.reduce((sum, p) => sum + p.u, 0) / projected.length,
+      v: projected.reduce((sum, p) => sum + p.v, 0) / projected.length,
+    };
+    const radius =
+      Math.max(...projected.map((p) => Math.hypot(p.u - centroid.u, p.v - centroid.v))) || 1;
+    const inradius = Math.min(
+      ...projected.map((p, index) =>
+        distanceToEdge(centroid, p, projected[(index + 1) % projected.length] ?? p),
+      ),
+    );
+    fits[faceIndex] = Math.min(1, Math.max(0.25, inradius / radius));
+    const toUv = (p: Point2): [number, number] => [
+      0.5 + (0.5 * (p.u - centroid.u)) / radius,
+      0.5 + (0.5 * (p.v - centroid.v)) / radius,
     ];
     const triangleCount = face.length - 2;
     for (let i = 0; i < triangleCount; i++) {
       for (const cornerIndex of [0, i + 1, i + 2]) {
         const corner = corners[cornerIndex];
-        const uv = toUv(projected[cornerIndex] ?? { u: 0, v: 0 });
+        const uv = toUv(projected[cornerIndex] ?? centroid);
         if (corner) positions.push(...corner);
         uvs.push(...uv);
       }
@@ -117,35 +205,31 @@ function buildDieMesh(die: VisualDie, dieColor: string, labelColor: string): Mes
   geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
   geometry.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
   geometry.computeVertexNormals();
-  const materials = data.faces.map(
-    (_, faceIndex) =>
-      new MeshStandardMaterial({
-        map: labelTexture(die.labels[faceIndex] ?? "", dieColor, labelColor),
-        roughness: 0.4,
-        metalness: 0.1,
-        side: DoubleSide,
-        transparent: !die.kept,
-        opacity: die.kept ? 1 : 0.35,
-      }),
+  const materials = data.faces.map((_, faceIndex) =>
+    dieMaterial(
+      labelTexture(die.labels[faceIndex] ?? "", dieColor, labelColor, fits[faceIndex] ?? 0.7),
+    ),
   );
-  return new Mesh(geometry, materials);
+  const mesh = new Mesh(geometry, materials);
+  mesh.castShadow = true;
+  mesh.userData.ownsGeometry = true;
+  return mesh;
 }
 
 function buildCoinMesh(coin: VisualCoin, dieColor: string, labelColor: string): Mesh {
   const geometry = new CylinderGeometry(1.3, 1.3, 0.22, 48);
-  const side = new MeshStandardMaterial({ color: dieColor, roughness: 0.35, metalness: 0.4 });
-  const heads = new MeshStandardMaterial({
-    map: labelTexture("H", dieColor, labelColor),
+  const rim = new MeshPhysicalMaterial({
+    color: dieColor,
     roughness: 0.35,
-    metalness: 0.4,
+    metalness: 0.35,
+    clearcoat: 0.5,
   });
-  const tails = new MeshStandardMaterial({
-    map: labelTexture("T", dieColor, labelColor),
-    roughness: 0.35,
-    metalness: 0.4,
-  });
+  const heads = dieMaterial(labelTexture("H", dieColor, labelColor, 0.7));
+  const tails = dieMaterial(labelTexture("T", dieColor, labelColor, 0.7));
   // CylinderGeometry material order: side, top, bottom.
-  const mesh = new Mesh(geometry, [side, heads, tails]);
+  const mesh = new Mesh(geometry, [rim, heads, tails]);
+  mesh.castShadow = true;
+  mesh.userData.ownsGeometry = true;
   mesh.userData.finalOrientation =
     coin.outcome === "heads"
       ? new Quaternion()
@@ -155,7 +239,7 @@ function buildCoinMesh(coin: VisualCoin, dieColor: string, labelColor: string): 
 
 /**
  * Final die orientation: the resolved face up, then yawed so its label reads
- * upright from the default camera position.
+ * upright from the camera.
  */
 function finalDieOrientation(die: VisualDie): Quaternion {
   const upright = faceUpQuaternion(die.shape, die.face);
@@ -169,14 +253,19 @@ function finalDieOrientation(die: VisualDie): Quaternion {
   return new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), yaw).multiply(upright);
 }
 
-type AnimatedMesh = {
-  readonly mesh: Object3D;
+type DieEntry = {
+  readonly object: Object3D;
   readonly finalOrientation: Quaternion;
   readonly restingPosition: Vector3;
+  readonly baseScale: Vector3;
   readonly startQuaternion: Quaternion;
   readonly tumbleAxis: Vector3;
   readonly tumbleSpeed: number;
   readonly delayMs: number;
+  readonly kept: boolean;
+  /** Materials this scene owns and may recolor when revealing dropped dice. */
+  readonly dimMaterials: readonly MeshStandardMaterial[];
+  readonly baseColors: readonly Color[];
   handoff?: Quaternion;
 };
 
@@ -195,32 +284,101 @@ function layoutPosition(index: number, total: number): Vector3 {
   return new Vector3(x, 0, z);
 }
 
+function ownedMaterials(object: Object3D): MeshStandardMaterial[] {
+  const fromModel = object.userData.dimMaterials as MeshStandardMaterial[] | undefined;
+  if (fromModel) return fromModel;
+  const collected: MeshStandardMaterial[] = [];
+  object.traverse((child) => {
+    if (child instanceof Mesh) {
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      for (const material of materials) {
+        if (material instanceof MeshStandardMaterial) collected.push(material);
+      }
+    }
+  });
+  return collected;
+}
+
+/**
+ * Fades a dropped die back: it dims, desaturates, and shrinks slightly, staying
+ * visible so the roll can still be read. `progress` runs 0 (as rolled) to 1.
+ */
+function applyDropReveal(entry: DieEntry, progress: number): void {
+  const k = easeOutCubic(clamp01(progress));
+  entry.object.scale.copy(entry.baseScale).multiplyScalar(1 - 0.16 * k);
+  entry.dimMaterials.forEach((material, index) => {
+    const base = entry.baseColors[index];
+    if (base) material.color.copy(base).lerp(new Color(0x11131a), 0.62 * k);
+    material.transparent = k > 0.001;
+    material.opacity = 1 - 0.42 * k;
+    material.needsUpdate = true;
+  });
+}
+
 export function createWebglBackend(options: WebglBackendOptions): PresenterBackend {
-  const { container, dieColor, labelColor } = options;
+  const { container, dieColor, labelColor, models } = options;
   const renderer = new WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio ?? 1, 2));
   const width = container.clientWidth || 640;
   const height = container.clientHeight || 360;
   renderer.setSize(width, height);
+  renderer.toneMappingExposure = 1.1;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = PCFSoftShadowMap;
   renderer.domElement.dataset.diceforge = "webgl-presenter";
   container.append(renderer.domElement);
 
   const scene = new Scene();
-  const camera = new PerspectiveCamera(42, width / height, 0.1, 100);
-  camera.position.set(0, 8.5, 8.5);
-  camera.lookAt(0, 0, 0);
-  scene.add(new AmbientLight(0xffffff, 0.9));
-  const keyLight = new DirectionalLight(0xffffff, 1.6);
-  keyLight.position.set(4, 9, 6);
+  const camera = new PerspectiveCamera(42, width / height, 0.1, 200);
+  let elevationDeg = TOP_DOWN_ELEVATION;
+  let framedRadius = DIE_RADIUS * 2;
+
+  scene.add(new HemisphereLight(0xdfe8ff, 0x30323a, 1.15));
+  scene.add(new AmbientLight(0xffffff, 0.25));
+  const keyLight = new DirectionalLight(0xffffff, 2.1);
+  keyLight.position.set(5, 12, 6);
+  keyLight.castShadow = true;
+  keyLight.shadow.mapSize.set(1024, 1024);
+  keyLight.shadow.camera.near = 1;
+  keyLight.shadow.camera.far = 60;
+  keyLight.shadow.camera.left = -16;
+  keyLight.shadow.camera.right = 16;
+  keyLight.shadow.camera.top = 16;
+  keyLight.shadow.camera.bottom = -16;
+  keyLight.shadow.bias = -0.0012;
   scene.add(keyLight);
+  const rimLight = new DirectionalLight(0xa9c7ff, 0.7);
+  rimLight.position.set(-6, 4, -7);
+  scene.add(rimLight);
+
+  // Catches a soft contact shadow so dice read as resting on a surface.
+  const ground = new Mesh(new PlaneGeometry(120, 120), new ShadowMaterial({ opacity: 0.26 }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -DIE_RADIUS;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
   const diceGroup = new Group();
   scene.add(diceGroup);
+
+  /** Places the camera so the whole layout fits, at the given elevation. */
+  function frameCamera(): void {
+    const vertical = (camera.fov * Math.PI) / 180;
+    const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * camera.aspect);
+    const fit = Math.min(vertical, horizontal);
+    const distance = Math.max((framedRadius * 1.12) / Math.tan(fit / 2), 6.5);
+    const angle = (elevationDeg * Math.PI) / 180;
+    camera.position.set(0, distance * Math.sin(angle), distance * Math.cos(angle));
+    camera.lookAt(0, 0, 0);
+  }
+  frameCamera();
 
   const handleResize = (): void => {
     const nextWidth = container.clientWidth || width;
     const nextHeight = container.clientHeight || height;
     camera.aspect = nextWidth / nextHeight;
     camera.updateProjectionMatrix();
+    frameCamera();
     renderer.setSize(nextWidth, nextHeight);
     renderer.render(scene, camera);
   };
@@ -232,39 +390,36 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
   function clearDice(): void {
     for (const child of [...diceGroup.children]) {
       diceGroup.remove(child);
-      // Model instances share geometry/materials with the loader cache; only
-      // dispose resources this scene owns (procedural meshes and the dimmed
-      // material clones created for dropped dice).
-      const dimmed = child.userData.disposeMaterials as Material[] | undefined;
-      if (dimmed) {
-        for (const material of dimmed) material.dispose();
-        continue;
-      }
-      if (child instanceof Mesh) {
-        child.geometry.dispose();
-        const materials = Array.isArray(child.material) ? child.material : [child.material];
-        for (const material of materials) {
-          if (material instanceof MeshStandardMaterial) material.map?.dispose();
-          material.dispose();
-        }
-      }
+      // Model instances share cached geometry and textures with the loader;
+      // dispose only what this scene created.
+      child.traverse((node) => {
+        if (!(node instanceof Mesh)) return;
+        if (node.userData.ownsGeometry) node.geometry.dispose();
+      });
+      for (const material of ownedMaterials(child)) material.dispose();
     }
   }
 
-  function animate(animated: readonly AnimatedMesh[], context: PresentContext): Promise<void> {
+  function animate(entries: readonly DieEntry[], context: PresentContext): Promise<void> {
     cancelActive?.();
     if (context.signal?.aborted) return Promise.reject(abortError());
+    const settle = (entry: DieEntry): void => {
+      entry.object.quaternion.copy(entry.finalOrientation);
+      entry.object.position.copy(entry.restingPosition);
+      if (!entry.kept) applyDropReveal(entry, 1);
+    };
     if (context.motion === "reduce") {
-      for (const entry of animated) {
-        entry.mesh.quaternion.copy(entry.finalOrientation);
-        entry.mesh.position.copy(entry.restingPosition);
-      }
+      for (const entry of entries) settle(entry);
       renderer.render(scene, camera);
       return Promise.resolve();
     }
     return new Promise<void>((resolve, reject) => {
       const started = performance.now();
-      const totalMs = BASE_DURATION_MS + STAGGER_MS * Math.max(0, animated.length - 1) + 150;
+      const landedAt =
+        BASE_DURATION_MS + STAGGER_MS * Math.max(0, entries.length - 1) + SETTLE_TAIL_MS;
+      const hasDropped = entries.some((entry) => !entry.kept);
+      const revealAt = landedAt + REVEAL_HOLD_MS;
+      const endsAt = hasDropped ? revealAt + REVEAL_MS : landedAt;
       let onAbort: (() => void) | undefined;
       const finish = (error?: Error): void => {
         cancelAnimationFrame(activeFrame);
@@ -280,28 +435,29 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
       }
       const frame = (now: number): void => {
         const elapsed = now - started;
-        for (const entry of animated) {
-          const local = Math.min(Math.max((elapsed - entry.delayMs) / BASE_DURATION_MS, 0), 1);
-          entry.mesh.position.copy(entry.restingPosition);
-          entry.mesh.position.y = entry.restingPosition.y + 5 * (1 - easeOutCubic(local));
+        for (const entry of entries) {
+          const local = clamp01((elapsed - entry.delayMs) / BASE_DURATION_MS);
+          entry.object.position.copy(entry.restingPosition);
+          entry.object.position.y = entry.restingPosition.y + 5 * (1 - easeOutCubic(local));
           if (local < TUMBLE_PORTION) {
             const spin = new Quaternion().setFromAxisAngle(
               entry.tumbleAxis,
               entry.tumbleSpeed * local,
             );
-            entry.mesh.quaternion.copy(spin.multiply(entry.startQuaternion));
+            entry.object.quaternion.copy(spin.multiply(entry.startQuaternion));
           } else {
-            if (!entry.handoff) entry.handoff = entry.mesh.quaternion.clone();
-            const settle = easeOutCubic((local - TUMBLE_PORTION) / (1 - TUMBLE_PORTION));
-            entry.mesh.quaternion.copy(entry.handoff.clone().slerp(entry.finalOrientation, settle));
+            if (!entry.handoff) entry.handoff = entry.object.quaternion.clone();
+            const t = easeOutCubic((local - TUMBLE_PORTION) / (1 - TUMBLE_PORTION));
+            entry.object.quaternion.copy(entry.handoff.clone().slerp(entry.finalOrientation, t));
+          }
+          // Dropped dice look exactly like the rest until every die has landed.
+          if (hasDropped && !entry.kept && elapsed > revealAt) {
+            applyDropReveal(entry, (elapsed - revealAt) / REVEAL_MS);
           }
         }
         renderer.render(scene, camera);
-        if (elapsed >= totalMs) {
-          for (const entry of animated) {
-            entry.mesh.quaternion.copy(entry.finalOrientation);
-            entry.mesh.position.copy(entry.restingPosition);
-          }
+        if (elapsed >= endsAt) {
+          for (const entry of entries) settle(entry);
           renderer.render(scene, camera);
           finish();
           return;
@@ -312,14 +468,25 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
     });
   }
 
-  function toAnimated(mesh: Object3D, finalOrientation: Quaternion, index: number, total: number) {
+  function toEntry(
+    object: Object3D,
+    finalOrientation: Quaternion,
+    index: number,
+    total: number,
+    kept: boolean,
+  ): DieEntry {
     const restingPosition = layoutPosition(index, total);
-    mesh.position.copy(restingPosition);
-    diceGroup.add(mesh);
+    object.position.copy(restingPosition);
+    object.traverse((node) => {
+      if (node instanceof Mesh) node.castShadow = true;
+    });
+    diceGroup.add(object);
+    const dimMaterials = kept ? [] : ownedMaterials(object);
     return {
-      mesh,
+      object,
       finalOrientation,
       restingPosition,
+      baseScale: object.scale.clone(),
       startQuaternion: new Quaternion().setFromAxisAngle(
         randomUnitVector(),
         Math.random() * Math.PI * 2,
@@ -327,10 +494,11 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
       tumbleAxis: randomUnitVector(),
       tumbleSpeed: 9 + Math.random() * 5,
       delayMs: index * STAGGER_MS,
-    } satisfies AnimatedMesh;
+      kept,
+      dimMaterials,
+      baseColors: dimMaterials.map((material) => material.color.clone()),
+    };
   }
-
-  const { models } = options;
 
   async function resolveDieObject(
     die: VisualDie,
@@ -341,7 +509,7 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
       const model = url ? await loadDieModel(url) : null;
       if (model && tuple) {
         return {
-          object: instantiateDieModel(model, die.kept),
+          object: instantiateDieModel(model, !die.kept),
           final: new Quaternion(tuple[0], tuple[1], tuple[2], tuple[3]),
         };
       }
@@ -355,16 +523,29 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
       // result stays visible until the new roll is ready to animate.
       const resolved = await Promise.all(dice.map((die) => resolveDieObject(die)));
       clearDice();
-      const animated = resolved.map((entry, index) =>
-        toAnimated(entry.object, entry.final, index, dice.length),
+      const entries = resolved.map((entry, index) =>
+        toEntry(entry.object, entry.final, index, dice.length, dice[index]?.kept ?? true),
       );
-      return animate(animated, context);
+      // A d4 shows its value on the side, so only an all-d4 roll gets the low
+      // angled view; anything else is read from above.
+      elevationDeg = dice.every((die) => die.shape === 4) ? ANGLED_ELEVATION : TOP_DOWN_ELEVATION;
+      framedRadius =
+        entries.reduce(
+          (max, entry) =>
+            Math.max(max, Math.hypot(entry.restingPosition.x, entry.restingPosition.z)),
+          0,
+        ) + DIE_RADIUS;
+      frameCamera();
+      return animate(entries, context);
     },
     presentCoin(coin, context) {
       clearDice();
       const mesh = buildCoinMesh(coin, dieColor, labelColor);
       const finalOrientation = mesh.userData.finalOrientation as Quaternion;
-      return animate([toAnimated(mesh, finalOrientation, 0, 1)], context);
+      elevationDeg = TOP_DOWN_ELEVATION;
+      framedRadius = DIE_RADIUS;
+      frameCamera();
+      return animate([toEntry(mesh, finalOrientation, 0, 1, true)], context);
     },
     dispose() {
       cancelActive?.();

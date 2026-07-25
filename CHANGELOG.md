@@ -12,9 +12,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `kayKitTheme({ baseUrl, color })` for the KayKit Board Game Bits dice (CC0, Kay Lousberg) in red, blue, green, and yellow, covering d4, d6, d8, and d20. Assets live in `assets/` and are served by the host application; published packages remain code-only.
 - Theme picker in the browser demo, and a maintainer calibration tool (`examples/web-demo/calibrate.html`) that derives face tables and re-renders from the shipped table to verify them.
 
+- KayKit d6 pip styles: `kayKitTheme({ d6Style: "pips-a" | "pips-b" })` alongside the default printed numerals, with their own calibrated face table.
+
 ### Changed
 
+- Dropped dice are now revealed only after the whole roll has landed: they tumble looking identical to every other die, then dim, desaturate, and shrink once the result is visible. Previously they were drawn translucent from the first frame, which gave the outcome away before the dice settled.
+- The camera now frames the whole roll automatically and looks down steeply so the resolved face reads clearly; a roll made only of d4s keeps the lower angled view those dice are read from.
+- Procedural dice reworked: all shapes are scaled to a common size (a d8 no longer renders much smaller than a d20), numerals are centered on each face's centroid and sized to fit inside it (they previously drifted off triangular faces), and lighting, materials, and default colors were redone for a brighter, legible look with a contact shadow.
 - Both example apps now resolve workspace packages to source, so a demo can never run against a stale `dist` build.
+
+### Fixed
+
+- Procedural die labels could sit partly off a triangular face, and each shape rendered at a different physical size.
 
 ## [0.1.0] - 2026-07-25
 

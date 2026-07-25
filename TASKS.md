@@ -39,8 +39,9 @@ Remaining before tagging 0.1.0:
 - [ ] Custom dice definitions.
 - [ ] Notation extensions beyond grammar v1 (exploding dice, rerolls) via plugin contracts.
 - [x] Theme/asset pack policy and licensing checklist. (ADR-0010, `assets/LICENSES.md`, CONTRIBUTING)
-- [ ] Add the missing `boardgame_bits_texture.png` so the KayKit D6_A/D6_B pip styles can be offered.
+- [x] Add the missing `boardgame_bits_texture.png` so the KayKit D6_A/D6_B pip styles can be offered. (`d6Style: "pips-a" | "pips-b"`)
 - [ ] Calibrate d10/d12 models so themes can cover every shape.
+- [ ] Give procedural dice beveled edges, or retire them if every shape gains a model set.
 - [ ] Replay support.
 - [ ] Optional multiplayer transport plugin research.
 - [ ] Browser-based visual regression testing for the renderer.
