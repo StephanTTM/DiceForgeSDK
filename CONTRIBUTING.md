@@ -16,9 +16,21 @@ Thanks for contributing. DiceForge values small, well-tested changes that make c
 - Keep changes narrowly scoped and explain user-facing impact.
 - Preserve deterministic behavior and serialization compatibility, or document a deliberate change.
 
-## Development workflow (to be finalized)
+## Development workflow
 
-The initial implementation will define the exact package manager and commands. Until then, do not invent commands in documentation or automation. The expected quality gates are type checking, linting, formatting, unit tests, and integration/conformance tests for adapters.
+The workspace uses npm (ships with Node >= 20), Vitest, Biome, and plain `tsc` (ADR-0004). From the repository root:
+
+```bash
+npm ci                 # install exact locked dependencies
+npm run check          # Biome lint + format check
+npm run format         # apply Biome formatting
+npm run typecheck      # TypeScript, no emit
+npm test               # Vitest (npm run test:coverage for coverage)
+npm run build          # compile @diceforge/core to packages/core/dist
+npm run example        # build, then run the headless example
+```
+
+All of these must pass before a pull request; CI runs the same gates on Node 20 and 24. Seeded-RNG golden tests lock the reproducibility contract — never update those constants without a superseding ADR (see ADR-0005).
 
 ## Pull requests
 

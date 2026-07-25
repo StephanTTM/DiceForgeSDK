@@ -12,31 +12,31 @@ DiceForge SDK is an open-source, offline-first toolkit for deterministic dice ro
 - **Visuals are optional** — resolve a trustworthy headless result, then animate that result when a renderer is available.
 - **Extensible by design** — physics, renderers, dice definitions, themes, audio, and integrations are replaceable plugins.
 
-## Planned capabilities
+## Implemented today (`@diceforge/core`)
 
-- Standard polyhedral dice: d4, d6, d8, d10, d12, d20, and percentile dice.
-- Dice notation and roll policies such as modifiers, keep/drop, advantage, and deterministic seeds.
-- Coin flips, including a headless resolver and optional animated presentation.
-- Adapters for web first, followed by Unity and Godot.
-- Record/replay data for debugging, animation, and later synchronization providers.
+- Standard polyhedral dice — d4, d6, d8, d10, d12, d20, d100/percentile — plus coin flips, resolved fully headlessly.
+- Dice notation with modifiers and keep/drop (`2d20kh1+3` for advantage, `4d6dl1`, `d%`), with positioned parse errors.
+- Injected randomness: a reproducible seeded source (same seed ⇒ same results on every platform) and a non-seeded system source, with provenance recorded in every result.
+- Immutable, schema-versioned event records with validating JSON serialization for storage, replay, and future presentation.
 
-## Conceptual API
+Planned next: a web adapter and 3D renderer plugin, then Unity and Godot adapters. See [ROADMAP.md](ROADMAP.md).
+
+## Quick start (headless)
 
 ```ts
-const engine = createDiceEngine({ rng: seededRng("table-42") });
+import { createDiceEngine, createSeededRandomSource } from "@diceforge/core";
 
-const roll = engine.roll("2d20kh1+3");
-const flip = engine.flipCoin();
+const engine = createDiceEngine({ random: createSeededRandomSource("table-42") });
 
-// A renderer may later present the already-resolved event.
-await presenter.present(roll);
+const roll = engine.roll("2d20kh1+3"); // { total, groups, provenance, ... } — frozen and serializable
+const flip = engine.flipCoin();        // { outcome: "heads" | "tails", ... }
 ```
 
-The public API is illustrative until the first release. See [API.md](API.md) for design direction.
+A runnable version lives in [examples/headless/main.mjs](examples/headless/main.mjs) (`npm run example`). Full contracts, the notation grammar, and determinism guarantees are documented in [API.md](API.md).
 
 ## Project status
 
-The repository is in the foundation phase. Interfaces and package names may change before the first public release. See [ROADMAP.md](ROADMAP.md) and [TASKS.md](TASKS.md).
+The 0.1.0 foundation core is implemented with tests and CI, but not yet published to npm; interfaces may change before the first public release. To use it today, build from source (`npm ci && npm run build`). See [ROADMAP.md](ROADMAP.md) and [TASKS.md](TASKS.md).
 
 ## Repository guides
 

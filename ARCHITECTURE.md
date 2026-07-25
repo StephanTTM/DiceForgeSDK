@@ -46,17 +46,17 @@ Seeded RNG providers must produce reproducible core results. Presentation physic
 
 ```text
 packages/
-  core/                 rules, notation, resolver, event schemas
-  plugin-contracts/     optional extension interfaces
-  renderer-web/         web rendering integration
-  adapter-unity/        Unity-facing integration
-  adapter-godot/        Godot-facing integration
-  testing/              test fixtures and conformance suites
-examples/               minimal, runnable integration examples
-docs/                   user and contributor documentation
+  core/                 rules, notation, resolver, event schemas   [implemented]
+  plugin-contracts/     optional extension interfaces              [future]
+  renderer-web/         web rendering integration                  [future]
+  adapter-unity/        Unity-facing integration                   [future]
+  adapter-godot/        Godot-facing integration                   [future]
+  testing/              test fixtures and conformance suites       [future]
+examples/               minimal, runnable integration examples     [headless example implemented]
+docs/                   user and contributor documentation         [future]
 ```
 
-This is a target structure, not a reason to create empty packages prematurely.
+This is a target structure, not a reason to create empty packages prematurely. `packages/core` (npm workspace `@diceforge/core`) ships the ADR-0004 toolchain: ESM-only `tsc` output, Vitest tests colocated as `*.test.ts`, Biome lint/format.
 
 ## Compatibility rules
 
