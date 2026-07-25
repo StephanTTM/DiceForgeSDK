@@ -1,0 +1,36 @@
+{
+  "name": "@diceforge/core",
+  "version": "0.1.0",
+  "description": "Headless, renderer-agnostic dice and coin-flip engine with seedable RNG, dice notation, and schema-versioned event records.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "dice",
+    "rng",
+    "seeded",
+    "deterministic",
+    "tabletop",
+    "coin-flip",
+    "headless"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run"
+  }
+}

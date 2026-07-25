@@ -29,6 +29,15 @@ This log records decisions that materially affect architecture, public contracts
 - **Consequences:** Plugin architecture remains general, but no speculative support for cards, tiles, or spinners is built initially.
 - **Alternatives considered:** A broad tabletop interaction engine from the outset.
 
+## ADR-0004: npm workspaces, Vitest, Biome, and ESM-only tsc builds
+
+- **Date:** 2026-07-25
+- **Status:** Accepted
+- **Decision:** The TypeScript monorepo uses npm workspaces (no separate monorepo task runner), Vitest for tests and coverage, Biome for linting and formatting, and plain `tsc` producing ESM-only output with type declarations. Supported runtime is Node.js >= 20 for tooling and any ES2022 JavaScript environment for the core package.
+- **Rationale:** npm ships with Node, keeps contributor setup to `npm ci`, and its publish workflow is a plain `npm publish`. Unity and Godot adapters will not be npm packages, so a heavier monorepo tool buys nothing today. Vitest and Biome minimize configuration and dependencies while covering tests, coverage, lint, and format. ESM-only output matches modern bundlers and Node without dual-package complexity.
+- **Consequences:** Contributors need no global tooling beyond Node and npm. If the workspace later gains many interdependent packages, a task runner (or pnpm) can be adopted via a superseding ADR. CommonJS consumers must use dynamic `import()` or a bundler.
+- **Alternatives considered:** pnpm workspaces (stricter isolation but extra install step); Turborepo/Nx (premature for one package); ESLint + Prettier (more configuration and dependencies); dual CJS/ESM builds (complexity without a current consumer).
+
 ## ADR template
 
 ```md
