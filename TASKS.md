@@ -27,9 +27,9 @@ Remaining before tagging 0.1.0:
 
 ## Next: toward 0.2.0 completion
 
-- [ ] Add one popular-framework example (React) consuming `@diceforge-sdk/renderer-web`.
+- [x] Add one popular-framework example (React) consuming `@diceforge-sdk/renderer-web`. (`examples/react-demo`)
 - [ ] Theme/asset loading as an optional presentation concern (with the licensing checklist below).
-- [ ] Decide the npm publish pipeline and publish `@diceforge-sdk/core` + `@diceforge-sdk/renderer-web` together.
+- [ ] Publish 0.1.0: pipeline and scaffolding are in place (ADR-0009); the two `npm publish` commands need a maintainer's interactive 2FA approval. Afterwards: tag `v0.1.0`, configure npm trusted publishing for both packages, and check this off.
 
 ## Backlog
 

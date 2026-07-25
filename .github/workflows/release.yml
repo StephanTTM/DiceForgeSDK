@@ -37,5 +37,15 @@ jobs:
               echo "::error::$PKG is $VERSION but tag is $TAG"; exit 1
             fi
           done
-      - run: npm publish --workspace @diceforge-sdk/core --provenance --access public
-      - run: npm publish --workspace @diceforge-sdk/renderer-web --provenance --access public
+      - name: Publish packages (idempotent per version)
+        run: |
+          set -e
+          for DIR in packages/core packages/renderer-web; do
+            NAME=$(node -p "require('./$DIR/package.json').name")
+            VERSION=$(node -p "require('./$DIR/package.json').version")
+            if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+              echo "$NAME@$VERSION already on the registry - skipping"
+            else
+              npm publish --workspace "$NAME" --provenance --access public
+            fi
+          done
