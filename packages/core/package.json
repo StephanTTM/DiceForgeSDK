@@ -4,6 +4,16 @@
   "description": "Headless, renderer-agnostic dice and coin-flip engine with seedable RNG, dice notation, and schema-versioned event records.",
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StephanTTM/DiceForgeSDK.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/StephanTTM/DiceForgeSDK#readme",
+  "bugs": "https://github.com/StephanTTM/DiceForgeSDK/issues",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

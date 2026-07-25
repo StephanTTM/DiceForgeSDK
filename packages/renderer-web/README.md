@@ -2,7 +2,11 @@
 
 Browser presenter for DiceForge. Renders already-resolved `@diceforge-sdk/core` events as 3D dice (Three.js) or accessible DOM tiles — it never decides or modifies outcomes (ADR-0007).
 
-Stability: **experimental (pre-0.2 release)**. Not yet published to npm; build from source at the repository root (`npm ci && npm run build`).
+Stability: **experimental (pre-1.0)** — minor versions may change APIs.
+
+```bash
+npm install @diceforge-sdk/renderer-web @diceforge-sdk/core
+```
 
 ## Usage
 

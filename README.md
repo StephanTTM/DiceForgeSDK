@@ -24,6 +24,10 @@ Planned next: a popular-framework example and theme support, then Unity and Godo
 
 ## Quick start (headless)
 
+```bash
+npm install @diceforge-sdk/core
+```
+
 ```ts
 import { createDiceEngine, createSeededRandomSource } from "@diceforge-sdk/core";
 
@@ -37,7 +41,7 @@ A runnable version lives in [examples/headless/main.mjs](examples/headless/main.
 
 ## Project status
 
-The 0.1.0 foundation core is implemented with tests and CI, but not yet published to npm; interfaces may change before the first public release. To use it today, build from source (`npm ci && npm run build`). See [ROADMAP.md](ROADMAP.md) and [TASKS.md](TASKS.md).
+Version 0.1.0 is published to npm as [`@diceforge-sdk/core`](https://www.npmjs.com/package/@diceforge-sdk/core) and [`@diceforge-sdk/renderer-web`](https://www.npmjs.com/package/@diceforge-sdk/renderer-web). APIs are experimental pre-1.0 and may change between minor versions; serialized records carry a `schemaVersion` for compatibility. See [ROADMAP.md](ROADMAP.md) and [TASKS.md](TASKS.md).
 
 ## Repository guides
 

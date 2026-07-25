@@ -1,0 +1,41 @@
+name: Release
+
+# Publishes @diceforge-sdk/core and @diceforge-sdk/renderer-web when a version
+# tag (v*) is pushed. Both packages release together at the same version
+# (ADR-0009). Authentication uses npm trusted publishing (GitHub OIDC), which
+# must be configured in each package's npmjs.com settings; provenance links
+# the published artifacts to this workflow run.
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run check
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run build
+      - name: Verify tag matches package versions
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          for PKG in packages/core packages/renderer-web; do
+            VERSION=$(node -p "require('./$PKG/package.json').version")
+            if [ "$VERSION" != "$TAG" ]; then
+              echo "::error::$PKG is $VERSION but tag is $TAG"; exit 1
+            fi
+          done
+      - run: npm publish --workspace @diceforge-sdk/core --provenance --access public
+      - run: npm publish --workspace @diceforge-sdk/renderer-web --provenance --access public

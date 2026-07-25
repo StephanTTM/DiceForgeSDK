@@ -4,6 +4,16 @@
   "description": "Browser presenter for DiceForge: Three.js 3D dice with outcome-first animation, DOM fallback, reduced-motion support, and accessible announcements.",
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StephanTTM/DiceForgeSDK.git",
+    "directory": "packages/renderer-web"
+  },
+  "homepage": "https://github.com/StephanTTM/DiceForgeSDK#readme",
+  "bugs": "https://github.com/StephanTTM/DiceForgeSDK/issues",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -33,7 +43,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@diceforge-sdk/core": "*",
+    "@diceforge-sdk/core": "^0.1.0",
     "three": "^0.182.0"
   },
   "devDependencies": {
