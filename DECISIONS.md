@@ -56,6 +56,24 @@ This log records decisions that materially affect architecture, public contracts
 - **Consequences:** Exotic notation (exploding dice, rerolls, custom dice) requires grammar extensions in the 0.3.0 plugin/extension milestone, not silent core growth. Old cores reject records from future schema versions cleanly rather than mis-rendering them.
 - **Alternatives considered:** Adopting a full existing dice-expression language (large surface, licensing/compatibility risk); arbitrary die sizes in v1 (blocks curated presentation and asset mapping); mutable result objects (invites presentation-layer outcome tampering).
 
+## ADR-0007: Web presentation via Three.js with outcome-first scripted animation
+
+- **Date:** 2026-07-25
+- **Status:** Accepted
+- **Decision:** The first renderer is `@diceforge/renderer-web`: Three.js (MIT) renders 3D dice, and a procedural tumble animation is constructed backward from the core-resolved outcome so every die always lands showing its recorded face. No physics engine is added; physics-based presentation remains a future plugin category. The package serves as both the first renderer plugin and the browser adapter until a split is justified. It ships graceful fallback tiers: WebGL 3D → DOM/2D rendering when WebGL is unavailable → instant results plus text announcements under reduced motion, with aria-live announcements always available.
+- **Rationale:** Animating toward a known outcome honors the architecture rule that presentation never decides results, by construction rather than by correction. Skipping a physics dependency keeps the first web integration small, deterministic to verify, and light for adopters. Three.js is the most widely adopted MIT web 3D library, kept strictly internal to the package (no Three types in public contracts).
+- **Consequences:** Dice motion is stylized rather than physically simulated; a future physics presenter plugin can offer realism behind the same `InteractionPresenter` contract. Splitting adapter and renderer into separate packages later requires only package reshuffling, not contract changes.
+- **Alternatives considered:** cannon-es/Rapier physics with final-orientation correction (heavier, corrective rather than constructive); Babylon.js (larger engine footprint); CSS/2D-only presentation (defers the SDK's 3D promise).
+
+## ADR-0008: Presenter contract lives in the core as type-only exports
+
+- **Date:** 2026-07-25
+- **Status:** Accepted
+- **Decision:** `InteractionPresenter`, `PresentationOptions`, and `AbortSignalLike` are defined in `@diceforge/core` as pure type exports (`packages/core/src/presentation.ts`). The core declares a structural `AbortSignalLike` instead of referencing the DOM `AbortSignal` so its type surface stays platform-free. A dedicated `@diceforge/plugin-contracts` package is created only when multiple plugin categories (physics, themes, audio, transport) need shared contracts.
+- **Rationale:** ARCHITECTURE.md places plugin contracts behind core-defined interfaces. A single small interface does not justify a new package (per the "no empty packages" rule), and type-only exports add zero runtime weight or dependencies to the core.
+- **Consequences:** Renderer packages depend on `@diceforge/core` for the contract, which they already need for event record types. If contracts grow, moving them to `@diceforge/plugin-contracts` is a re-export away and will be recorded in a superseding ADR.
+- **Alternatives considered:** A `plugin-contracts` package now (premature); defining the contract in each renderer (fragments the ecosystem); referencing DOM `AbortSignal` directly (drags platform libs into the core's types).
+
 ## ADR template
 
 ```md

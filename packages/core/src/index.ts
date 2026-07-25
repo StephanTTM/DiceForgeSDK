@@ -20,6 +20,11 @@ export {
   parseDiceNotation,
 } from "./notation/parser.js";
 export type {
+  AbortSignalLike,
+  InteractionPresenter,
+  PresentationOptions,
+} from "./presentation.js";
+export type {
   CoinFlipResult,
   DieOutcome,
   InteractionEvent,
