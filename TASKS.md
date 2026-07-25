@@ -15,7 +15,7 @@
 
 Remaining before tagging 0.1.0:
 
-- [ ] Push to a Git host and verify the CI workflow runs green on Node 20 and 24.
+- [x] Push to a Git host and verify the CI workflow runs green on Node 20 and 24. (github.com/StephanTTM/DiceForgeSDK, private until release readiness)
 - [ ] Decide the npm publish pipeline (scope ownership, provenance, release automation) and publish `@diceforge/core@0.1.0`.
 
 ## Next: web proof of integration
