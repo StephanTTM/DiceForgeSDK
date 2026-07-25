@@ -7,8 +7,10 @@ import {
   DoubleSide,
   Float32BufferAttribute,
   Group,
+  type Material,
   Mesh,
   MeshStandardMaterial,
+  type Object3D,
   PerspectiveCamera,
   Quaternion,
   Scene,
@@ -19,11 +21,16 @@ import {
 import type { PresentContext, PresenterBackend, VisualCoin, VisualDie } from "../backend.js";
 import { dieGeometry, dot, subtract } from "../math/geometry.js";
 import { faceBasis, faceUpQuaternion } from "../math/orientation.js";
+import type { DieModelSet } from "../theme.js";
+import { hasCalibratedModel } from "../theme.js";
+import { instantiateDieModel, loadDieModel } from "./models.js";
 
 export type WebglBackendOptions = {
   readonly container: HTMLElement;
   readonly dieColor: string;
   readonly labelColor: string;
+  /** Optional theme models; shapes without a calibrated model render procedurally. */
+  readonly models?: DieModelSet | undefined;
 };
 
 const TUMBLE_PORTION = 0.6;
@@ -163,7 +170,7 @@ function finalDieOrientation(die: VisualDie): Quaternion {
 }
 
 type AnimatedMesh = {
-  readonly mesh: Mesh;
+  readonly mesh: Object3D;
   readonly finalOrientation: Quaternion;
   readonly restingPosition: Vector3;
   readonly startQuaternion: Quaternion;
@@ -225,6 +232,14 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
   function clearDice(): void {
     for (const child of [...diceGroup.children]) {
       diceGroup.remove(child);
+      // Model instances share geometry/materials with the loader cache; only
+      // dispose resources this scene owns (procedural meshes and the dimmed
+      // material clones created for dropped dice).
+      const dimmed = child.userData.disposeMaterials as Material[] | undefined;
+      if (dimmed) {
+        for (const material of dimmed) material.dispose();
+        continue;
+      }
       if (child instanceof Mesh) {
         child.geometry.dispose();
         const materials = Array.isArray(child.material) ? child.material : [child.material];
@@ -297,7 +312,7 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
     });
   }
 
-  function toAnimated(mesh: Mesh, finalOrientation: Quaternion, index: number, total: number) {
+  function toAnimated(mesh: Object3D, finalOrientation: Quaternion, index: number, total: number) {
     const restingPosition = layoutPosition(index, total);
     mesh.position.copy(restingPosition);
     diceGroup.add(mesh);
@@ -315,16 +330,33 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
     } satisfies AnimatedMesh;
   }
 
+  const { models } = options;
+
+  async function resolveDieObject(
+    die: VisualDie,
+  ): Promise<{ object: Object3D; final: Quaternion }> {
+    if (hasCalibratedModel(models, die.shape)) {
+      const url = models.urls[die.shape];
+      const tuple = models.faceRotations[die.shape]?.[die.face - 1];
+      const model = url ? await loadDieModel(url) : null;
+      if (model && tuple) {
+        return {
+          object: instantiateDieModel(model, die.kept),
+          final: new Quaternion(tuple[0], tuple[1], tuple[2], tuple[3]),
+        };
+      }
+    }
+    return { object: buildDieMesh(die, dieColor, labelColor), final: finalDieOrientation(die) };
+  }
+
   return {
-    presentDice(dice, context) {
+    async presentDice(dice, context) {
+      // Resolve models (network) before touching the scene so the previous
+      // result stays visible until the new roll is ready to animate.
+      const resolved = await Promise.all(dice.map((die) => resolveDieObject(die)));
       clearDice();
-      const animated = dice.map((die, index) =>
-        toAnimated(
-          buildDieMesh(die, dieColor, labelColor),
-          finalDieOrientation(die),
-          index,
-          dice.length,
-        ),
+      const animated = resolved.map((entry, index) =>
+        toAnimated(entry.object, entry.final, index, dice.length),
       );
       return animate(animated, context);
     },

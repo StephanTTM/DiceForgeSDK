@@ -1,9 +1,9 @@
 import { fileURLToPath } from "node:url";
-import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [react()],
+  // Serve the repository's CC0 dice assets (assets/LICENSES.md) at the root,
+  // e.g. /D20_red.gltf, for the theme demo and the calibration page.
   publicDir: "../../assets",
   resolve: {
     // Run against workspace source, so the demo never shows a stale dist build.

@@ -83,6 +83,15 @@ This log records decisions that materially affect architecture, public contracts
 - **Consequences:** A version bump releases both packages even if one is unchanged — acceptable at this stage, revisit via ADR if the package count grows. Renaming the scope later would be a breaking change for consumers and would require a superseding ADR with migration notes.
 - **Alternatives considered:** Unscoped names like `diceforge-core` (no namespace ownership, squat-prone); a different scope such as `@diceforgejs` (weaker match to the project name); independent per-package versioning (premature bookkeeping); publishing manually forever (unreproducible, no provenance).
 
+## ADR-0010: Themes are data; asset packs stay outside published packages
+
+- **Date:** 2026-07-25
+- **Status:** Accepted
+- **Decision:** A `DiceTheme` is plain data — colors plus an optional `DieModelSet` of glTF URLs and a calibrated face-rotation table per shape. Themes never ship binary assets: published npm packages contain code only, and asset files live in the repository's `assets/` directory, served by the host application at a `baseUrl` the theme is given. A model is used only when its shape has **both** a URL and a complete rotation table (`hasCalibratedModel`); otherwise, and on any load failure, that die falls back to the built-in procedural geometry. Third-party assets require a license permitting redistribution, recorded in `assets/LICENSES.md` with author, source URL, retrieval date, and any conditions. The first bundled theme uses KayKit Board Game Bits (CC0, Kay Lousberg).
+- **Rationale:** Keeping assets out of the tarball keeps installs small and licensing auditable, and lets applications host, cache, or CDN their art as they choose. Requiring a calibrated table is what preserves architecture rule 5: a model may only present an outcome when we can prove which orientation shows which value, so presentation can never imply a face the core did not resolve. Per-shape granularity lets a partial pack (KayKit has no d10 or d12) coexist with procedural dice in the same roll.
+- **Consequences:** Theme authors must calibrate any new model set; the maintainer tool at `examples/web-demo/calibrate.html` derives the tables and re-renders from the shipped table to verify them, and unit tests assert each table maps every value to a distinct upward direction. Applications must serve the asset directory themselves — documented in the renderer README. Asset-bearing themes cannot be installed with `npm install` alone; if that becomes a burden, a separate opt-in asset package would need its own ADR.
+- **Alternatives considered:** Bundling models into `@diceforge-sdk/renderer-web` (bloats every install, entangles code and art licensing); auto-detecting face orientation at load time (unreliable — numerals live in textures, and a wrong guess would misreport an outcome); a texture-only theming system (cannot express real dice shapes); refusing to render shapes the pack lacks (worse than mixed presentation).
+
 ## ADR template
 
 ```md

@@ -28,7 +28,7 @@ Remaining before tagging 0.1.0:
 ## Next: toward 0.2.0 completion
 
 - [x] Add one popular-framework example (React) consuming `@diceforge-sdk/renderer-web`. (`examples/react-demo`)
-- [ ] Theme/asset loading as an optional presentation concern (with the licensing checklist below).
+- [x] Theme/asset loading as an optional presentation concern. (`DiceTheme` + lazy glTF models with calibrated face tables, KayKit CC0 pack — ADR-0010)
 - [x] Publish 0.1.0 to npm. (`@diceforge-sdk/core` + `@diceforge-sdk/renderer-web` live 2026-07-25; `v0.1.0` tagged; trusted publishing configured; release workflow verified green and idempotent — ADR-0009)
 
 ## Backlog
@@ -38,7 +38,9 @@ Remaining before tagging 0.1.0:
 - [ ] Godot adapter exploration and package distribution plan.
 - [ ] Custom dice definitions.
 - [ ] Notation extensions beyond grammar v1 (exploding dice, rerolls) via plugin contracts.
-- [ ] Theme/asset pack policy and licensing checklist.
+- [x] Theme/asset pack policy and licensing checklist. (ADR-0010, `assets/LICENSES.md`, CONTRIBUTING)
+- [ ] Add the missing `boardgame_bits_texture.png` so the KayKit D6_A/D6_B pip styles can be offered.
+- [ ] Calibrate d10/d12 models so themes can cover every shape.
 - [ ] Replay support.
 - [ ] Optional multiplayer transport plugin research.
 - [ ] Browser-based visual regression testing for the renderer.

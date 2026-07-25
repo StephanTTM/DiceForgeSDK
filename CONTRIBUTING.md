@@ -46,7 +46,9 @@ Maintainers may request an ADR for changes affecting the core boundary, plugin c
 
 ## Asset contributions
 
-Do not add third-party art, models, textures, or audio without a documented license that permits the intended redistribution. Include attribution and provenance where required. Keep optional assets out of the core package.
+Do not add third-party art, models, textures, or audio without a documented license that permits the intended redistribution. Record every pack in [`assets/LICENSES.md`](assets/LICENSES.md) with its author, source URL, license, retrieval date, and any conditions the author asks for. Assets live in `assets/` and are served by the host application; they are never bundled into a published npm package (ADR-0010).
+
+A theme that ships 3D models must include a calibrated face-rotation table so each value has a proven orientation — use the maintainer tool at `examples/web-demo/calibrate.html`, and verify with `?verify=1`, which re-renders from the shipped table so every cell can be checked against its expected value. Uncalibrated shapes must fall back to the built-in dice rather than guess.
 
 ## Community standards
 

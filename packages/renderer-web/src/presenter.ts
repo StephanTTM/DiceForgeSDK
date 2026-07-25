@@ -6,6 +6,7 @@ import { visualDiceForEvent } from "./backend.js";
 import type { MotionPreference, RenderMode, RenderModePreference } from "./capabilities.js";
 import { resolveMotion, resolveRenderMode } from "./capabilities.js";
 import { createDomBackend } from "./dom/backend.js";
+import type { DiceTheme } from "./theme.js";
 import { createWebglBackend } from "./webgl/backend.js";
 
 export type DicePresenterOptions = {
@@ -17,7 +18,12 @@ export type DicePresenterOptions = {
   readonly reducedMotion?: MotionPreference;
   /** Maintain an aria-live region announcing results. Default true. */
   readonly announceResults?: boolean;
-  /** Presentation colors; sensible dark-die defaults apply. */
+  /**
+   * Theme: colors plus optional lazily-loaded 3D models (WebGL mode only).
+   * Shapes without a calibrated model always render procedurally.
+   */
+  readonly theme?: DiceTheme;
+  /** Color overrides; take precedence over the theme's colors. */
   readonly colors?: { readonly die?: string; readonly label?: string };
 };
 
@@ -40,11 +46,11 @@ export function createDicePresenter(options: DicePresenterOptions): DicePresente
   }
   const doc = container.ownerDocument;
   const mode = resolveRenderMode(options.renderMode ?? "auto", doc);
-  const dieColor = options.colors?.die ?? "#2b2d42";
-  const labelColor = options.colors?.label ?? "#f8f9fa";
+  const dieColor = options.colors?.die ?? options.theme?.colors.die ?? "#2b2d42";
+  const labelColor = options.colors?.label ?? options.theme?.colors.label ?? "#f8f9fa";
   const backend =
     mode === "webgl"
-      ? createWebglBackend({ container, dieColor, labelColor })
+      ? createWebglBackend({ container, dieColor, labelColor, models: options.theme?.models })
       : createDomBackend({ container, dieColor, labelColor });
   const announcer = options.announceResults === false ? undefined : createAnnouncer(container);
   let disposed = false;

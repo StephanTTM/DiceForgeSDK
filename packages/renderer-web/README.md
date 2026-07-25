@@ -32,13 +32,33 @@ presenter.dispose();
 | `renderMode`      | `"auto" \| "webgl" \| "dom"`        | `"auto"` | `auto` uses WebGL when available, otherwise the DOM tile fallback.      |
 | `reducedMotion`   | `"auto" \| "animate" \| "reduce"`   | `"auto"` | `auto` honors the platform's `prefers-reduced-motion`.                  |
 | `announceResults` | `boolean`                           | `true`   | Maintain a visually hidden `aria-live` region announcing every result.  |
-| `colors`          | `{ die?: string; label?: string }`  | dark die | Die body and label colors.                                              |
+| `theme`           | `DiceTheme`                         | built-in | Colors plus optional 3D models (see Themes).                            |
+| `colors`          | `{ die?: string; label?: string }`  | theme    | Color overrides; take precedence over the theme.                        |
 
 `present(event, { signal })` accepts an `AbortSignal`; aborting rejects the promise with an `"AbortError"`-named error. A failed or aborted presentation never invalidates the resolved event.
 
 ## How outcomes stay authoritative
 
 Every record is re-validated (`validateEventRecord`) before display. Die meshes are built from shared polyhedron data, and the tumble animation hands off to a rotation that ends **exactly** at the resolved face's orientation — the outcome is honored by construction, not by reading the physics. Presentation motion is intentionally non-deterministic (ARCHITECTURE.md permits this); the record is the replayable truth.
+
+## Themes and 3D models (ADR-0010)
+
+A theme is plain data: colors, plus an optional set of glTF model URLs with a **calibrated face-rotation table** that says which orientation shows which value. Models load lazily on first use and are cached.
+
+```ts
+import { createDicePresenter, kayKitTheme } from "@diceforge-sdk/renderer-web";
+
+const presenter = createDicePresenter({
+  container,
+  theme: kayKitTheme({ baseUrl: "/dice-assets", color: "blue" }),
+});
+```
+
+**This package ships no art.** `baseUrl` points at wherever your app serves the model files from — copy them out of the repository's [`assets/`](../../assets) directory (or your own pack) and serve them statically. The bundled `kayKitTheme` expects the KayKit Board Game Bits files (CC0, Kay Lousberg; see [`assets/LICENSES.md`](../../assets/LICENSES.md)) at that base, in four colors: `red`, `blue`, `green`, `yellow`.
+
+Coverage is per shape: KayKit provides d4, d6, d8, and d20. A d10, d12, or percentile die in the same roll renders with the built-in procedural geometry in the theme's colors — mixed presentation is expected, not an error.
+
+Custom model sets implement `DieModelSet`. A model is used only when its shape has both a URL **and** a rotation table of exactly `shape` entries; anything else falls back to procedural dice, as does any load or parse failure. That rule is what keeps a model from ever showing a face the core did not resolve. To calibrate a new pack, use the maintainer tool at `examples/web-demo/calibrate.html` — it derives the table from the mesh, and `?verify=1` re-renders straight from the shipped table so each cell can be checked against its expected value.
 
 ## Fallback tiers
 
@@ -55,9 +75,10 @@ A `role="status"` / `aria-live="polite"` region announces results in plain langu
 ## Known presentation limitations (v0.2 scope)
 
 - Dice float and present the resolved face toward the camera; they are stylized, not physically simulated resting dice (a physics presenter is a future plugin category).
-- Face numbering uses the classic 1/6-opposite layout on the d6 only; other shapes number faces in construction order.
+- Built-in procedural dice use the classic 1/6-opposite layout on the d6 only; other shapes number faces in construction order.
 - Non-top face labels may appear rotated relative to their faces; the landing face is always yawed to read upright.
+- The KayKit d4 is read from the numeral at the base of the camera-facing side, the convention those models are numbered for.
 
 ## Compatibility
 
-ESM-only. Requires a DOM; WebGL is optional (see fallbacks). Depends on `three` (MIT) internally — no Three.js types appear in the public API, per the core boundary rules.
+ESM-only. Requires a DOM; WebGL is optional (see fallbacks). Depends on `three` (MIT) internally — no Three.js types appear in the public API, per the core boundary rules. The published package contains code only; art is never bundled (ADR-0010).

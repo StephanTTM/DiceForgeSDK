@@ -19,6 +19,7 @@ DiceForge SDK is an open-source, offline-first toolkit for deterministic dice ro
 - Injected randomness: a reproducible seeded source (same seed ⇒ same results on every platform) and a non-seeded system source, with provenance recorded in every result.
 - Immutable, schema-versioned event records with validating JSON serialization for storage, replay, and future presentation.
 - A browser presenter (`@diceforge-sdk/renderer-web`): Three.js 3D dice whose tumble always lands on the core-resolved face, with a no-WebGL DOM fallback, reduced-motion support, and aria-live announcements.
+- Optional themes: bring your own glTF dice models with a calibrated face table, or use the bundled KayKit theme (CC0 art, four colors). Art is never bundled into the packages.
 
 Planned next: a popular-framework example and theme support, then Unity and Godot adapters. See [ROADMAP.md](ROADMAP.md).
 
@@ -53,7 +54,9 @@ Version 0.1.0 is published to npm as [`@diceforge-sdk/core`](https://www.npmjs.c
 
 ## Assets and third-party content
 
-The SDK must remain usable without bundled proprietary assets. Any optional art (including potential KayKit Board Game Bits assets) must be added only after confirming its license, attribution requirements, redistribution rights, and repository policy. Keep asset packs separate from the platform-agnostic core.
+The SDK is fully usable with no assets at all: the built-in dice are generated procedurally. Optional art lives in [`assets/`](assets), is served by the host application, and is never bundled into a published package (ADR-0010). Every pack's license, author, and source is recorded in [`assets/LICENSES.md`](assets/LICENSES.md).
+
+The bundled theme uses [KayKit Board Game Bits](https://kaylousberg.itch.io/board-game-bits) by Kay Lousberg, released under CC0 (no attribution required — we credit it anyway).
 
 ## License
 

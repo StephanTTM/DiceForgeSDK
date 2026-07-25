@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Theming for `@diceforge-sdk/renderer-web`: `DiceTheme` carries colors plus an optional set of lazily-loaded glTF models with calibrated face-rotation tables, so a model only ever shows the face the core resolved (ADR-0010). Shapes without a calibrated model — and any asset that fails to load — fall back to the built-in procedural dice.
+- `kayKitTheme({ baseUrl, color })` for the KayKit Board Game Bits dice (CC0, Kay Lousberg) in red, blue, green, and yellow, covering d4, d6, d8, and d20. Assets live in `assets/` and are served by the host application; published packages remain code-only.
+- Theme picker in the browser demo, and a maintainer calibration tool (`examples/web-demo/calibrate.html`) that derives face tables and re-renders from the shipped table to verify them.
+
+### Changed
+
+- Both example apps now resolve workspace packages to source, so a demo can never run against a stale `dist` build.
+
 ## [0.1.0] - 2026-07-25
 
 First published release: `@diceforge-sdk/core` and `@diceforge-sdk/renderer-web` on npm (scope per ADR-0009).

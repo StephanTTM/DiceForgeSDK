@@ -101,10 +101,24 @@
           <option value="reduce">reduce</option>
         </select>
       </label>
+      <label>
+        Theme
+        <select id="theme">
+          <option value="">built-in (procedural)</option>
+          <option value="red">KayKit red</option>
+          <option value="blue">KayKit blue</option>
+          <option value="green">KayKit green</option>
+          <option value="yellow">KayKit yellow</option>
+        </select>
+      </label>
       <span class="hint" id="active-mode"></span>
     </div>
     <div id="stage"></div>
     <p id="status" role="presentation"></p>
+    <p class="hint">
+      KayKit themes cover d4, d6, d8, and d20; other shapes fall back to the built-in dice.
+      Model assets are CC0 by Kay Lousberg — see <code>assets/LICENSES.md</code>.
+    </p>
     <pre id="record"></pre>
     <script type="module" src="./main.ts"></script>
   </body>
