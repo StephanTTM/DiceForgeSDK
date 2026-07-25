@@ -15,7 +15,7 @@
   "scripts": {
     "check": "biome check .",
     "format": "biome format --write .",
-    "typecheck": "tsc -p packages/core/tsconfig.json --noEmit && tsc -p packages/renderer-web/tsconfig.json --noEmit",
+    "typecheck": "npm run build && tsc -p packages/core/tsconfig.json --noEmit && tsc -p packages/renderer-web/tsconfig.json --noEmit && tsc -p examples/web-demo/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "build": "tsc -p packages/core/tsconfig.build.json && tsc -p packages/renderer-web/tsconfig.build.json",

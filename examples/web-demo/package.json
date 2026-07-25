@@ -1,0 +1,12 @@
+{
+  "name": "diceforge-example-web-demo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Browser demo for DiceForge: 3D dice and coin flips with DOM and reduced-motion fallbacks.",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@diceforge/core": "*",
+    "@diceforge/renderer-web": "*"
+  }
+}

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DiceForge web demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 860px;
+        padding: 24px 16px;
+        line-height: 1.5;
+      }
+      h1 {
+        font-size: 1.4rem;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: end;
+        margin-bottom: 12px;
+      }
+      .controls label {
+        display: flex;
+        flex-direction: column;
+        font-size: 0.8rem;
+        gap: 4px;
+      }
+      input,
+      select,
+      button {
+        font: inherit;
+        padding: 6px 10px;
+      }
+      button {
+        cursor: pointer;
+      }
+      #stage {
+        position: relative;
+        height: 340px;
+        border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      #status {
+        min-height: 1.5em;
+        margin: 12px 0 4px;
+        font-weight: 600;
+      }
+      #record {
+        font-size: 0.75rem;
+        overflow-x: auto;
+        background: color-mix(in srgb, currentColor 8%, transparent);
+        padding: 12px;
+        border-radius: 8px;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .hint {
+        font-size: 0.8rem;
+        opacity: 0.75;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>DiceForge web demo</h1>
+    <p class="hint">
+      The headless core resolves every outcome first; the presenter only animates the
+      already-resolved record. Seeded rolls advance a reproducible sequence — re-enter the seed to
+      replay it from the start.
+    </p>
+    <div class="controls">
+      <label>
+        Notation
+        <input id="notation" value="2d20kh1+3" size="14" />
+      </label>
+      <label>
+        Seed (optional)
+        <input id="seed" placeholder="table-42" size="10" />
+      </label>
+      <button id="roll" type="button">Roll</button>
+      <button id="flip" type="button">Flip coin</button>
+      <label>
+        Renderer
+        <select id="mode">
+          <option value="auto">auto</option>
+          <option value="webgl">webgl</option>
+          <option value="dom">dom (fallback)</option>
+        </select>
+      </label>
+      <label>
+        Motion
+        <select id="motion">
+          <option value="auto">auto</option>
+          <option value="animate">animate</option>
+          <option value="reduce">reduce</option>
+        </select>
+      </label>
+      <span class="hint" id="active-mode"></span>
+    </div>
+    <div id="stage"></div>
+    <p id="status" role="presentation"></p>
+    <pre id="record"></pre>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

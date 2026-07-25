@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "noEmit": true,
+    "paths": {
+      "@diceforge/core": ["../../packages/core/src/index.ts"],
+      "@diceforge/renderer-web": ["../../packages/renderer-web/src/index.ts"]
+    }
+  },
+  "include": ["main.ts"]
+}
