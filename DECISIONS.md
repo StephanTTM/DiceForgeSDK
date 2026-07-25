@@ -47,6 +47,15 @@ This log records decisions that materially affect architecture, public contracts
 - **Consequences:** Replays, tests, and cross-device synchronization can rely on identical outcomes from identical seeds. Cryptographic unpredictability is explicitly **not** guaranteed for seeded sequences; provenance metadata records which source produced each result. Verifiable fairness remains future scope.
 - **Alternatives considered:** `Math.random` with no seeding (not reproducible); PCG32 (needs 64-bit emulation in JS); Mersenne Twister (large state, slower); float-based mulberry32 pipelines (risk of cross-engine drift).
 
+## ADR-0006: Dice notation grammar v1 and event schema v1
+
+- **Date:** 2026-07-25
+- **Status:** Accepted
+- **Decision:** Notation grammar v1 is `[sign] term { ("+"|"-") term }` where a term is an integer modifier or a dice group `[count]d(sides|%)` with optional `kh`/`kl`/`dh`/`dl` selection (count defaults to 1). It is case-insensitive and whitespace-tolerant; `d%` means d100; sides are restricted to {4, 6, 8, 10, 12, 20, 100}. Limits: 100 dice per group, 20 terms, modifiers up to 1,000,000, 500-character expressions, and at least one dice group per expression. Event records (`RollResult`, `CoinFlipResult`) carry `schemaVersion: 1`, are deeply frozen, preserve per-die rolled order with `kept` flags, and embed RNG provenance. Keep/drop ties are broken in favor of earlier-rolled dice. Serialization is canonical JSON; deserialization validates structure and internal consistency (subtotals and totals recomputed), drops unknown fields, and rejects unknown schema versions with a dedicated error code. Additive optional fields keep the version; renaming, removing, or re-meaning fields bumps `schemaVersion` with documented migration.
+- **Rationale:** A small, unambiguous grammar covers the dominant tabletop cases (modifiers, advantage/disadvantage via `2d20kh1`/`2d20kl1`, ability-score `4d6dl1`, percentile) without committing to a full expression language. Consistency validation makes deserialized records trustworthy inputs for presenters and replay. Explicit limits bound memory and keep records renderable.
+- **Consequences:** Exotic notation (exploding dice, rerolls, custom dice) requires grammar extensions in the 0.3.0 plugin/extension milestone, not silent core growth. Old cores reject records from future schema versions cleanly rather than mis-rendering them.
+- **Alternatives considered:** Adopting a full existing dice-expression language (large surface, licensing/compatibility risk); arbitrary die sizes in v1 (blocks curated presentation and asset mapping); mutable result objects (invites presentation-layer outcome tampering).
+
 ## ADR template
 
 ```md
