@@ -18,8 +18,9 @@ DiceForge SDK is an open-source, offline-first toolkit for deterministic dice ro
 - Dice notation with modifiers and keep/drop (`2d20kh1+3` for advantage, `4d6dl1`, `d%`), with positioned parse errors.
 - Injected randomness: a reproducible seeded source (same seed ⇒ same results on every platform) and a non-seeded system source, with provenance recorded in every result.
 - Immutable, schema-versioned event records with validating JSON serialization for storage, replay, and future presentation.
+- A browser presenter (`@diceforge/renderer-web`): Three.js 3D dice whose tumble always lands on the core-resolved face, with a no-WebGL DOM fallback, reduced-motion support, and aria-live announcements.
 
-Planned next: a web adapter and 3D renderer plugin, then Unity and Godot adapters. See [ROADMAP.md](ROADMAP.md).
+Planned next: a popular-framework example and theme support, then Unity and Godot adapters. See [ROADMAP.md](ROADMAP.md).
 
 ## Quick start (headless)
 
@@ -32,7 +33,7 @@ const roll = engine.roll("2d20kh1+3"); // { total, groups, provenance, ... } —
 const flip = engine.flipCoin();        // { outcome: "heads" | "tails", ... }
 ```
 
-A runnable version lives in [examples/headless/main.mjs](examples/headless/main.mjs) (`npm run example`). Full contracts, the notation grammar, and determinism guarantees are documented in [API.md](API.md).
+A runnable version lives in [examples/headless/main.mjs](examples/headless/main.mjs) (`npm run example`). For the visual side, `npm run demo:web` serves a browser demo ([examples/web-demo](examples/web-demo)) with 3D dice, coin flips, and toggles for the DOM and reduced-motion fallbacks. Full contracts, the notation grammar, and determinism guarantees are documented in [API.md](API.md) and [packages/renderer-web/README.md](packages/renderer-web/README.md).
 
 ## Project status
 

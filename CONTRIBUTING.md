@@ -24,10 +24,11 @@ The workspace uses npm (ships with Node >= 20), Vitest, Biome, and plain `tsc` (
 npm ci                 # install exact locked dependencies
 npm run check          # Biome lint + format check
 npm run format         # apply Biome formatting
-npm run typecheck      # TypeScript, no emit
-npm test               # Vitest (npm run test:coverage for coverage)
-npm run build          # compile @diceforge/core to packages/core/dist
+npm run typecheck      # builds packages, then type-checks all configs (tests included)
+npm test               # Vitest (npm run test:coverage for coverage); resolves packages from source
+npm run build          # compile @diceforge/core and @diceforge/renderer-web to dist
 npm run example        # build, then run the headless example
+npm run demo:web       # build, then serve the browser demo (Vite)
 ```
 
 All of these must pass before a pull request; CI runs the same gates on Node 20 and 24. Seeded-RNG golden tests lock the reproducibility contract — never update those constants without a superseding ADR (see ADR-0005).

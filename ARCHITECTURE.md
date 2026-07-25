@@ -47,12 +47,12 @@ Seeded RNG providers must produce reproducible core results. Presentation physic
 ```text
 packages/
   core/                 rules, notation, resolver, event schemas   [implemented]
-  plugin-contracts/     optional extension interfaces              [future]
-  renderer-web/         web rendering integration                  [future]
+  plugin-contracts/     optional extension interfaces              [presenter contract lives in core for now — ADR-0008]
+  renderer-web/         web rendering integration                  [implemented — also serves as the browser adapter, ADR-0007]
   adapter-unity/        Unity-facing integration                   [future]
   adapter-godot/        Godot-facing integration                   [future]
   testing/              test fixtures and conformance suites       [future]
-examples/               minimal, runnable integration examples     [headless example implemented]
+examples/               minimal, runnable integration examples     [headless + web demo implemented]
 docs/                   user and contributor documentation         [future]
 ```
 

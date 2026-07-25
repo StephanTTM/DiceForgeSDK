@@ -1,0 +1,59 @@
+# @diceforge/renderer-web
+
+Browser presenter for DiceForge. Renders already-resolved `@diceforge/core` events as 3D dice (Three.js) or accessible DOM tiles — it never decides or modifies outcomes (ADR-0007).
+
+Stability: **experimental (pre-0.2 release)**. Not yet published to npm; build from source at the repository root (`npm ci && npm run build`).
+
+## Usage
+
+```ts
+import { createDiceEngine, createSeededRandomSource } from "@diceforge/core";
+import { createDicePresenter } from "@diceforge/renderer-web";
+
+const engine = createDiceEngine({ random: createSeededRandomSource("table-42") });
+const presenter = createDicePresenter({ container: document.querySelector("#stage")! });
+
+const roll = engine.roll("2d20kh1+3"); // resolved headlessly first
+await presenter.present(roll);          // animation lands on the resolved faces
+presenter.dispose();
+```
+
+`createDicePresenter` returns the core `InteractionPresenter` contract plus `mode` (the backend actually chosen) and `dispose()`.
+
+## Options
+
+| Option            | Type                                | Default  | Meaning                                                                 |
+| ----------------- | ----------------------------------- | -------- | ----------------------------------------------------------------------- |
+| `container`       | `HTMLElement`                       | required | Element the presenter renders into.                                     |
+| `renderMode`      | `"auto" \| "webgl" \| "dom"`        | `"auto"` | `auto` uses WebGL when available, otherwise the DOM tile fallback.      |
+| `reducedMotion`   | `"auto" \| "animate" \| "reduce"`   | `"auto"` | `auto` honors the platform's `prefers-reduced-motion`.                  |
+| `announceResults` | `boolean`                           | `true`   | Maintain a visually hidden `aria-live` region announcing every result.  |
+| `colors`          | `{ die?: string; label?: string }`  | dark die | Die body and label colors.                                              |
+
+`present(event, { signal })` accepts an `AbortSignal`; aborting rejects the promise with an `"AbortError"`-named error. A failed or aborted presentation never invalidates the resolved event.
+
+## How outcomes stay authoritative
+
+Every record is re-validated (`validateEventRecord`) before display. Die meshes are built from shared polyhedron data, and the tumble animation hands off to a rotation that ends **exactly** at the resolved face's orientation — the outcome is honored by construction, not by reading the physics. Presentation motion is intentionally non-deterministic (ARCHITECTURE.md permits this); the record is the replayable truth.
+
+## Fallback tiers
+
+1. **WebGL** — Three.js dice with numbered faces; dropped dice render dimmed; d100 appears as the classic percentile pair (tens + units d10, `100` = `00` + `0`).
+2. **DOM** — without WebGL (or with `renderMode: "dom"`), dice render as labeled tiles with the same kept/dropped states.
+3. **Reduced motion** — animations are skipped and results appear immediately; announcements still fire.
+
+In a hidden tab, browsers pause `requestAnimationFrame`, so an animated WebGL presentation completes when the tab becomes visible again (the animation is time-based and finishes immediately on resume).
+
+## Accessibility
+
+A `role="status"` / `aria-live="polite"` region announces results in plain language (e.g. "Rolled 2d20kh1+3. 2d20kh1: 1 dropped, 19. Modifier +3. Total 22."). The same wording is exported as `formatEventAnnouncement(event)`.
+
+## Known presentation limitations (v0.2 scope)
+
+- Dice float and present the resolved face toward the camera; they are stylized, not physically simulated resting dice (a physics presenter is a future plugin category).
+- Face numbering uses the classic 1/6-opposite layout on the d6 only; other shapes number faces in construction order.
+- Non-top face labels may appear rotated relative to their faces; the landing face is always yawed to read upright.
+
+## Compatibility
+
+ESM-only. Requires a DOM; WebGL is optional (see fallbacks). Depends on `three` (MIT) internally — no Three.js types appear in the public API, per the core boundary rules.

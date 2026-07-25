@@ -132,15 +132,20 @@ class DiceNotationError extends DiceForgeError { position: number } // code: "no
 
 `code` values are stable API; message text is not.
 
-## Presentation contract (direction — not yet implemented)
+## Presentation contract (implemented — ADR-0008)
 
 ```ts
 interface InteractionPresenter {
   present(event: InteractionEvent, options?: PresentationOptions): Promise<void>;
+  dispose?(): void;
 }
+
+type PresentationOptions = { signal?: AbortSignalLike };
 ```
 
-A presenter maps event data to visuals, motion, audio, or haptics. It must document capabilities and degraded behavior; a failed presentation must not invalidate a resolved core event. This contract will be defined with the 0.2.0 web renderer milestone.
+Type-only exports from the core (`InteractionPresenter`, `PresentationOptions`, `AbortSignalLike`). A presenter maps event data to visuals, motion, audio, or haptics; it must never decide or modify outcomes, and a failed or cancelled presentation does not invalidate the resolved event. `AbortSignalLike` is a structural stand-in satisfied by any real `AbortSignal`, so the core's types stay platform-free.
+
+The first implementation is [`@diceforge/renderer-web`](packages/renderer-web/README.md): Three.js 3D dice with outcome-first animation, a DOM fallback, reduced-motion support, and aria-live announcements (ADR-0007).
 
 ## API documentation checklist
 

@@ -16,17 +16,24 @@
 Remaining before tagging 0.1.0:
 
 - [x] Push to a Git host and verify the CI workflow runs green on Node 20 and 24. (github.com/StephanTTM/DiceForgeSDK, private until release readiness)
-- [ ] Decide the npm publish pipeline (scope ownership, provenance, release automation) and publish `@diceforge/core@0.1.0`.
+- [ ] Publish to npm — folded into the publish task under "Next" so both packages ship together.
 
-## Next: web proof of integration
+## Web proof of integration (complete)
 
-- [ ] Select a web renderer/physics approach through an ADR.
-- [ ] Define renderer plugin contract and presentation lifecycle.
-- [ ] Build a small browser demo with dice and coin flip interactions.
-- [ ] Add reduced-motion and no-WebGL fallbacks.
+- [x] Select a web renderer/physics approach through an ADR. (Three.js + outcome-first scripted tumble — ADR-0007)
+- [x] Define renderer plugin contract and presentation lifecycle. (`InteractionPresenter` in core — ADR-0008)
+- [x] Build a small browser demo with dice and coin flip interactions. (`examples/web-demo`, `npm run demo:web`)
+- [x] Add reduced-motion and no-WebGL fallbacks. (DOM tile backend, `prefers-reduced-motion`, aria-live announcements)
+
+## Next: toward 0.2.0 completion
+
+- [ ] Add one popular-framework example (React) consuming `@diceforge/renderer-web`.
+- [ ] Theme/asset loading as an optional presentation concern (with the licensing checklist below).
+- [ ] Decide the npm publish pipeline and publish `@diceforge/core` + `@diceforge/renderer-web` together.
 
 ## Backlog
 
+- [ ] Physics-based presenter plugin exploration (realistic motion behind the same presenter contract).
 - [ ] Unity adapter exploration and package distribution plan.
 - [ ] Godot adapter exploration and package distribution plan.
 - [ ] Custom dice definitions.
@@ -34,6 +41,7 @@ Remaining before tagging 0.1.0:
 - [ ] Theme/asset pack policy and licensing checklist.
 - [ ] Replay support.
 - [ ] Optional multiplayer transport plugin research.
+- [ ] Browser-based visual regression testing for the renderer.
 
 ## Task maintenance
 
