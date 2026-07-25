@@ -1,0 +1,11 @@
+{
+  "name": "diceforge-example-headless",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Headless DiceForge usage: seeded rolls, coin flips, and event serialization without any renderer.",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@diceforge/core": "*"
+  }
+}
