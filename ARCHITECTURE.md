@@ -56,7 +56,7 @@ examples/               minimal, runnable integration examples     [headless + w
 docs/                   user and contributor documentation         [future]
 ```
 
-This is a target structure, not a reason to create empty packages prematurely. `packages/core` (npm workspace `@diceforge/core`) ships the ADR-0004 toolchain: ESM-only `tsc` output, Vitest tests colocated as `*.test.ts`, Biome lint/format.
+This is a target structure, not a reason to create empty packages prematurely. `packages/core` (npm workspace `@diceforge-sdk/core`) ships the ADR-0004 toolchain: ESM-only `tsc` output, Vitest tests colocated as `*.test.ts`, Biome lint/format.
 
 ## Compatibility rules
 

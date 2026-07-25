@@ -26,7 +26,7 @@ npm run check          # Biome lint + format check
 npm run format         # apply Biome formatting
 npm run typecheck      # builds packages, then type-checks all configs (tests included)
 npm test               # Vitest (npm run test:coverage for coverage); resolves packages from source
-npm run build          # compile @diceforge/core and @diceforge/renderer-web to dist
+npm run build          # compile @diceforge-sdk/core and @diceforge-sdk/renderer-web to dist
 npm run example        # build, then run the headless example
 npm run demo:web       # build, then serve the browser demo (Vite)
 ```

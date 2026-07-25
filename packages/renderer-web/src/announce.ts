@@ -1,4 +1,4 @@
-import type { InteractionEvent } from "@diceforge/core";
+import type { InteractionEvent } from "@diceforge-sdk/core";
 
 /**
  * Plain-language description of a resolved event, used for aria-live

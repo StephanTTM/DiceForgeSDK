@@ -1,4 +1,4 @@
-import type { AbortSignalLike, RollResult } from "@diceforge/core";
+import type { AbortSignalLike, RollResult } from "@diceforge-sdk/core";
 import type { MotionMode } from "./capabilities.js";
 import type { ShapedDieSides } from "./math/geometry.js";
 import { percentileDisplay } from "./math/percentile.js";

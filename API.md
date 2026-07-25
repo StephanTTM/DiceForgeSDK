@@ -1,4 +1,4 @@
-# API Reference — `@diceforge/core`
+# API Reference — `@diceforge-sdk/core`
 
 Stability: **experimental (pre-0.1 release)**. Names may still change before 1.0; every change to an implemented export updates this document in the same change set. The package is ESM-only, has no runtime dependencies, and runs in any ES2022 environment (Node >= 20, modern browsers, workers).
 
@@ -12,7 +12,7 @@ Stability: **experimental (pre-0.1 release)**. Names may still change before 1.0
 ## Engine
 
 ```ts
-import { createDiceEngine, createSeededRandomSource } from "@diceforge/core";
+import { createDiceEngine, createSeededRandomSource } from "@diceforge-sdk/core";
 
 const engine = createDiceEngine({ random: createSeededRandomSource("table-42") });
 const roll = engine.roll("2d20kh1+3"); // RollResult
@@ -145,7 +145,7 @@ type PresentationOptions = { signal?: AbortSignalLike };
 
 Type-only exports from the core (`InteractionPresenter`, `PresentationOptions`, `AbortSignalLike`). A presenter maps event data to visuals, motion, audio, or haptics; it must never decide or modify outcomes, and a failed or cancelled presentation does not invalidate the resolved event. `AbortSignalLike` is a structural stand-in satisfied by any real `AbortSignal`, so the core's types stay platform-free.
 
-The first implementation is [`@diceforge/renderer-web`](packages/renderer-web/README.md): Three.js 3D dice with outcome-first animation, a DOM fallback, reduced-motion support, and aria-live announcements (ADR-0007).
+The first implementation is [`@diceforge-sdk/renderer-web`](packages/renderer-web/README.md): Three.js 3D dice with outcome-first animation, a DOM fallback, reduced-motion support, and aria-live announcements (ADR-0007).
 
 ## API documentation checklist
 

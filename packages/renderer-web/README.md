@@ -1,14 +1,14 @@
-# @diceforge/renderer-web
+# @diceforge-sdk/renderer-web
 
-Browser presenter for DiceForge. Renders already-resolved `@diceforge/core` events as 3D dice (Three.js) or accessible DOM tiles — it never decides or modifies outcomes (ADR-0007).
+Browser presenter for DiceForge. Renders already-resolved `@diceforge-sdk/core` events as 3D dice (Three.js) or accessible DOM tiles — it never decides or modifies outcomes (ADR-0007).
 
 Stability: **experimental (pre-0.2 release)**. Not yet published to npm; build from source at the repository root (`npm ci && npm run build`).
 
 ## Usage
 
 ```ts
-import { createDiceEngine, createSeededRandomSource } from "@diceforge/core";
-import { createDicePresenter } from "@diceforge/renderer-web";
+import { createDiceEngine, createSeededRandomSource } from "@diceforge-sdk/core";
+import { createDicePresenter } from "@diceforge-sdk/renderer-web";
 
 const engine = createDiceEngine({ random: createSeededRandomSource("table-42") });
 const presenter = createDicePresenter({ container: document.querySelector("#stage")! });

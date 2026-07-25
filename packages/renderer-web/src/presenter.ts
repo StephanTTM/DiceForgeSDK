@@ -1,5 +1,5 @@
-import type { InteractionPresenter, PresentationOptions } from "@diceforge/core";
-import { DiceForgeError, validateEventRecord } from "@diceforge/core";
+import type { InteractionPresenter, PresentationOptions } from "@diceforge-sdk/core";
+import { DiceForgeError, validateEventRecord } from "@diceforge-sdk/core";
 import { createAnnouncer, formatEventAnnouncement } from "./announce.js";
 import type { PresentContext } from "./backend.js";
 import { visualDiceForEvent } from "./backend.js";

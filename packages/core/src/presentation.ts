@@ -23,7 +23,7 @@ export type PresentationOptions = {
  * failed or cancelled presentation does not invalidate the resolved event.
  *
  * This contract is type-only in the core; implementations live in renderer
- * and adapter packages such as `@diceforge/renderer-web`.
+ * and adapter packages such as `@diceforge-sdk/renderer-web`.
  */
 export interface InteractionPresenter {
   /** Resolves when the presentation has finished (or been skipped). */

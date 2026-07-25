@@ -74,6 +74,15 @@ This log records decisions that materially affect architecture, public contracts
 - **Consequences:** Renderer packages depend on `@diceforge/core` for the contract, which they already need for event record types. If contracts grow, moving them to `@diceforge/plugin-contracts` is a re-export away and will be recorded in a superseding ADR.
 - **Alternatives considered:** A `plugin-contracts` package now (premature); defining the contract in each renderer (fragments the ecosystem); referencing DOM `AbortSignal` directly (drags platform libs into the core's types).
 
+## ADR-0009: npm scope @diceforge-sdk and tag-driven release pipeline
+
+- **Date:** 2026-07-25
+- **Status:** Accepted
+- **Decision:** Packages publish under the npm scope `@diceforge-sdk` (`@diceforge-sdk/core`, `@diceforge-sdk/renderer-web`) because the `diceforge` org name was already taken when the org was registered. All packages are public (`publishConfig.access: "public"`) and version-locked: they release together with the same version number. Releases are driven by version tags (`v*`): a GitHub Actions release workflow re-runs every quality gate and publishes both packages with npm provenance. The first publish of each package happens from a maintainer machine (npm requires interactive 2FA before automation exists); afterwards, npm trusted publishing (OIDC) is configured so CI publishes without long-lived tokens. Earlier documents referencing `@diceforge/...` describe the same packages under their pre-publish working name.
+- **Rationale:** The scope mirrors the project name (DiceForge SDK) while staying available. Version-locking sidesteps a compatibility matrix while both packages are pre-1.0 and co-developed. Tag-driven CI releases keep publishes reproducible and reviewed; provenance links every artifact to its source commit and workflow.
+- **Consequences:** A version bump releases both packages even if one is unchanged — acceptable at this stage, revisit via ADR if the package count grows. Renaming the scope later would be a breaking change for consumers and would require a superseding ADR with migration notes.
+- **Alternatives considered:** Unscoped names like `diceforge-core` (no namespace ownership, squat-prone); a different scope such as `@diceforgejs` (weaker match to the project name); independent per-package versioning (premature bookkeeping); publishing manually forever (unreproducible, no provenance).
+
 ## ADR template
 
 ```md

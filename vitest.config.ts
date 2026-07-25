@@ -5,8 +5,8 @@ export default defineConfig({
   resolve: {
     // Resolve workspace packages to source so tests never depend on dist builds.
     alias: {
-      "@diceforge/core": fileURLToPath(new URL("packages/core/src/index.ts", import.meta.url)),
-      "@diceforge/renderer-web": fileURLToPath(
+      "@diceforge-sdk/core": fileURLToPath(new URL("packages/core/src/index.ts", import.meta.url)),
+      "@diceforge-sdk/renderer-web": fileURLToPath(
         new URL("packages/renderer-web/src/index.ts", import.meta.url),
       ),
     },

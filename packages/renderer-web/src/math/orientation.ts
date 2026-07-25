@@ -1,4 +1,4 @@
-import { DiceForgeError } from "@diceforge/core";
+import { DiceForgeError } from "@diceforge-sdk/core";
 import { Quaternion, Vector3 } from "three";
 import type { PolyhedronData, ShapedDieSides, Vec3 } from "./geometry.js";
 import { cross, dieGeometry, dot, faceCentroid, normalize, subtract } from "./geometry.js";

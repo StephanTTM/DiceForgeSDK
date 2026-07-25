@@ -1,4 +1,4 @@
-import { DiceForgeError } from "@diceforge/core";
+import { DiceForgeError } from "@diceforge-sdk/core";
 
 export type PercentileDie = {
   /** Text shown on the die face: "00".."90" for tens, "0".."9" for units. */

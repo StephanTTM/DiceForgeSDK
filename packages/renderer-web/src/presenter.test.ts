@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import type { RollResult } from "@diceforge/core";
-import { createDiceEngine, createSeededRandomSource, DiceForgeError } from "@diceforge/core";
+import type { RollResult } from "@diceforge-sdk/core";
+import { createDiceEngine, createSeededRandomSource, DiceForgeError } from "@diceforge-sdk/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { createDicePresenter } from "./presenter.js";
 

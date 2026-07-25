@@ -6,7 +6,7 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "@diceforge/core": "*",
-    "@diceforge/renderer-web": "*"
+    "@diceforge-sdk/core": "*",
+    "@diceforge-sdk/renderer-web": "*"
   }
 }

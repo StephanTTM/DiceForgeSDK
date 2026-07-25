@@ -5,7 +5,7 @@ import {
   createSeededRandomSource,
   deserializeEvent,
   serializeEvent,
-} from "@diceforge/core";
+} from "@diceforge-sdk/core";
 
 function describeRoll(result) {
   const groups = result.groups

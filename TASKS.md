@@ -3,7 +3,7 @@
 ## Current focus: repository foundation
 
 - [x] Choose the TypeScript package manager and monorepo tool after evaluating publish workflow and Unity/Godot needs. (npm workspaces — ADR-0004)
-- [x] Create the core package with strict TypeScript configuration. (`packages/core`, `@diceforge/core`)
+- [x] Create the core package with strict TypeScript configuration. (`packages/core`, `@diceforge-sdk/core`)
 - [x] Define domain schemas for die definitions, coin flips, RNG, roll requests, and immutable result records. (`records.ts`, `rng/types.ts`, `notation/ast.ts`)
 - [x] Implement seeded and system RNG providers with tests. (xoshiro128\*\* + golden tests — ADR-0005)
 - [x] Implement initial dice notation parser and resolver with tests. (grammar v1 — ADR-0006)
@@ -27,9 +27,9 @@ Remaining before tagging 0.1.0:
 
 ## Next: toward 0.2.0 completion
 
-- [ ] Add one popular-framework example (React) consuming `@diceforge/renderer-web`.
+- [ ] Add one popular-framework example (React) consuming `@diceforge-sdk/renderer-web`.
 - [ ] Theme/asset loading as an optional presentation concern (with the licensing checklist below).
-- [ ] Decide the npm publish pipeline and publish `@diceforge/core` + `@diceforge/renderer-web` together.
+- [ ] Decide the npm publish pipeline and publish `@diceforge-sdk/core` + `@diceforge-sdk/renderer-web` together.
 
 ## Backlog
 

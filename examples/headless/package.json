@@ -6,6 +6,6 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
-    "@diceforge/core": "*"
+    "@diceforge-sdk/core": "*"
   }
 }

@@ -12,20 +12,20 @@ DiceForge SDK is an open-source, offline-first toolkit for deterministic dice ro
 - **Visuals are optional** — resolve a trustworthy headless result, then animate that result when a renderer is available.
 - **Extensible by design** — physics, renderers, dice definitions, themes, audio, and integrations are replaceable plugins.
 
-## Implemented today (`@diceforge/core`)
+## Implemented today (`@diceforge-sdk/core`)
 
 - Standard polyhedral dice — d4, d6, d8, d10, d12, d20, d100/percentile — plus coin flips, resolved fully headlessly.
 - Dice notation with modifiers and keep/drop (`2d20kh1+3` for advantage, `4d6dl1`, `d%`), with positioned parse errors.
 - Injected randomness: a reproducible seeded source (same seed ⇒ same results on every platform) and a non-seeded system source, with provenance recorded in every result.
 - Immutable, schema-versioned event records with validating JSON serialization for storage, replay, and future presentation.
-- A browser presenter (`@diceforge/renderer-web`): Three.js 3D dice whose tumble always lands on the core-resolved face, with a no-WebGL DOM fallback, reduced-motion support, and aria-live announcements.
+- A browser presenter (`@diceforge-sdk/renderer-web`): Three.js 3D dice whose tumble always lands on the core-resolved face, with a no-WebGL DOM fallback, reduced-motion support, and aria-live announcements.
 
 Planned next: a popular-framework example and theme support, then Unity and Godot adapters. See [ROADMAP.md](ROADMAP.md).
 
 ## Quick start (headless)
 
 ```ts
-import { createDiceEngine, createSeededRandomSource } from "@diceforge/core";
+import { createDiceEngine, createSeededRandomSource } from "@diceforge-sdk/core";
 
 const engine = createDiceEngine({ random: createSeededRandomSource("table-42") });
 

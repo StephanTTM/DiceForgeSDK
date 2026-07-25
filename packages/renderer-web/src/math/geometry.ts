@@ -1,4 +1,4 @@
-import { DiceForgeError } from "@diceforge/core";
+import { DiceForgeError } from "@diceforge-sdk/core";
 
 export type Vec3 = readonly [number, number, number];
 

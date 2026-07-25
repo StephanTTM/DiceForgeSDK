@@ -1,4 +1,4 @@
-import { createDiceEngine, createSeededRandomSource } from "@diceforge/core";
+import { createDiceEngine, createSeededRandomSource } from "@diceforge-sdk/core";
 import { describe, expect, it } from "vitest";
 import { formatEventAnnouncement } from "./announce.js";
 
