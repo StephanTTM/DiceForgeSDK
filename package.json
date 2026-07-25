@@ -15,16 +15,19 @@
   "scripts": {
     "check": "biome check .",
     "format": "biome format --write .",
-    "typecheck": "tsc -p packages/core/tsconfig.json --noEmit",
+    "typecheck": "tsc -p packages/core/tsconfig.json --noEmit && tsc -p packages/renderer-web/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "build": "tsc -p packages/core/tsconfig.build.json",
-    "example": "npm run build && node examples/headless/main.mjs"
+    "build": "tsc -p packages/core/tsconfig.build.json && tsc -p packages/renderer-web/tsconfig.build.json",
+    "example": "npm run build && node examples/headless/main.mjs",
+    "demo:web": "npm run build && vite examples/web-demo"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.5",
     "@vitest/coverage-v8": "^4.1.10",
+    "jsdom": "^29.1.1",
     "typescript": "^7.0.2",
+    "vite": "^8.1.5",
     "vitest": "^4.1.10"
   }
 }
