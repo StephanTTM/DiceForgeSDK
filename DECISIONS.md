@@ -38,6 +38,15 @@ This log records decisions that materially affect architecture, public contracts
 - **Consequences:** Contributors need no global tooling beyond Node and npm. If the workspace later gains many interdependent packages, a task runner (or pnpm) can be adopted via a superseding ADR. CommonJS consumers must use dynamic `import()` or a bundler.
 - **Alternatives considered:** pnpm workspaces (stricter isolation but extra install step); Turborepo/Nx (premature for one package); ESLint + Prettier (more configuration and dependencies); dual CJS/ESM builds (complexity without a current consumer).
 
+## ADR-0005: Seeded RNG algorithm and reproducibility guarantee
+
+- **Date:** 2026-07-25
+- **Status:** Accepted
+- **Decision:** The seeded random source hashes the seed text with cyrb128 into the state of a xoshiro128\*\* generator, implemented with 32-bit integer operations only. Guarantee: the same seed produces the same sequence on every platform and every core release. Golden known-answer tests lock the sequences; changing the algorithm or constants is a breaking change requiring a superseding ADR. Die faces are derived from `nextUint32()` via rejection sampling so no face is biased. The system (non-seeded) source uses Web Crypto `getRandomValues` when present, falling back to `Math.random`, and is explicitly non-reproducible.
+- **Rationale:** xoshiro128\*\* is a public-domain, well-studied generator that is fast and exactly reproducible in JavaScript's 32-bit integer semantics, unlike float-based approaches. cyrb128 turns human-friendly string seeds ("table-42") into well-mixed state. Rejection sampling removes modulo bias without floating-point involvement.
+- **Consequences:** Replays, tests, and cross-device synchronization can rely on identical outcomes from identical seeds. Cryptographic unpredictability is explicitly **not** guaranteed for seeded sequences; provenance metadata records which source produced each result. Verifiable fairness remains future scope.
+- **Alternatives considered:** `Math.random` with no seeding (not reproducible); PCG32 (needs 64-bit emulation in JS); Mersenne Twister (large state, slower); float-based mulberry32 pipelines (risk of cross-engine drift).
+
 ## ADR template
 
 ```md
