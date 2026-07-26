@@ -5,6 +5,7 @@ import {
   Mesh,
   MeshStandardMaterial,
   type Object3D,
+  type Quaternion,
   SRGBColorSpace,
   type Texture,
   TextureLoader,
@@ -13,6 +14,7 @@ import {
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import { DIE_SIZE } from "../math/geometry.js";
+import { silhouetteArea } from "../math/orientation.js";
 
 /** Largest dimension of a normalized die model, matching the procedural dice. */
 const TARGET_SIZE = DIE_SIZE;
@@ -47,6 +49,42 @@ export function loadDieModel(url: string): Promise<Object3D | null> {
     cache.set(url, pending);
   }
   return pending;
+}
+
+const modelScaleCache = new Map<string, number>();
+
+/**
+ * Scale that makes a loaded model cover the same screen area as the reference
+ * die, measured from the model's own geometry in the orientation it rests in.
+ *
+ * Measuring the real mesh rather than the ideal solid is what keeps a themed
+ * set even: rounding a die's edges eats into its silhouette by an amount that
+ * depends on how sharp its corners were, so a d8 and a d20 built to the same
+ * nominal size do not end up looking the same size.
+ */
+export function modelSilhouetteScale(
+  key: string,
+  object: Object3D,
+  poses: readonly Quaternion[],
+  target: number,
+): number {
+  const cached = modelScaleCache.get(key);
+  if (cached !== undefined) return cached;
+  const points: Vector3[] = [];
+  object.updateMatrixWorld(true);
+  object.traverse((child) => {
+    if (!(child instanceof Mesh)) return;
+    const position = child.geometry.getAttribute("position");
+    for (let i = 0; i < position.count; i++) {
+      points.push(
+        new Vector3().fromBufferAttribute(position as never, i).applyMatrix4(child.matrixWorld),
+      );
+    }
+  });
+  const area = silhouetteArea(points, poses);
+  const scale = area > 0 ? Math.sqrt(target / area) : 1;
+  modelScaleCache.set(key, scale);
+  return scale;
 }
 
 const textureCache = new Map<string, Promise<Texture | null>>();

@@ -77,7 +77,7 @@ Custom model sets implement `DieModelSet`. A model is used only when its shape h
 
 Dice tumble in, then settle into the orientation that shows each resolved face. The camera frames the whole layout automatically and looks down from a steep angle, so the face that counts is the one facing the viewer. A roll made entirely of d4s is the exception: those are read from the side, so they get a lower, angled view.
 
-Dice are sized so each covers the same area of table when resting, rather than sharing a bounding box — a compact solid fills more of its box, so a d6 would otherwise dwarf a d8. This applies to both the built-in dice and model themes, so a mixed roll looks like one set.
+Dice are sized so each covers the same area of screen, rather than sharing a bounding box — a compact solid fills more of its box, so a d6 would otherwise dwarf a d8. The measurement is taken from the camera's angle (a die's height counts towards what you see) and averaged over the poses that die can land in. For themed models it is measured from the loaded mesh, so rounding the edges of a sharp-cornered solid is accounted for rather than assumed.
 
 A percentile roll is shown as the classic pair of d10s. The tens die reads 00–90, so a theme can give it its own atlas via `DieModelSet.tensTextureUrl`; `forgeTheme` does. Without one, both dice fall back to the plain 0–9 atlas.
 
@@ -104,7 +104,7 @@ A `role="status"` / `aria-live="polite"` region announces results in plain langu
 - Procedural dice use the classic 1/6-opposite layout on the d6 only; other shapes number faces in construction order.
 - Labels on non-top faces may appear rotated; only the landing face is yawed to read upright.
 - A roll mixing d4s with other shapes uses the top-down camera, which is the harder angle for reading a d4.
-- A d4 still reads as the most prominent die in a mixed roll: its footprint matches the others, but a flat triangle facing the camera looks larger than a many-faceted solid of the same area. Real d4s have the same quirk.
+- Die sizes match to within about 1%, except the d6, which renders roughly 6% large. The camera is a perspective one, and a cube carries most of its silhouette in the top face nearest the lens; a narrow field of view reduces the effect but cannot remove it without going orthographic.
 
 ## Compatibility
 

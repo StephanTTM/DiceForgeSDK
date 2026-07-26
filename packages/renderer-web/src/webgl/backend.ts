@@ -25,10 +25,22 @@ import {
 } from "three";
 import type { PresentContext, PresenterBackend, VisualCoin, VisualDie } from "../backend.js";
 import { dieGeometry, dot, subtract } from "../math/geometry.js";
-import { apparentScale, faceBasis, faceTriangles, faceUpQuaternion } from "../math/orientation.js";
+import {
+  apparentScale,
+  faceBasis,
+  faceTriangles,
+  faceUpQuaternion,
+  restingSilhouette,
+} from "../math/orientation.js";
 import type { CoinModel, DieModelSet } from "../theme.js";
 import { hasCalibratedModel } from "../theme.js";
-import { applyTexture, instantiateDieModel, loadDieModel, loadThemeTexture } from "./models.js";
+import {
+  applyTexture,
+  instantiateDieModel,
+  loadDieModel,
+  loadThemeTexture,
+  modelSilhouetteScale,
+} from "./models.js";
 
 export type WebglBackendOptions = {
   readonly container: HTMLElement;
@@ -354,7 +366,11 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
   container.append(renderer.domElement);
 
   const scene = new Scene();
-  const camera = new PerspectiveCamera(42, width / height, 0.1, 200);
+  // A narrow field of view keeps the dice close to an orthographic projection.
+  // A wide one magnifies whatever is nearest the lens, which is a die's top
+  // face — so a d6, whose top face is most of its silhouette, would render
+  // noticeably larger than a d20 sized to match it.
+  const camera = new PerspectiveCamera(22, width / height, 0.1, 400);
   let elevationDeg = TOP_DOWN_ELEVATION;
   let framedRadius = DIE_RADIUS * 2;
 
@@ -553,9 +569,15 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
       const model = url ? await loadDieModel(url) : null;
       if (model && tuple) {
         const object = instantiateDieModel(model);
-        // Models arrive at a common bounding box; even the set out so each die
-        // covers the same area of table.
-        object.scale.multiplyScalar(apparentScale(die.shape));
+        // Even the set out by what each model actually covers on screen, not by
+        // its nominal size: bevelling eats into a sharp-cornered solid more
+        // than a round one, so equal bounding boxes do not look equal.
+        const poses = (models.faceRotations[die.shape] ?? []).map(
+          (q) => new Quaternion(q[0], q[1], q[2], q[3]),
+        );
+        object.scale.multiplyScalar(
+          modelSilhouetteScale(url ?? `d${die.shape}`, object, poses, restingSilhouette(20)),
+        );
         const textureUrl =
           (die.role === "tens" ? models.tensTextureUrl : undefined) ??
           models.textureUrls?.[die.shape];

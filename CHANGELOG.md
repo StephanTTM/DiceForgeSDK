@@ -26,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- Dice in a mixed roll no longer look like a mismatched set. They shared a bounding box, but a compact solid fills more of one, so a d6 covered well over twice the table area of a d8. Each die is now scaled so its resting footprint matches (`apparentScale`), for both model themes and the built-in dice.
+- Dice in a mixed roll no longer look like a mismatched set. They shared a bounding box, but a compact solid fills more of one, so a d6 covered well over twice the table area of a d8. Every die is now scaled so it covers the same screen area, measured from the camera's angle and averaged over the poses it can land in — from the loaded mesh for themed models, so bevelling is accounted for rather than assumed. Measured on screen, the d8, d10 and d12 now sit within 1% of the d20. The camera's field of view was narrowed to 22°, since a wide lens magnifies whatever is nearest it and made flat-topped dice read large.
 - A percentile roll's tens die reads 00–90 instead of repeating the units die's 0–9, via `DieModelSet.tensTextureUrl` and a generated atlas per colour.
 - Themed dice ignored a theme change: only one shape took the new colour while the rest kept the previous one. Cloning a model shares its materials with the loader's cache, so applying a texture repainted every die of that shape ever shown, and clearing the scene disposed materials the cache still needed. Each presented die now owns its materials.
 - The coin no longer spins on the spot. It rests flat, is tossed into the air spinning end over end, and drops back down onto its result; the number of half turns is picked by parity so it lands on the resolved face without correcting mid-flight.

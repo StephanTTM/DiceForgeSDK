@@ -168,8 +168,10 @@ async function preview(): Promise<void> {
         : [event.outcome],
     total: event.kind === "roll" ? event.total : 0,
     count: 0,
-    // Read back immediately: the drawing buffer is cleared once composited.
-    dataUrl: canvas?.toDataURL("image/jpeg", 0.88) ?? null,
+    // PNG keeps the alpha channel, so the die's exact silhouette can be
+    // measured. Read back immediately: the drawing buffer is cleared once
+    // composited.
+    dataUrl: canvas?.toDataURL("image/png") ?? null,
   };
   console.log("preview ready");
 }

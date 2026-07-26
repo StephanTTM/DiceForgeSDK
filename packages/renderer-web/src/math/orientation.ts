@@ -111,32 +111,74 @@ function hullArea(points: readonly (readonly [number, number])[]): number {
   return Math.abs(area) / 2;
 }
 
-/** Table footprint of a die resting with one face up, seen from above. */
-export function restingFootprint(sides: ShapedDieSides): number {
+/**
+ * Elevation the presenter views the table from. Apparent size has to be
+ * measured from where the camera actually is: straight down would ignore a
+ * die's height, and a tall solid like the d10 gains silhouette from it.
+ */
+const VIEW_ELEVATION_RADIANS = (80 * Math.PI) / 180;
+
+// Camera looks down from +Z at the view elevation; the screen plane is spanned
+// by world X and the direction perpendicular to the view.
+const SCREEN_UP = new Vector3(
+  0,
+  Math.cos(VIEW_ELEVATION_RADIANS),
+  -Math.sin(VIEW_ELEVATION_RADIANS),
+);
+const SCREEN_RIGHT = new Vector3(1, 0, 0);
+
+/** Screen area a set of points covers in one pose, from the presenter's camera. */
+export function projectedArea(points: readonly Vector3[], pose: Quaternion): number {
+  return hullArea(
+    points.map((point) => {
+      const turned = point.clone().applyQuaternion(pose);
+      return [turned.dot(SCREEN_RIGHT), turned.dot(SCREEN_UP)] as const;
+    }),
+  );
+}
+
+/**
+ * Screen area averaged over the poses a die actually lands in. Averaging over
+ * arbitrary yaw instead would count orientations a die never comes to rest at,
+ * which biases shapes whose outline changes a lot as they turn — a cube most of
+ * all, since it is much wider corner-on than face-on.
+ */
+export function silhouetteArea(points: readonly Vector3[], poses: readonly Quaternion[]): number {
+  if (poses.length === 0) return 0;
+  let total = 0;
+  for (const pose of poses) total += projectedArea(points, pose);
+  return total / poses.length;
+}
+
+/**
+ * Silhouette a die covers on screen when resting with a face up, averaged over
+ * the yaw it may land at.
+ */
+export function restingSilhouette(sides: ShapedDieSides): number {
   const data = dieGeometry(sides);
-  const up = faceNormal(data, 0);
-  // Any two axes perpendicular to the up direction span the table plane.
-  const seed: Vec3 = Math.abs(up[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
-  const axisU = normalize(cross(up, seed));
-  const axisV = cross(up, axisU);
-  return hullArea(data.vertices.map((v) => [dot(v, axisU), dot(v, axisV)] as const));
+  const points = data.vertices.map((v) => new Vector3(...v));
+  // Every face in turn: the poses this die can come to rest in.
+  const poses = data.faces.map((_, index) => faceUpQuaternion(sides, index + 1));
+  return silhouetteArea(points, poses);
 }
 
 const apparentScales = new Map<ShapedDieSides, number>();
 
 /**
- * Uniform scale that gives every die the same footprint on the table.
+ * Uniform scale that makes every die cover the same amount of screen.
  *
  * Solids are built to a common bounding box, but a compact one fills more of
  * that box: a d6 covers well over twice the area of a d8 at the same nominal
- * size, which reads as a mismatched set. Equalizing the area each die actually
- * covers when resting is what makes them look like they belong together. The
- * d20 is the reference, so it is unchanged.
+ * size, which reads as a mismatched set. What has to match is the silhouette
+ * from where the camera actually sits — a die's height counts towards that, so
+ * measuring the straight-down footprint instead leaves tall solids like the
+ * d10 looking oversized next to the d20. The d20 is the reference and is
+ * unchanged.
  */
 export function apparentScale(sides: ShapedDieSides): number {
   const cached = apparentScales.get(sides);
   if (cached !== undefined) return cached;
-  const scale = Math.sqrt(restingFootprint(20) / restingFootprint(sides));
+  const scale = Math.sqrt(restingSilhouette(20) / restingSilhouette(sides));
   apparentScales.set(sides, scale);
   return scale;
 }

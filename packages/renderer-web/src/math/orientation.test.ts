@@ -7,7 +7,7 @@ import {
   faceNormal,
   faceTriangles,
   faceUpQuaternion,
-  restingFootprint,
+  restingSilhouette,
 } from "./orientation.js";
 
 const ALL_SHAPES: readonly ShapedDieSides[] = [4, 6, 8, 10, 12, 20];
@@ -90,19 +90,27 @@ describe("apparentScale", () => {
    * resting, so a set does not look mismatched. Measured the same way the
    * scale is derived, but independently of the cached result.
    */
-  /** Pins the projection and hull maths against shapes whose area is known. */
-  it("measures a resting footprint correctly", () => {
-    // A cube resting face-up covers a square of its own edge length.
-    expect(restingFootprint(6)).toBeCloseTo(DIE_SIZE * DIE_SIZE, 6);
-    // A tetrahedron covers an equilateral triangle on the edge of its face.
-    const edge = DIE_SIZE * Math.SQRT2;
-    expect(restingFootprint(4)).toBeCloseTo((Math.sqrt(3) / 4) * edge * edge, 6);
+  /**
+   * Pins the hull maths with a shape whose silhouette is known: a cube resting
+   * face-up, seen from a steep angle, covers its top square plus the sliver of
+   * one side wall that the tilt reveals.
+   */
+  it("measures a silhouette from the camera's angle", () => {
+    // A cube rests square to the viewer whichever face is up, so at elevation θ
+    // it covers its top face foreshortened plus the one side wall the tilt
+    // reveals: a²·sinθ + a²·cosθ.
+    const elevation = (80 * Math.PI) / 180;
+    const face = DIE_SIZE * DIE_SIZE;
+    expect(restingSilhouette(6)).toBeCloseTo(
+      face * Math.sin(elevation) + face * Math.cos(elevation),
+      4,
+    );
   });
 
-  it("gives every die the same resting footprint once scaled", () => {
-    const reference = restingFootprint(20);
+  it("gives every die the same silhouette once scaled", () => {
+    const reference = restingSilhouette(20);
     for (const sides of ALL_SHAPES) {
-      const scaled = restingFootprint(sides) * apparentScale(sides) ** 2;
+      const scaled = restingSilhouette(sides) * apparentScale(sides) ** 2;
       expect(scaled, `d${sides}`).toBeCloseTo(reference, 6);
     }
   });
