@@ -16,7 +16,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from "three";
-import type { PresentContext, PresenterBackend, VisualCoin, VisualDie } from "../backend.js";
+import type { PresentContext, PresenterBackend, VisualDie } from "../backend.js";
 import { restingSilhouette } from "../math/orientation.js";
 import type { CoinModel, DieModelSet } from "../theme.js";
 import { hasCalibratedModel } from "../theme.js";
