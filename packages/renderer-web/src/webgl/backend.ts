@@ -47,6 +47,11 @@ const SETTLE_TAIL_MS = 120;
 /** Dropped dice stay indistinguishable until the whole roll has landed. */
 const REVEAL_HOLD_MS = 220;
 const REVEAL_MS = 420;
+/** A coin rests, is tossed, and lands again — it never simply spins in place. */
+const COIN_REST_MS = 200;
+const COIN_FLIGHT_MS = 1050;
+const COIN_HEIGHT = 4.2;
+const FLIP_AXIS = new Vector3(1, 0, 0);
 const DIE_SPACING = 2.4;
 const DICE_PER_ROW = 6;
 const DIE_RADIUS = 1.25;
@@ -261,9 +266,20 @@ function finalDieOrientation(die: VisualDie): Quaternion {
   return new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), yaw).multiply(upright);
 }
 
+/**
+ * A coin toss instead of a die tumble: the coin sits flat, is thrown, spins end
+ * over end, and comes down on its result. `turns` counts half turns, so its
+ * parity decides which face is up when the arc ends.
+ */
+type FlipPlan = {
+  readonly heads: Quaternion;
+  readonly turns: number;
+};
+
 type DieEntry = {
   readonly object: Object3D;
   readonly finalOrientation: Quaternion;
+  readonly flip?: FlipPlan;
   readonly restingPosition: Vector3;
   readonly baseScale: Vector3;
   readonly startQuaternion: Quaternion;
@@ -293,7 +309,7 @@ function layoutPosition(index: number, total: number): Vector3 {
 }
 
 function ownedMaterials(object: Object3D): MeshStandardMaterial[] {
-  const fromModel = object.userData.dimMaterials as MeshStandardMaterial[] | undefined;
+  const fromModel = object.userData.ownedMaterials as MeshStandardMaterial[] | undefined;
   if (fromModel) return fromModel;
   const collected: MeshStandardMaterial[] = [];
   object.traverse((child) => {
@@ -424,8 +440,10 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
     }
     return new Promise<void>((resolve, reject) => {
       const started = performance.now();
-      const landedAt =
-        BASE_DURATION_MS + STAGGER_MS * Math.max(0, entries.length - 1) + SETTLE_TAIL_MS;
+      const tossing = entries.some((entry) => entry.flip);
+      const landedAt = tossing
+        ? COIN_REST_MS + COIN_FLIGHT_MS
+        : BASE_DURATION_MS + STAGGER_MS * Math.max(0, entries.length - 1) + SETTLE_TAIL_MS;
       const hasDropped = entries.some((entry) => !entry.kept);
       const revealAt = landedAt + REVEAL_HOLD_MS;
       const endsAt = hasDropped ? revealAt + REVEAL_MS : landedAt;
@@ -445,6 +463,21 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
       const frame = (now: number): void => {
         const elapsed = now - started;
         for (const entry of entries) {
+          if (entry.flip) {
+            // Sits flat, is tossed, and drops back onto the same spot. The arc
+            // starts and ends at the table, so the coin lands rather than
+            // hanging in the air.
+            const u = clamp01((elapsed - COIN_REST_MS) / COIN_FLIGHT_MS);
+            const settleEase = u * u * (3 - 2 * u);
+            entry.object.position.copy(entry.restingPosition);
+            entry.object.position.y = entry.restingPosition.y + COIN_HEIGHT * Math.sin(Math.PI * u);
+            const spin = new Quaternion().setFromAxisAngle(
+              FLIP_AXIS,
+              Math.PI * entry.flip.turns * settleEase,
+            );
+            entry.object.quaternion.copy(spin.multiply(entry.flip.heads));
+            continue;
+          }
           const local = clamp01((elapsed - entry.delayMs) / BASE_DURATION_MS);
           entry.object.position.copy(entry.restingPosition);
           entry.object.position.y = entry.restingPosition.y + 5 * (1 - easeOutCubic(local));
@@ -483,6 +516,7 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
     index: number,
     total: number,
     kept: boolean,
+    flip?: FlipPlan,
   ): DieEntry {
     const restingPosition = layoutPosition(index, total);
     object.position.copy(restingPosition);
@@ -494,6 +528,7 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
     return {
       object,
       finalOrientation,
+      ...(flip ? { flip } : {}),
       restingPosition,
       baseScale: object.scale.clone(),
       startQuaternion: new Quaternion().setFromAxisAngle(
@@ -517,7 +552,7 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
       const tuple = models.faceRotations[die.shape]?.[die.face - 1];
       const model = url ? await loadDieModel(url) : null;
       if (model && tuple) {
-        const object = instantiateDieModel(model, !die.kept);
+        const object = instantiateDieModel(model);
         const textureUrl = models.textureUrls?.[die.shape];
         if (textureUrl) {
           const texture = await loadThemeTexture(textureUrl);
@@ -536,7 +571,7 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
     if (!coinModel) return null;
     const model = await loadDieModel(coinModel.url);
     if (!model) return null;
-    const object = instantiateDieModel(model, true);
+    const object = instantiateDieModel(model);
     for (const slot of ["heads", "tails", "rim"] as const) {
       const url = coinModel.textures?.[slot];
       if (!url) continue;
@@ -574,10 +609,17 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
       clearDice();
       const mesh = themed?.object ?? buildCoinMesh(coin, dieColor, labelColor);
       const finalOrientation = themed?.final ?? (mesh.userData.finalOrientation as Quaternion);
+      // Start resting heads-up and choose the number of half turns by parity, so
+      // the toss lands on the resolved face without correcting mid-air.
+      const heads = themed
+        ? new Quaternion(...(coinModel?.rotations[0] ?? [0, 0, 0, 1]))
+        : new Quaternion();
+      const wholeTurns = 4 + 2 * Math.floor(Math.random() * 2);
+      const turns = coin.outcome === "heads" ? wholeTurns : wholeTurns + 1;
       elevationDeg = TOP_DOWN_ELEVATION;
       framedRadius = DIE_RADIUS;
       frameCamera();
-      return animate([toEntry(mesh, finalOrientation, 0, 1, true)], context);
+      return animate([toEntry(mesh, finalOrientation, 0, 1, true, { heads, turns })], context);
     },
     dispose() {
       cancelActive?.();

@@ -26,6 +26,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Themed dice ignored a theme change: only one shape took the new colour while the rest kept the previous one. Cloning a model shares its materials with the loader's cache, so applying a texture repainted every die of that shape ever shown, and clearing the scene disposed materials the cache still needed. Each presented die now owns its materials.
+- The coin no longer spins on the spot. It rests flat, is tossed into the air spinning end over end, and drops back down onto its result; the number of half turns is picked by parity so it lands on the resolved face without correcting mid-flight.
+- Bevel width is now proportional to each solid's face size instead of a single absolute value, which left the d10's large faces looking unrounded at the setting that suited the d20's small ones.
+- Face UVs leave a margin inside their atlas tile, so bevelled geometry cannot sample a neighbouring face's numeral.
 - Dropped dice no longer render translucent. They were dimmed partly by lowering opacity, which — with double-sided materials — let a die's own interior and back faces show through, reading as a rendering glitch. Dropped dice are now fully opaque and dimmed by color alone.
 - Half of the procedural d10's triangles were wound inward, so their lighting normals faced into the solid. All faces are now wound outward (`faceTriangles`), which also lets dice render with back-face culling as the closed solids they are.
 - Procedural die labels could sit partly off a triangular face, and each shape rendered at a different physical size.

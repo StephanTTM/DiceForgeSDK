@@ -4,6 +4,7 @@
   "atlas": {
    "columns": 2,
    "rows": 2,
+   "faceFraction": 0.82,
    "faces": [
     {
      "tile": [
@@ -67,6 +68,7 @@
   "atlas": {
    "columns": 3,
    "rows": 2,
+   "faceFraction": 0.82,
    "faces": [
     {
      "tile": [
@@ -156,6 +158,7 @@
   "atlas": {
    "columns": 3,
    "rows": 3,
+   "faceFraction": 0.82,
    "faces": [
     {
      "tile": [
@@ -271,6 +274,7 @@
   "atlas": {
    "columns": 4,
    "rows": 3,
+   "faceFraction": 0.82,
    "faces": [
     {
      "tile": [
@@ -412,6 +416,7 @@
   "atlas": {
    "columns": 4,
    "rows": 3,
+   "faceFraction": 0.82,
    "faces": [
     {
      "tile": [
@@ -579,6 +584,7 @@
   "atlas": {
    "columns": 5,
    "rows": 4,
+   "faceFraction": 0.82,
    "faces": [
     {
      "tile": [

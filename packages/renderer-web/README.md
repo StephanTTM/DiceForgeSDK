@@ -77,6 +77,8 @@ Custom model sets implement `DieModelSet`. A model is used only when its shape h
 
 Dice tumble in, then settle into the orientation that shows each resolved face. The camera frames the whole layout automatically and looks down from a steep angle, so the face that counts is the one facing the viewer. A roll made entirely of d4s is the exception: those are read from the side, so they get a lower, angled view.
 
+A coin is not rolled but tossed: it rests flat, is thrown into the air spinning end over end, and drops back onto the same spot. The number of half turns is chosen by parity so the toss lands on the resolved face without any mid-air correction.
+
 **Dropped dice are revealed only after the roll lands.** Every die looks identical while it is in motion; once all of them have settled, a short pause passes and then dice excluded by a keep/drop selection darken and shrink slightly. They stay on the table, fully opaque, so the whole roll can still be read — nothing disappears, nothing turns see-through, and nothing gives the outcome away early. Under reduced motion there is no animation at all: the final state, dimming included, appears immediately.
 
 ## Fallback tiers

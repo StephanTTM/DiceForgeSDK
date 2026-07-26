@@ -94,27 +94,29 @@ export function applyTexture(
 }
 
 /**
- * Clones a normalized model for one presentation. When the die may later be
- * dimmed (a dropped die), its materials are cloned up front and exposed on
- * `userData.dimMaterials` so recoloring never leaks into the cached original.
- * The clone starts identical to a kept die: the reveal happens after landing.
+ * Clones a normalized model for one presentation.
+ *
+ * `Object3D.clone()` shares materials with the original, and the original here
+ * is the loader's cache. Every instance therefore gets its own copies: without
+ * that, applying a theme texture would repaint every die of that shape ever
+ * shown, and clearing the scene would dispose materials the cache still needs.
+ * The copies are listed on `userData.ownedMaterials` so the scene knows exactly
+ * what it may recolor and dispose.
  */
-export function instantiateDieModel(model: Object3D, dimmable: boolean): Object3D {
+export function instantiateDieModel(model: Object3D): Object3D {
   const instance = model.clone(true);
-  if (!dimmable) return instance;
-  const clones: Material[] = [];
+  const owned: Material[] = [];
   instance.traverse((child) => {
     if (child instanceof Mesh) {
       const materials = Array.isArray(child.material) ? child.material : [child.material];
       const copies = materials.map((material: Material) => {
         const copy = material.clone();
-        clones.push(copy);
+        owned.push(copy);
         return copy;
       });
       child.material = Array.isArray(child.material) ? copies : (copies[0] ?? child.material);
     }
   });
-  // The scene disposes these clones on clear; cached originals stay intact.
-  instance.userData.dimMaterials = clones;
+  instance.userData.ownedMaterials = owned;
   return instance;
 }

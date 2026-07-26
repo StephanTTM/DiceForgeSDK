@@ -32,7 +32,7 @@ Blender 5.1 has **no bevel geometry node**, and its mesh primitives stop at cube
 
 - **`dice_shapes.py`** builds each solid exactly, in pure Python. The math mirrors `packages/renderer-web/src/math/geometry.ts`, which is unit-tested for planarity, distinct outward normals, and face-up orientation — so the generated models and the renderer's built-in procedural dice are the same shapes.
 - **The "DiceForge Finish" geometry node group** normalizes every die to a common longest-axis size, measured live from its bounding box. Add a new solid and it is scaled to match the rest without touching the script.
-- **A Bevel modifier** rounds the edges (width and segments are constants at the top of `build_dice.py`), since no node equivalent exists.
+- **A Bevel modifier** rounds the edges, since no node equivalent exists. Width is *per shape*, computed as a fraction of that solid's mean face radius (`DICEFORGE_BEVEL_FRACTION`, default 0.13): one absolute width would leave a d10's large faces looking sharp at the same setting that melts a d20's small ones.
 
 ## Numbering and orientation
 
@@ -51,6 +51,6 @@ npm run demo:web
 
 ## UV atlas
 
-Each face is mapped into its own square tile of an atlas grid (`atlas.columns` × `atlas.rows`), centred on the face and scaled by its circumradius so it can never bleed into a neighbouring tile. Per face, `fit` is inradius ÷ circumradius: the fraction of the tile a centred numeral may occupy before it crosses an edge — 0.5 on an equilateral triangle, ~0.43 on the d10's kites, 1.0 on a square. A texture generator should size glyphs by it.
+Each face is mapped into its own square tile of an atlas grid (`atlas.columns` × `atlas.rows`), centred on the face and scaled by its circumradius. A face spans only `atlas.faceFraction` of its tile: bevelling extends geometry slightly past the original face and its UVs go with it, so the margin keeps that overshoot from sampling the neighbouring tile. The texture generator scales glyphs by the same fraction, so the numerals keep their proportions. Per face, `fit` is inradius ÷ circumradius: the fraction of the tile a centred numeral may occupy before it crosses an edge — 0.5 on an equilateral triangle, ~0.43 on the d10's kites, 1.0 on a square. A texture generator should size glyphs by it.
 
 The coin carries three material slots — `forge_coin_heads`, `forge_coin_tails`, `forge_coin_rim` — so its two faces can be textured independently.

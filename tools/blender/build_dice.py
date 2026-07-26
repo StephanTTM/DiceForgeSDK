@@ -26,6 +26,7 @@ import math
 import os
 import sys
 
+import bmesh
 import bpy
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -37,8 +38,17 @@ OUT_DIR = os.path.join(REPO, "assets", "forge")
 BLEND_PATH = os.path.join(REPO, "tools", "blender", "diceforge-dice.blend")
 
 DIE_SIZE = 2.1
-BEVEL_WIDTH = 0.055
-BEVEL_SEGMENTS = 3
+# Bevel width is measured per shape rather than fixed: one absolute width makes
+# a d20's small faces look melted at the same setting that leaves a d10's large
+# faces looking sharp. Scaling by mean face radius gives every die the same
+# apparent rounding.
+BEVEL_FRACTION = float(os.environ.get("DICEFORGE_BEVEL_FRACTION", "0.13"))
+BEVEL_SEGMENTS = int(os.environ.get("DICEFORGE_BEVEL_SEGMENTS", "4"))
+# Fraction of its atlas tile a face's UVs may span. Bevelling extends geometry
+# slightly past the original face, and those UVs go with it; without a margin
+# the overshoot samples the neighbouring tile and drags a sliver of someone
+# else's numeral onto the edge.
+FACE_TILE_FRACTION = 0.82
 
 
 # --------------------------------------------------------------------------
@@ -159,11 +169,12 @@ def face_uv_layout(vertices, faces):
         fits.append(min(1.0, max(0.2, inradius / circumradius)))
         column, row = index % columns, index // columns
         tile_centre = ((column + 0.5) * tile, 1.0 - (row + 0.5) * tile)
+        span = 0.5 * tile * FACE_TILE_FRACTION
         per_face_uv.append(
             [
                 (
-                    tile_centre[0] + 0.5 * tile * (u / circumradius),
-                    tile_centre[1] + 0.5 * tile * (v / circumradius),
+                    tile_centre[0] + span * (u / circumradius),
+                    tile_centre[1] + span * (v / circumradius),
                 )
                 for u, v in planar
             ]
@@ -179,9 +190,13 @@ def coin_uv_layout(vertices, faces):
     for index, face in enumerate(faces):
         if index < 2:  # top, then bottom
             flip = 1.0 if index == 0 else -1.0
+            span = 0.5 * FACE_TILE_FRACTION
             per_face_uv.append(
                 [
-                    (0.5 + 0.5 * flip * vertices[i][0] / radius, 0.5 + 0.5 * vertices[i][2] / radius)
+                    (
+                        0.5 + span * flip * vertices[i][0] / radius,
+                        0.5 + span * vertices[i][2] / radius,
+                    )
                     for i in face
                 ]
             )
@@ -271,6 +286,15 @@ def make_object(name: str, vertices, faces, uvs, materials: list[str], material_
     mesh.from_pydata([tuple(v) for v in vertices], [], [list(f) for f in faces])
     mesh.validate()
 
+    # Guarantee consistent outward normals before bevelling: an inconsistently
+    # wound face makes the modifier emit inverted geometry, which shows up as a
+    # dark slit once back faces are culled.
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(mesh)
+    bm.free()
+
     for material_name in materials:
         material = bpy.data.materials.get(material_name) or bpy.data.materials.new(material_name)
         material.use_nodes = True
@@ -279,21 +303,35 @@ def make_object(name: str, vertices, faces, uvs, materials: list[str], material_
         for polygon in mesh.polygons:
             polygon.material_index = material_index(polygon.index)
 
+    # Look UVs up by vertex index rather than by position in the loop, so a
+    # face flipped by the normal recalculation still gets the right corners.
     uv_layer = mesh.uv_layers.new(name="UVMap")
     for polygon in mesh.polygons:
-        face_uv = uvs[polygon.index]
-        for corner, loop_index in enumerate(polygon.loop_indices):
-            uv_layer.data[loop_index].uv = face_uv[corner]
+        by_vertex = {vertex: uvs[polygon.index][corner] for corner, vertex in enumerate(faces[polygon.index])}
+        for loop_index in polygon.loop_indices:
+            vertex = mesh.loops[loop_index].vertex_index
+            uv_layer.data[loop_index].uv = by_vertex[vertex]
 
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.scene.collection.objects.link(obj)
     return obj
 
 
-def finish_object(obj: bpy.types.Object, group: bpy.types.NodeTree, bevel: bool) -> None:
+def bevel_width_for(vertices, faces) -> float:
+    """Rounding proportional to how large this solid's faces actually are."""
+    radii = []
+    for face in faces:
+        centre = ds.centroid(vertices, face)
+        radii.append(max(math.dist(vertices[i], centre) for i in face))
+    return BEVEL_FRACTION * (sum(radii) / len(radii))
+
+
+def finish_object(
+    obj: bpy.types.Object, group: bpy.types.NodeTree, bevel: float | None
+) -> None:
     if bevel:
         modifier = obj.modifiers.new("Round", "BEVEL")
-        modifier.width = BEVEL_WIDTH
+        modifier.width = bevel
         modifier.segments = BEVEL_SEGMENTS
         modifier.limit_method = "ANGLE"
         modifier.angle_limit = math.radians(20)
@@ -336,7 +374,7 @@ def main() -> None:
         uvs, fits, columns, rows, up_axes = face_uv_layout(vertices, faces)
 
         obj = make_object(name, vertices, faces, uvs, [f"forge_{name}"], lambda _i: 0)
-        finish_object(obj, group, bevel=True)
+        finish_object(obj, group, bevel_width_for(vertices, faces))
         export(obj, os.path.join(OUT_DIR, f"{name}.glb"))
 
         # rotations[value - 1] orients the die so that value reads upward.
@@ -353,7 +391,12 @@ def main() -> None:
             }
         manifest[name] = {
             "faces": len(faces),
-            "atlas": {"columns": columns, "rows": rows, "faces": atlas},
+            "atlas": {
+                "columns": columns,
+                "rows": rows,
+                "faceFraction": FACE_TILE_FRACTION,
+                "faces": atlas,
+            },
             "rotations": [[round(c, 6) for c in q] for q in rotations],
         }
 
@@ -367,7 +410,7 @@ def main() -> None:
         ["forge_coin_heads", "forge_coin_tails", "forge_coin_rim"],
         lambda index: 0 if index == 0 else (1 if index == 1 else 2),
     )
-    finish_object(coin_obj, group, bevel=True)
+    finish_object(coin_obj, group, 0.05)
     export(coin_obj, os.path.join(OUT_DIR, "coin.glb"))
     manifest["coin"] = {
         "faces": 2,

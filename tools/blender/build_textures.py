@@ -120,12 +120,15 @@ def build_die_atlas(die: str, entry: dict, body, ink) -> Image.Image:
     scale = TILE * SUPERSAMPLE
     image = Image.new("RGB", (grid * scale, grid * scale), body)
     draw = ImageDraw.Draw(image)
+    # The face spans only this fraction of its tile (a margin keeps bevelled
+    # geometry from sampling the neighbour), so glyphs shrink to match.
+    fraction = atlas.get("faceFraction", 1.0)
     for value_index, face in enumerate(atlas["faces"]):
         column, row = face["tile"]
         centre = ((column + 0.5) * scale, (row + 0.5) * scale)
-        # `fit` spans the inscribed circle's diameter across the tile; hold a
+        # `fit` spans the inscribed circle's diameter across the face; hold a
         # little back so glyphs never touch a bevelled edge.
-        budget = face["fit"] * scale * 0.78
+        budget = face["fit"] * fraction * scale * 0.78
         draw_glyph(draw, die_label(die, value_index + 1), centre, budget, ink)
     return image.resize((grid * TILE, grid * TILE), Image.LANCZOS)
 
@@ -136,9 +139,11 @@ def build_coin_faces(body, ink) -> dict[str, Image.Image]:
     for name, glyph in (("heads", "H"), ("tails", "T")):
         image = Image.new("RGB", (scale, scale), body)
         draw = ImageDraw.Draw(image)
-        inset = scale * 0.09
-        draw.ellipse([inset, inset, scale - inset, scale - inset], outline=ink, width=int(scale * 0.02))
-        draw_glyph(draw, glyph, (scale / 2, scale / 2), scale * 0.46, ink)
+        inset = scale * 0.16
+        draw.ellipse(
+            [inset, inset, scale - inset, scale - inset], outline=ink, width=int(scale * 0.02)
+        )
+        draw_glyph(draw, glyph, (scale / 2, scale / 2), scale * 0.38, ink)
         faces[name] = image.resize((TILE * 2, TILE * 2), Image.LANCZOS)
     rim = Image.new("RGB", (TILE, TILE // 4), body)
     faces["rim"] = rim
