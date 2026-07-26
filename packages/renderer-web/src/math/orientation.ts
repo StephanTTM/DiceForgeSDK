@@ -56,10 +56,7 @@ export function faceUpQuaternion(sides: ShapedDieSides, value: number): Quaterni
  * normals from it, and an inward-facing triangle is lit from within and shows
  * through the solid whenever a material is not fully opaque.
  */
-export function faceTriangles(
-  data: PolyhedronData,
-  faceIndex: number,
-): [number, number, number][] {
+export function faceTriangles(data: PolyhedronData, faceIndex: number): [number, number, number][] {
   const face = data.faces[faceIndex];
   if (!face) {
     throw new DiceForgeError("invalid-argument", `face ${faceIndex} does not exist`);
