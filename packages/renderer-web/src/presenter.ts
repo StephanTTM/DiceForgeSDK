@@ -51,7 +51,13 @@ export function createDicePresenter(options: DicePresenterOptions): DicePresente
   const labelColor = options.colors?.label ?? options.theme?.colors.label ?? "#1d2230";
   const backend =
     mode === "webgl"
-      ? createWebglBackend({ container, dieColor, labelColor, models: options.theme?.models })
+      ? createWebglBackend({
+          container,
+          dieColor,
+          labelColor,
+          models: options.theme?.models,
+          coin: options.theme?.coin,
+        })
       : createDomBackend({ container, dieColor, labelColor });
   const announcer = options.announceResults === false ? undefined : createAnnouncer(container);
   let disposed = false;

@@ -4,19 +4,27 @@ Generates the first-party die set — d4, d6, d8, d10, d12, d20 and a two-faced 
 
 ## Regenerating
 
-Requires Blender 5.1 or newer on `PATH` (or call the executable directly). From the repository root:
+Three steps, in order — the second and third read what the first writes. Step 1 needs Blender 5.1+; steps 2 and 3 are plain Python (step 2 needs Pillow). From the repository root:
 
 ```bash
 blender --background --factory-startup --python tools/blender/build_dice.py
+python tools/blender/build_textures.py
+python tools/blender/emit_rotations.py
 ```
 
 Outputs, all overwritten in place:
 
-| File | Contents |
-| --- | --- |
-| `assets/forge/<name>.glb` | one model per die, plus `coin.glb` |
-| `assets/forge/face-rotations.json` | face-up rotations, UV atlas layout, coin materials |
-| `tools/blender/diceforge-dice.blend` | the scene, for inspecting or hand-editing |
+| File | Written by | Contents |
+| --- | --- | --- |
+| `assets/forge/<name>.glb` | `build_dice` | one model per die, plus `coin.glb` |
+| `assets/forge/face-rotations.json` | `build_dice` | face-up rotations, UV atlas layout, coin materials |
+| `tools/blender/diceforge-dice.blend` | `build_dice` | the scene, for inspecting or hand-editing |
+| `assets/forge/textures/<colour>/*.png` | `build_textures` | one atlas per die, plus coin heads/tails/rim |
+| `packages/renderer-web/src/forge-rotations.ts` | `emit_rotations` | the rotation tables the renderer imports |
+
+`forge-rotations.test.ts` compares the emitted TypeScript against the manifest, so forgetting step 3 fails the test suite rather than shipping stale orientations.
+
+Fonts: `build_textures.py` prefers DejaVu Sans Bold (permissively licensed, and bundled with matplotlib) so glyphs are identical anywhere it is installed, and falls back to a system bold face otherwise. It prints which font it used.
 
 ## Why this is a script plus a node group, not one node graph
 
@@ -28,7 +36,9 @@ Blender 5.1 has **no bevel geometry node**, and its mesh primitives stop at cube
 
 ## Numbering and orientation
 
-Faces are numbered so that opposite faces sum to *N+1*, the standard die layout, by pairing each face with its antipodal neighbour. A tetrahedron has no antipodal faces and is simply numbered 1–4.
+Faces are numbered so that opposite faces sum to *N+1*, the standard die layout, by pairing each face with its antipodal neighbour. A tetrahedron has no antipodal faces and is simply numbered 1–4. The d10 is labelled 0–9, so a 10 reads as "0" the way a percentile die does.
+
+Each rotation also carries a yaw, so a numeral is not just face-up but the right way up: the renderer views the table from above with world −Z as screen-up, and the face's texture-up axis is turned to point that way. That axis follows the face's first *edge* rather than a corner, which is what makes a d6 land square to the viewer instead of as a diamond.
 
 Because numbering is *assigned* here rather than measured afterwards, `face-rotations.json` is exact by construction — the manual calibration the KayKit models needed does not apply to these. Entry `rotations[value - 1]` is the quaternion `(x, y, z, w)` that turns the die so `value` reads upward, already converted to glTF's Y-up convention.
 

@@ -41,7 +41,9 @@ Remaining before tagging 0.1.0:
 - [x] Theme/asset pack policy and licensing checklist. (ADR-0010, `assets/LICENSES.md`, CONTRIBUTING)
 - [x] Add the missing `boardgame_bits_texture.png` so the KayKit D6_A/D6_B pip styles can be offered. (`d6Style: "pips-a" | "pips-b"`)
 - [x] Calibrate d10/d12 models so themes can cover every shape. (superseded: first-party set generated for every shape, tables exact by construction — ADR-0011)
-- [ ] Texture the first-party dice (numerals/pips into the UV atlas from `assets/forge/face-rotations.json`), then ship `forgeTheme()`.
+- [x] Texture the first-party dice, then ship `forgeTheme()`. (five colours, textured coin, `tools/blender/build_textures.py`)
+- [ ] Give the percentile tens die its own 00–90 texture; the renderer needs a per-role texture hook to select it.
+- [ ] Even out apparent die sizes: bounding-box normalization leaves a d4/d6 looking larger than a d20 beside them.
 - [ ] Give procedural dice beveled edges, or retire them if every shape gains a model set.
 - [ ] Replay support.
 - [ ] Optional multiplayer transport plugin research.

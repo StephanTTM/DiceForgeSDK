@@ -6,6 +6,8 @@
 import { createDiceEngine, createSeededRandomSource } from "@diceforge-sdk/core";
 import {
   createDicePresenter,
+  type ForgeColor,
+  forgeTheme,
   KAYKIT_FACE_ROTATIONS,
   KAYKIT_PIP_D6_ROTATIONS,
   type KayKitColor,
@@ -132,31 +134,39 @@ async function preview(): Promise<void> {
   host.append(stage);
 
   const themeColor = params.get("theme") as KayKitColor | null;
+  const forgeColor = params.get("forgeTheme") as ForgeColor | null;
+  const theme = forgeColor
+    ? forgeTheme({ baseUrl: "/forge", color: forgeColor })
+    : themeColor
+      ? kayKitTheme({
+          baseUrl: "/",
+          color: themeColor,
+          d6Style: (params.get("d6style") ?? "numerals") as KayKitD6Style,
+        })
+      : undefined;
   const presenter = createDicePresenter({
     container: stage,
     renderMode: "webgl",
     reducedMotion: "reduce",
-    ...(themeColor
-      ? {
-          theme: kayKitTheme({
-            baseUrl: "/",
-            color: themeColor,
-            d6Style: (params.get("d6style") ?? "numerals") as KayKitD6Style,
-          }),
-        }
-      : {}),
+    ...(theme ? { theme } : {}),
   });
   const engine = createDiceEngine({
     random: createSeededRandomSource(params.get("seed") ?? "table-42"),
   });
-  const event = engine.roll(params.get("notation") ?? "4d6dl1");
+  const event =
+    params.get("flip") === "1"
+      ? engine.flipCoin()
+      : engine.roll(params.get("notation") ?? "4d6dl1");
   await presenter.present(event);
   const canvas = stage.querySelector("canvas");
   (window as { __calibration?: unknown }).__calibration = {
     preview: true,
-    expression: event.expression,
-    dice: event.groups.flatMap((g) => g.dice.map((d) => `${d.value}${d.kept ? "" : " (dropped)"}`)),
-    total: event.total,
+    expression: event.kind === "roll" ? event.expression : "coin",
+    dice:
+      event.kind === "roll"
+        ? event.groups.flatMap((g) => g.dice.map((d) => `${d.value}${d.kept ? "" : " (dropped)"}`))
+        : [event.outcome],
+    total: event.kind === "roll" ? event.total : 0,
     count: 0,
     // Read back immediately: the drawing buffer is cleared once composited.
     dataUrl: canvas?.toDataURL("image/jpeg", 0.88) ?? null,

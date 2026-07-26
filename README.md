@@ -19,7 +19,7 @@ DiceForge SDK is an open-source, offline-first toolkit for deterministic dice ro
 - Injected randomness: a reproducible seeded source (same seed ⇒ same results on every platform) and a non-seeded system source, with provenance recorded in every result.
 - Immutable, schema-versioned event records with validating JSON serialization for storage, replay, and future presentation.
 - A browser presenter (`@diceforge-sdk/renderer-web`): Three.js 3D dice whose tumble always lands on the core-resolved face, with a no-WebGL DOM fallback, reduced-motion support, and aria-live announcements.
-- Optional themes: bring your own glTF dice models with a calibrated face table, or use the bundled KayKit theme (CC0 art, four colors). Art is never bundled into the packages.
+- Optional themes: a first-party textured die set covering every shape plus a two-faced coin (five colors), the bundled KayKit theme (CC0 art), or bring your own glTF models with a face table. Art is never bundled into the packages.
 
 Planned next: a popular-framework example and theme support, then Unity and Godot adapters. See [ROADMAP.md](ROADMAP.md).
 

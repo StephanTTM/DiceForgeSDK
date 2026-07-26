@@ -1,4 +1,15 @@
-import { Box3, Group, type Material, Mesh, type Object3D, Vector3 } from "three";
+import {
+  Box3,
+  Group,
+  type Material,
+  Mesh,
+  MeshStandardMaterial,
+  type Object3D,
+  SRGBColorSpace,
+  type Texture,
+  TextureLoader,
+  Vector3,
+} from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import { DIE_SIZE } from "../math/geometry.js";
@@ -36,6 +47,50 @@ export function loadDieModel(url: string): Promise<Object3D | null> {
     cache.set(url, pending);
   }
   return pending;
+}
+
+const textureCache = new Map<string, Promise<Texture | null>>();
+
+/**
+ * Loads a theme texture. Resolves null on failure so a missing atlas leaves the
+ * model's own material intact rather than breaking the presentation.
+ */
+export function loadThemeTexture(url: string): Promise<Texture | null> {
+  let pending = textureCache.get(url);
+  if (!pending) {
+    pending = new TextureLoader()
+      .loadAsync(url)
+      .then((texture) => {
+        texture.colorSpace = SRGBColorSpace;
+        texture.flipY = false; // glTF UVs have their origin at the top left
+        texture.anisotropy = 4;
+        return texture;
+      })
+      .catch(() => null);
+    textureCache.set(url, pending);
+  }
+  return pending;
+}
+
+/**
+ * Paints a texture onto a model's materials. `match` picks which materials to
+ * touch by name, so a coin can texture heads, tails and rim independently.
+ */
+export function applyTexture(
+  object: Object3D,
+  texture: Texture,
+  match: (materialName: string) => boolean = () => true,
+): void {
+  object.traverse((child) => {
+    if (!(child instanceof Mesh)) return;
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    for (const material of materials) {
+      if (material instanceof MeshStandardMaterial && match(material.name)) {
+        material.map = texture;
+        material.needsUpdate = true;
+      }
+    }
+  });
 }
 
 /**

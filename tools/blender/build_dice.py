@@ -126,7 +126,9 @@ def face_uv_layout(vertices, faces):
     Each face is centred on its tile and scaled by its circumradius, so the
     polygon always fits and never bleeds into a neighbour. `fit` records
     inradius/circumradius per face, which tells a texture generator how large a
-    numeral may be drawn before it crosses an edge.
+    numeral may be drawn before it crosses an edge. The per-face texture-up
+    axis is returned as well, because the export has to yaw each die so its
+    numeral reads upright once that face is on top.
     """
     count = len(faces)
     columns = math.ceil(math.sqrt(count))
@@ -134,12 +136,17 @@ def face_uv_layout(vertices, faces):
     tile = 1.0 / max(columns, rows)
     per_face_uv: list[list[tuple[float, float]]] = []
     fits: list[float] = []
+    up_axes: list[Vec3] = []
 
     for index, face in enumerate(faces):
         normal = ds.face_normal(vertices, face)
         centre = ds.centroid(vertices, face)
-        axis_u = ds._normalize(ds._sub(vertices[face[0]], centre))
+        # Align to the face's first edge, not to a corner: a numeral then sits
+        # parallel to an edge, so a d6 lands square to the viewer rather than
+        # as a diamond, and triangular faces read like real dice.
+        axis_u = ds._normalize(ds._sub(vertices[face[1]], vertices[face[0]]))
         axis_v = ds._cross(normal, axis_u)
+        up_axes.append(axis_v)
         planar = [
             (ds._dot(ds._sub(vertices[i], centre), axis_u), ds._dot(ds._sub(vertices[i], centre), axis_v))
             for i in face
@@ -161,7 +168,26 @@ def face_uv_layout(vertices, faces):
                 for u, v in planar
             ]
         )
-    return per_face_uv, fits, columns, rows
+    return per_face_uv, fits, columns, rows, up_axes
+
+
+def coin_uv_layout(vertices, faces):
+    """The coin's two flat faces each own a whole texture, so heads and tails
+    can carry full-resolution art. The rim strip is mapped separately."""
+    per_face_uv: list[list[tuple[float, float]]] = []
+    radius = max(math.hypot(v[0], v[2]) for v in vertices) or 1.0
+    for index, face in enumerate(faces):
+        if index < 2:  # top, then bottom
+            flip = 1.0 if index == 0 else -1.0
+            per_face_uv.append(
+                [
+                    (0.5 + 0.5 * flip * vertices[i][0] / radius, 0.5 + 0.5 * vertices[i][2] / radius)
+                    for i in face
+                ]
+            )
+        else:
+            per_face_uv.append([(0.0, 0.0), (0.0, 1.0), (1.0, 1.0), (1.0, 0.0)][: len(face)])
+    return per_face_uv
 
 
 def _distance_to_edge(point, a, b) -> float:
@@ -176,14 +202,39 @@ def _distance_to_edge(point, a, b) -> float:
 # --------------------------------------------------------------------------
 # Orientation table
 # --------------------------------------------------------------------------
+def _quat_rotate(q, v):
+    qx, qy, qz, qw = q
+    t = (2 * (qy * v[2] - qz * v[1]), 2 * (qz * v[0] - qx * v[2]), 2 * (qx * v[1] - qy * v[0]))
+    return (
+        v[0] + qw * t[0] + qy * t[2] - qz * t[1],
+        v[1] + qw * t[1] + qz * t[0] - qx * t[2],
+        v[2] + qw * t[2] + qx * t[1] - qy * t[0],
+    )
+
+
+def _quat_mul(a, b):
+    ax, ay, az, aw = a
+    bx, by, bz, bw = b
+    return (
+        aw * bx + ax * bw + ay * bz - az * by,
+        aw * by - ax * bz + ay * bw + az * bx,
+        aw * bz + ax * by - ay * bx + az * bw,
+        aw * bw - ax * bx - ay * by - az * bz,
+    )
+
+
+def to_gltf(vector) -> tuple[float, float, float]:
+    """Blender is Z-up, glTF is Y-up: (x, y, z) -> (x, z, -y)."""
+    return (vector[0], vector[2], -vector[1])
+
+
 def gltf_face_up_quaternion(normal_blender) -> list[float]:
     """Quaternion (x, y, z, w) that turns a face's normal to +Y in glTF space.
 
     The exporter converts Blender's Z-up coordinates to glTF's Y-up as
     (x, y, z) -> (x, z, -y), so the normal is converted before solving.
     """
-    nx, ny, nz = normal_blender
-    normal = (nx, nz, -ny)
+    normal = to_gltf(normal_blender)
     up = (0.0, 1.0, 0.0)
     dot = ds._dot(normal, up)
     if dot > 0.999999:
@@ -194,6 +245,22 @@ def gltf_face_up_quaternion(normal_blender) -> list[float]:
     quaternion = [axis[0], axis[1], axis[2], 1.0 + dot]
     length = math.sqrt(sum(component * component for component in quaternion))
     return [component / length for component in quaternion]
+
+
+def upright_face_rotation(normal_blender, texture_up_blender) -> list[float]:
+    """Face-up rotation, yawed so the face's numeral reads upright on screen.
+
+    Putting the face on top still leaves the die free to spin about the vertical
+    axis, which would leave numerals at arbitrary angles. The renderer views the
+    table from above with world -Z appearing as screen-up, so the face's
+    texture-up axis is turned to point that way.
+    """
+    face_up = gltf_face_up_quaternion(normal_blender)
+    turned = _quat_rotate(face_up, to_gltf(texture_up_blender))
+    angle = math.atan2(turned[0], turned[2])
+    yaw = math.pi - angle
+    spin = (0.0, math.sin(yaw / 2.0), 0.0, math.cos(yaw / 2.0))
+    return list(_quat_mul(spin, tuple(face_up)))
 
 
 # --------------------------------------------------------------------------
@@ -266,7 +333,7 @@ def main() -> None:
         vertices = ds.normalize_size(vertices, DIE_SIZE)
         faces = ds.wind_outward(vertices, faces)
         values = ds.number_faces(vertices, faces)
-        uvs, fits, columns, rows = face_uv_layout(vertices, faces)
+        uvs, fits, columns, rows, up_axes = face_uv_layout(vertices, faces)
 
         obj = make_object(name, vertices, faces, uvs, [f"forge_{name}"], lambda _i: 0)
         finish_object(obj, group, bevel=True)
@@ -277,7 +344,9 @@ def main() -> None:
         atlas: list[dict[str, object]] = [{} for _ in faces]
         for index, face in enumerate(faces):
             value = values[index]
-            rotations[value - 1] = gltf_face_up_quaternion(ds.face_normal(vertices, face))
+            rotations[value - 1] = upright_face_rotation(
+                ds.face_normal(vertices, face), up_axes[index]
+            )
             atlas[value - 1] = {
                 "tile": [index % columns, index // columns],
                 "fit": round(fits[index], 4),
@@ -289,7 +358,7 @@ def main() -> None:
         }
 
     coin_vertices, coin_faces = ds.coin()
-    coin_uvs, _fits, _c, _r = face_uv_layout(coin_vertices, coin_faces)
+    coin_uvs = coin_uv_layout(coin_vertices, coin_faces)
     coin_obj = make_object(
         "coin",
         coin_vertices,

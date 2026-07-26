@@ -11,16 +11,21 @@ export {
   resolveMotion,
   resolveRenderMode,
 } from "./capabilities.js";
+export { FORGE_COIN_ROTATIONS, FORGE_FACE_ROTATIONS } from "./forge-rotations.js";
 export type { DicePresenter, DicePresenterOptions } from "./presenter.js";
 export { createDicePresenter } from "./presenter.js";
 export type {
+  CoinModel,
   DiceTheme,
   DieModelSet,
+  ForgeColor,
   KayKitColor,
   KayKitD6Style,
   QuaternionTuple,
 } from "./theme.js";
 export {
+  FORGE_COLORS,
+  forgeTheme,
   hasCalibratedModel,
   KAYKIT_COLORS,
   KAYKIT_FACE_ROTATIONS,

@@ -26,9 +26,9 @@ import {
 import type { PresentContext, PresenterBackend, VisualCoin, VisualDie } from "../backend.js";
 import { dieGeometry, dot, subtract } from "../math/geometry.js";
 import { faceBasis, faceTriangles, faceUpQuaternion } from "../math/orientation.js";
-import type { DieModelSet } from "../theme.js";
+import type { CoinModel, DieModelSet } from "../theme.js";
 import { hasCalibratedModel } from "../theme.js";
-import { instantiateDieModel, loadDieModel } from "./models.js";
+import { applyTexture, instantiateDieModel, loadDieModel, loadThemeTexture } from "./models.js";
 
 export type WebglBackendOptions = {
   readonly container: HTMLElement;
@@ -36,6 +36,8 @@ export type WebglBackendOptions = {
   readonly labelColor: string;
   /** Optional theme models; shapes without a calibrated model render procedurally. */
   readonly models?: DieModelSet | undefined;
+  /** Optional themed coin; without one the built-in cylinder is used. */
+  readonly coin?: CoinModel | undefined;
 };
 
 const TUMBLE_PORTION = 0.62;
@@ -323,7 +325,7 @@ function applyDropReveal(entry: DieEntry, progress: number): void {
 }
 
 export function createWebglBackend(options: WebglBackendOptions): PresenterBackend {
-  const { container, dieColor, labelColor, models } = options;
+  const { container, dieColor, labelColor, models, coin: coinModel } = options;
   const renderer = new WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio ?? 1, 2));
   const width = container.clientWidth || 640;
@@ -515,13 +517,35 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
       const tuple = models.faceRotations[die.shape]?.[die.face - 1];
       const model = url ? await loadDieModel(url) : null;
       if (model && tuple) {
-        return {
-          object: instantiateDieModel(model, !die.kept),
-          final: new Quaternion(tuple[0], tuple[1], tuple[2], tuple[3]),
-        };
+        const object = instantiateDieModel(model, !die.kept);
+        const textureUrl = models.textureUrls?.[die.shape];
+        if (textureUrl) {
+          const texture = await loadThemeTexture(textureUrl);
+          if (texture) applyTexture(object, texture);
+        }
+        return { object, final: new Quaternion(tuple[0], tuple[1], tuple[2], tuple[3]) };
       }
     }
     return { object: buildDieMesh(die, dieColor, labelColor), final: finalDieOrientation(die) };
+  }
+
+  /** Themed coin model, or null to fall back to the built-in cylinder. */
+  async function resolveCoinObject(
+    outcome: "heads" | "tails",
+  ): Promise<{ object: Object3D; final: Quaternion } | null> {
+    if (!coinModel) return null;
+    const model = await loadDieModel(coinModel.url);
+    if (!model) return null;
+    const object = instantiateDieModel(model, true);
+    for (const slot of ["heads", "tails", "rim"] as const) {
+      const url = coinModel.textures?.[slot];
+      if (!url) continue;
+      const texture = await loadThemeTexture(url);
+      // Material names come from the model, e.g. "forge_coin_heads".
+      if (texture) applyTexture(object, texture, (name) => name.endsWith(slot));
+    }
+    const tuple = coinModel.rotations[outcome === "heads" ? 0 : 1];
+    return { object, final: new Quaternion(tuple[0], tuple[1], tuple[2], tuple[3]) };
   }
 
   return {
@@ -545,10 +569,11 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
       frameCamera();
       return animate(entries, context);
     },
-    presentCoin(coin, context) {
+    async presentCoin(coin, context) {
+      const themed = await resolveCoinObject(coin.outcome);
       clearDice();
-      const mesh = buildCoinMesh(coin, dieColor, labelColor);
-      const finalOrientation = mesh.userData.finalOrientation as Quaternion;
+      const mesh = themed?.object ?? buildCoinMesh(coin, dieColor, labelColor);
+      const finalOrientation = themed?.final ?? (mesh.userData.finalOrientation as Quaternion);
       elevationDeg = TOP_DOWN_ELEVATION;
       framedRadius = DIE_RADIUS;
       frameCamera();

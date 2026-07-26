@@ -2,6 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // Node types are for tests only (they read generated assets from disk);
+    // tsconfig.build.json excludes tests, so nothing shipped depends on them.
+    "types": ["node"],
     "rootDir": "src",
     "outDir": "dist"
   },

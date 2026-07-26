@@ -46,17 +46,28 @@ Every record is re-validated (`validateEventRecord`) before display. Die meshes 
 A theme is plain data: colors, plus an optional set of glTF model URLs with a **calibrated face-rotation table** that says which orientation shows which value. Models load lazily on first use and are cached.
 
 ```ts
-import { createDicePresenter, kayKitTheme } from "@diceforge-sdk/renderer-web";
+import { createDicePresenter, forgeTheme } from "@diceforge-sdk/renderer-web";
 
 const presenter = createDicePresenter({
   container,
-  theme: kayKitTheme({ baseUrl: "/dice-assets", color: "blue" }),
+  theme: forgeTheme({ baseUrl: "/dice-assets/forge", color: "blue" }),
 });
 ```
 
-**This package ships no art.** `baseUrl` points at wherever your app serves the model files from — copy them out of the repository's [`assets/`](../../assets) directory (or your own pack) and serve them statically. The bundled `kayKitTheme` expects the KayKit Board Game Bits files (CC0, Kay Lousberg; see [`assets/LICENSES.md`](../../assets/LICENSES.md)) at that base, in four colors: `red`, `blue`, `green`, `yellow`.
+Two themes ship with the package:
 
-Coverage is per shape: KayKit provides d4, d6, d8, and d20. A d10, d12, or percentile die in the same roll renders with the built-in procedural geometry in the theme's colors — mixed presentation is expected, not an error.
+| Theme | Covers | Art |
+| --- | --- | --- |
+| `forgeTheme({ baseUrl, color })` | d4–d20 **and** a two-faced coin | first-party, MIT, in `assets/forge/` |
+| `kayKitTheme({ baseUrl, color, d6Style })` | d4, d6, d8, d20 | KayKit Board Game Bits, CC0 |
+
+`forgeTheme` colours are `ivory` (default), `red`, `blue`, `green` and `yellow`. One model per die serves every colour — the theme swaps the texture atlas rather than the mesh — so adding a palette costs a few PNGs, not another set of models.
+
+**This package ships no art.** `baseUrl` points at wherever your app serves the model files from — copy them out of the repository's [`assets/`](../../assets) directory (or your own pack) and serve them statically. `forgeTheme` expects `assets/forge/` (models, plus `textures/<colour>/`); `kayKitTheme` expects the KayKit Board Game Bits files. Provenance and licences for both are in [`assets/LICENSES.md`](../../assets/LICENSES.md).
+
+A themed coin is optional too: `DiceTheme.coin` names a model whose heads, tails and rim materials are textured separately, and the two rotations that turn each face up. Without one, coin flips use the built-in cylinder.
+
+Coverage is per shape. The DiceForge set covers everything; KayKit provides d4, d6, d8 and d20, so a d10, d12 or percentile die in the same roll renders with the built-in procedural geometry in the theme's colours — mixed presentation is expected, not an error.
 
 The d6 comes in three styles — `numerals` (default), `pips-a`, and `pips-b` — selected with `kayKitTheme({ baseUrl, color, d6Style })`. The pip dice take their color from the pack's shared palette texture, so all four colors need `boardgame_bits_texture.png` present alongside the models.
 
@@ -87,6 +98,8 @@ A `role="status"` / `aria-live="polite"` region announces results in plain langu
 - Procedural dice use the classic 1/6-opposite layout on the d6 only; other shapes number faces in construction order.
 - Labels on non-top faces may appear rotated; only the landing face is yawed to read upright.
 - A roll mixing d4s with other shapes uses the top-down camera, which is the harder angle for reading a d4.
+- Model dice are scaled so each has the same longest bounding-box axis. That leaves a d4 and d6 looking slightly larger than a d20 next to them, since a compact solid fills more of its box.
+- A percentile roll shows two d10s carrying the same 0–9 atlas; a dedicated 00–90 tens texture is not wired up yet.
 
 ## Compatibility
 
