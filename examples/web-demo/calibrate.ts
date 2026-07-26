@@ -164,7 +164,92 @@ async function preview(): Promise<void> {
   console.log("preview ready");
 }
 
+/**
+ * Checks a generated DiceForge model against its exported rotation table: for
+ * every value, the table must bring a different face to the top, and together
+ * they must cover every face exactly once. This validates the shipped .glb
+ * rather than trusting the generator's arithmetic.
+ */
+async function forgeCheck(): Promise<void> {
+  const name = params.get("forge") ?? "d20";
+  const manifest = await (await fetch("/forge/face-rotations.json")).json();
+  const entry = manifest[name];
+  const gltf = await new GLTFLoader().loadAsync(`/forge/${name}.glb`);
+  const model = gltf.scene;
+  const box = new Box3().setFromObject(model);
+  const size = box.getSize(new Vector3());
+  const centre = box.getCenter(new Vector3());
+  const wrapper = new Group();
+  model.position.sub(centre);
+  wrapper.add(model);
+  wrapper.scale.setScalar(2.1 / Math.max(size.x, size.y, size.z));
+
+  const faceCount = entry.faces as number;
+  // Bevels add small chamfer faces; keep only the largest clusters, which are
+  // the real die faces.
+  const normals = faceClusters(wrapper, faceCount);
+  const winners: number[] = [];
+  for (const q of entry.rotations as number[][]) {
+    const quaternion = new Quaternion(q[0], q[1], q[2], q[3]);
+    let best = -1;
+    let bestY = Number.NEGATIVE_INFINITY;
+    normals.forEach((normal, index) => {
+      const y = normal.clone().applyQuaternion(quaternion).y;
+      if (y > bestY) {
+        bestY = y;
+        best = index;
+      }
+    });
+    winners.push(best);
+  }
+  const unique = new Set(winners);
+  const scene = new Scene();
+  scene.add(new AmbientLight(0xffffff, 1.3));
+  const light = new DirectionalLight(0xffffff, 1.7);
+  light.position.set(2, 8, 3);
+  scene.add(light);
+  scene.add(wrapper);
+  const camera = new PerspectiveCamera(35, 1, 0.1, 50);
+  camera.position.set(0, 6.5, 0.75);
+  camera.lookAt(0, 0, 0);
+  const renderer = new WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(CELL, CELL);
+  const sheet = document.createElement("canvas");
+  const rows = Math.ceil((entry.rotations as number[][]).length / COLS);
+  sheet.width = COLS * CELL;
+  sheet.height = rows * CELL;
+  const ctx = sheet.getContext("2d");
+  if (ctx) {
+    ctx.fillStyle = "#dddddd";
+    ctx.fillRect(0, 0, sheet.width, sheet.height);
+    (entry.rotations as number[][]).forEach((q, index) => {
+      wrapper.quaternion.set(q[0] ?? 0, q[1] ?? 0, q[2] ?? 0, q[3] ?? 1);
+      renderer.render(scene, camera);
+      const x = (index % COLS) * CELL;
+      const y = Math.floor(index / COLS) * CELL;
+      ctx.drawImage(renderer.domElement, x, y, CELL, CELL);
+      ctx.fillStyle = "#c22";
+      ctx.font = "bold 16px system-ui";
+      ctx.fillText(`v${index + 1} → face ${winners[index]}`, x + 6, y + 18);
+      ctx.strokeStyle = "#999";
+      ctx.strokeRect(x, y, CELL, CELL);
+    });
+    document.querySelector("#out")?.append(sheet);
+  }
+  (window as { __calibration?: unknown }).__calibration = {
+    forge: name,
+    faces: faceCount,
+    clusters: normals.length,
+    distinctTopFaces: unique.size,
+    pass: unique.size === faceCount && normals.length === faceCount,
+    dataUrl: sheet.toDataURL("image/jpeg", 0.86),
+    count: 0,
+  };
+  console.log("forge check ready");
+}
+
 async function main(): Promise<void> {
+  if (params.get("forge")) return forgeCheck();
   if (params.get("preview") === "1") return preview();
   const gltf = await new GLTFLoader().loadAsync(`/${fileName}`);
   const model = gltf.scene;

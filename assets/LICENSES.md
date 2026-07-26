@@ -1,8 +1,18 @@
-# Third-party assets
+# Assets
 
 Assets in this directory are optional presentation content. They are served by
 examples and theme factories at runtime and are **never bundled into the npm
 packages** (see ADR-0010 and CONTRIBUTING.md).
+
+## DiceForge die set (`forge/`) — first-party
+
+- **Files:** `forge/d4.glb`, `d6`, `d8`, `d10`, `d12`, `d20`, `coin.glb`, and `forge/face-rotations.json`
+- **Author:** DiceForgeSDK contributors
+- **License:** MIT, the same as the rest of this repository
+- **Source:** generated from `tools/blender/build_dice.py` — see [tools/blender/README.md](../tools/blender/README.md) to regenerate (ADR-0011)
+- **Notes:** covers every shape the SDK resolves, including the d10 and d12 the KayKit pack lacks, plus a coin whose two faces carry separate materials. Untextured for now; face numbering and the UV atlas are defined in `face-rotations.json`.
+
+# Third-party assets
 
 ## KayKit Board Game Bits — dice models
 

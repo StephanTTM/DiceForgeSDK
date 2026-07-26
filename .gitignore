@@ -5,3 +5,7 @@ coverage/
 *.tsbuildinfo
 .DS_Store
 Thumbs.db
+
+# Blender / Python tooling leftovers
+__pycache__/
+*.blend1
