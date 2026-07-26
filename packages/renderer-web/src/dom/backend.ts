@@ -113,14 +113,20 @@ export function createDomBackend(options: DomBackendOptions): PresenterBackend {
   }
 
   return {
-    presentDice(dice, context) {
+    async presentDice(dice, context) {
       const tiles = dice.map((die: VisualDie) =>
         makeTile(topLabel(die), `d${die.shape}`, die.kept, false),
       );
-      return show(tiles, context);
+      await show(tiles, context);
+      // Tiles need no assets, so this backend can always draw a resolved event.
+      return true;
     },
-    presentCoin(coin: VisualCoin, context) {
-      return show([makeTile(coin.outcome === "heads" ? "H" : "T", "coin", true, true)], context);
+    async presentCoin(coin: VisualCoin, context) {
+      await show([makeTile(coin.outcome === "heads" ? "H" : "T", "coin", true, true)], context);
+      return true;
+    },
+    setVisible(visible: boolean) {
+      root.style.display = visible ? "flex" : "none";
     },
     dispose() {
       root.remove();

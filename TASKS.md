@@ -44,10 +44,10 @@ Remaining before tagging 0.1.0:
 - [x] Texture the first-party dice, then ship `forgeTheme()`. (five colours, textured coin, `tools/blender/build_textures.py`)
 - [x] Give the percentile tens die its own 00–90 texture. (`DieModelSet.tensTextureUrl`, generated per colour)
 - [x] Even out apparent die sizes. (`apparentScale` equalizes each die's resting footprint, for both model and built-in dice)
-- [ ] Give procedural dice beveled edges, or retire them if every shape gains a model set.
+- [x] Give procedural dice beveled edges, or retire them. (retired, along with the KayKit pack — ADR-0012)
 - [ ] Replay support.
 - [ ] Optional multiplayer transport plugin research.
-- [ ] Browser-based visual regression testing for the renderer.
+- [ ] Browser-based visual regression testing for the renderer. (in progress)
 
 ## Task maintenance
 

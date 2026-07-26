@@ -1,7 +1,7 @@
 import { DiceForgeError } from "@diceforge-sdk/core";
 import { Quaternion, Vector3 } from "three";
 import type { PolyhedronData, ShapedDieSides, Vec3 } from "./geometry.js";
-import { cross, dieGeometry, dot, faceCentroid, normalize, subtract } from "./geometry.js";
+import { dieGeometry, dot, faceCentroid, normalize } from "./geometry.js";
 
 /**
  * Outward unit normal of a face, independent of winding order: Newell's
@@ -47,36 +47,6 @@ export function faceUpQuaternion(sides: ShapedDieSides, value: number): Quaterni
   }
   const normal = faceNormal(data, value - 1);
   return new Quaternion().setFromUnitVectors(new Vector3(...normal), UP);
-}
-
-/**
- * Fans a face into triangles wound counter-clockwise when seen from outside
- * the die. The source polygon lists corners in whichever order each solid was
- * authored, so winding must be corrected here: renderers derive lighting
- * normals from it, and an inward-facing triangle is lit from within and shows
- * through the solid whenever a material is not fully opaque.
- */
-export function faceTriangles(data: PolyhedronData, faceIndex: number): [number, number, number][] {
-  const face = data.faces[faceIndex];
-  if (!face) {
-    throw new DiceForgeError("invalid-argument", `face ${faceIndex} does not exist`);
-  }
-  const outward = faceNormal(data, faceIndex);
-  const triangles: [number, number, number][] = [];
-  for (let i = 1; i + 1 < face.length; i++) {
-    const a = face[0] ?? -1;
-    const b = face[i] ?? -1;
-    const c = face[i + 1] ?? -1;
-    const va = data.vertices[a];
-    const vb = data.vertices[b];
-    const vc = data.vertices[c];
-    if (!va || !vb || !vc) {
-      throw new DiceForgeError("invalid-argument", "face references a missing vertex");
-    }
-    const winding = cross(subtract(vb, va), subtract(vc, va));
-    triangles.push(dot(winding, outward) >= 0 ? [a, b, c] : [a, c, b]);
-  }
-  return triangles;
 }
 
 /** Area of the convex hull of 2D points, via the monotone chain. */
@@ -160,39 +130,4 @@ export function restingSilhouette(sides: ShapedDieSides): number {
   // Every face in turn: the poses this die can come to rest in.
   const poses = data.faces.map((_, index) => faceUpQuaternion(sides, index + 1));
   return silhouetteArea(points, poses);
-}
-
-const apparentScales = new Map<ShapedDieSides, number>();
-
-/**
- * Uniform scale that makes every die cover the same amount of screen.
- *
- * Solids are built to a common bounding box, but a compact one fills more of
- * that box: a d6 covers well over twice the area of a d8 at the same nominal
- * size, which reads as a mismatched set. What has to match is the silhouette
- * from where the camera actually sits — a die's height counts towards that, so
- * measuring the straight-down footprint instead leaves tall solids like the
- * d10 looking oversized next to the d20. The d20 is the reference and is
- * unchanged.
- */
-export function apparentScale(sides: ShapedDieSides): number {
-  const cached = apparentScales.get(sides);
-  if (cached !== undefined) return cached;
-  const scale = Math.sqrt(restingSilhouette(20) / restingSilhouette(sides));
-  apparentScales.set(sides, scale);
-  return scale;
-}
-
-/** In-plane axes of a face, for projecting its polygon into UV space. */
-export function faceBasis(data: PolyhedronData, faceIndex: number): { u: Vec3; v: Vec3 } {
-  const face = data.faces[faceIndex];
-  const first = face ? data.vertices[face[0] ?? -1] : undefined;
-  const second = face ? data.vertices[face[1] ?? -1] : undefined;
-  if (!face || !first || !second) {
-    throw new DiceForgeError("invalid-argument", `face ${faceIndex} does not exist`);
-  }
-  const normal = faceNormal(data, faceIndex);
-  const u = normalize(subtract(second, first));
-  const v = normalize(cross(normal, u));
-  return { u, v };
 }

@@ -25,10 +25,19 @@ export type PresentContext = {
   readonly signal?: AbortSignalLike | undefined;
 };
 
-/** Internal rendering strategy behind `createDicePresenter`. */
+/**
+ * Internal rendering strategy behind `createDicePresenter`.
+ *
+ * `presentDice` and `presentCoin` resolve to false when this backend cannot
+ * draw the event — a theme that does not cover one of the shapes, or an asset
+ * that failed to load — so the presenter can fall back rather than leave a
+ * resolved die off the table.
+ */
 export interface PresenterBackend {
-  presentDice(dice: readonly VisualDie[], context: PresentContext): Promise<void>;
-  presentCoin(coin: VisualCoin, context: PresentContext): Promise<void>;
+  presentDice(dice: readonly VisualDie[], context: PresentContext): Promise<boolean>;
+  presentCoin(coin: VisualCoin, context: PresentContext): Promise<boolean>;
+  /** Hides this backend's output while another one is showing. */
+  setVisible(visible: boolean): void;
   dispose(): void;
 }
 

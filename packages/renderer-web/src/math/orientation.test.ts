@@ -2,13 +2,7 @@ import { Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import type { ShapedDieSides, Vec3 } from "./geometry.js";
 import { DIE_SIZE, dieGeometry, dot, faceCentroid, subtract } from "./geometry.js";
-import {
-  apparentScale,
-  faceNormal,
-  faceTriangles,
-  faceUpQuaternion,
-  restingSilhouette,
-} from "./orientation.js";
+import { faceNormal, faceUpQuaternion, restingSilhouette } from "./orientation.js";
 
 const ALL_SHAPES: readonly ShapedDieSides[] = [4, 6, 8, 10, 12, 20];
 
@@ -52,49 +46,7 @@ describe("dieGeometry", () => {
   });
 });
 
-describe("faceTriangles", () => {
-  it("covers each face with a fan of triangles", () => {
-    for (const sides of ALL_SHAPES) {
-      const data = dieGeometry(sides);
-      data.faces.forEach((face, faceIndex) => {
-        expect(faceTriangles(data, faceIndex)).toHaveLength(face.length - 2);
-      });
-    }
-  });
-
-  /**
-   * Renderers derive lighting normals from winding, so every triangle must be
-   * wound outward. A stray inward triangle is lit from inside the die and shows
-   * through it — the die looks broken rather than solid.
-   */
-  it("winds every triangle outward", () => {
-    for (const sides of ALL_SHAPES) {
-      const data = dieGeometry(sides);
-      data.faces.forEach((_, faceIndex) => {
-        const outward = new Vector3(...faceNormal(data, faceIndex));
-        for (const [a, b, c] of faceTriangles(data, faceIndex)) {
-          const va = new Vector3(...(data.vertices[a] ?? [0, 0, 0]));
-          const vb = new Vector3(...(data.vertices[b] ?? [0, 0, 0]));
-          const vc = new Vector3(...(data.vertices[c] ?? [0, 0, 0]));
-          const winding = vb.clone().sub(va).cross(vc.clone().sub(va));
-          expect(winding.dot(outward), `d${sides} face ${faceIndex + 1}`).toBeGreaterThan(0);
-        }
-      });
-    }
-  });
-});
-
-describe("apparentScale", () => {
-  /**
-   * The point of the scale: every die should cover the same area of table when
-   * resting, so a set does not look mismatched. Measured the same way the
-   * scale is derived, but independently of the cached result.
-   */
-  /**
-   * Pins the hull maths with a shape whose silhouette is known: a cube resting
-   * face-up, seen from a steep angle, covers its top square plus the sliver of
-   * one side wall that the tilt reveals.
-   */
+describe("restingSilhouette", () => {
   it("measures a silhouette from the camera's angle", () => {
     // A cube rests square to the viewer whichever face is up, so at elevation θ
     // it covers its top face foreshortened plus the one side wall the tilt
@@ -107,26 +59,10 @@ describe("apparentScale", () => {
     );
   });
 
-  it("gives every die the same silhouette once scaled", () => {
-    const reference = restingSilhouette(20);
-    for (const sides of ALL_SHAPES) {
-      const scaled = restingSilhouette(sides) * apparentScale(sides) ** 2;
-      expect(scaled, `d${sides}`).toBeCloseTo(reference, 6);
-    }
-  });
-
-  it("leaves the d20 as the reference and resizes the outliers", () => {
-    expect(apparentScale(20)).toBeCloseTo(1, 6);
-    // A d8 covers far less table than a d6 at the same bounding box, so it
-    // must grow while the d6 shrinks.
-    expect(apparentScale(8)).toBeGreaterThan(1.2);
-    expect(apparentScale(6)).toBeLessThan(1);
-  });
-
-  it("is stable across calls", () => {
-    for (const sides of ALL_SHAPES) {
-      expect(apparentScale(sides)).toBe(apparentScale(sides));
-    }
+  it("reports a larger silhouette for solids that fill their box", () => {
+    // The whole reason models are scaled by silhouette: a cube covers far more
+    // screen than an octahedron built to the same size.
+    expect(restingSilhouette(6)).toBeGreaterThan(restingSilhouette(8) * 2);
   });
 });
 

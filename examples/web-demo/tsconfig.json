@@ -8,5 +8,5 @@
       "@diceforge-sdk/renderer-web": ["../../packages/renderer-web/src/index.ts"]
     }
   },
-  "include": ["main.ts", "calibrate.ts"]
+  "include": ["main.ts", "devtools.ts"]
 }

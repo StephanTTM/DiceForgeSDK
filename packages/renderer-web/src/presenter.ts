@@ -1,7 +1,7 @@
 import type { InteractionPresenter, PresentationOptions } from "@diceforge-sdk/core";
 import { DiceForgeError, validateEventRecord } from "@diceforge-sdk/core";
 import { createAnnouncer, formatEventAnnouncement } from "./announce.js";
-import type { PresentContext } from "./backend.js";
+import type { PresentContext, PresenterBackend } from "./backend.js";
 import { visualDiceForEvent } from "./backend.js";
 import type { MotionPreference, RenderMode, RenderModePreference } from "./capabilities.js";
 import { resolveMotion, resolveRenderMode } from "./capabilities.js";
@@ -45,20 +45,30 @@ export function createDicePresenter(options: DicePresenterOptions): DicePresente
     throw new DiceForgeError("invalid-argument", "container must be an HTMLElement");
   }
   const doc = container.ownerDocument;
-  const mode = resolveRenderMode(options.renderMode ?? "auto", doc);
+  // 3D needs both WebGL and a theme to draw with: this package ships code, not
+  // art (ADR-0010), so without a theme there is nothing to render in 3D.
+  const wanted = resolveRenderMode(options.renderMode ?? "auto", doc);
+  const mode: RenderMode = wanted === "webgl" && options.theme?.models ? "webgl" : "dom";
   // Light body with dark numerals: the classic dice look, and legible small.
   const dieColor = options.colors?.die ?? options.theme?.colors.die ?? "#edf0f5";
   const labelColor = options.colors?.label ?? options.theme?.colors.label ?? "#1d2230";
-  const backend =
+
+  const webgl =
     mode === "webgl"
       ? createWebglBackend({
           container,
-          dieColor,
-          labelColor,
           models: options.theme?.models,
           coin: options.theme?.coin,
         })
-      : createDomBackend({ container, dieColor, labelColor });
+      : undefined;
+  // Created on demand: it is the fallback when the theme cannot draw a roll.
+  let dom: PresenterBackend | undefined =
+    mode === "dom" ? createDomBackend({ container, dieColor, labelColor }) : undefined;
+  const tiles = (): PresenterBackend => {
+    dom ??= createDomBackend({ container, dieColor, labelColor });
+    return dom;
+  };
+
   const announcer = options.announceResults === false ? undefined : createAnnouncer(container);
   let disposed = false;
   return {
@@ -74,16 +84,28 @@ export function createDicePresenter(options: DicePresenterOptions): DicePresente
         motion: resolveMotion(options.reducedMotion ?? "auto", doc.defaultView ?? globalThis),
         signal: presentationOptions?.signal,
       };
-      if (record.kind === "coin-flip") {
-        await backend.presentCoin({ outcome: record.outcome }, context);
+      const draw = (backend: PresenterBackend): Promise<boolean> =>
+        record.kind === "coin-flip"
+          ? backend.presentCoin({ outcome: record.outcome }, context)
+          : backend.presentDice(visualDiceForEvent(record), context);
+
+      // A themed roll the models cannot cover falls back to tiles for the whole
+      // event, so a resolved die is never simply missing from the table.
+      let drawn = webgl ? await draw(webgl) : false;
+      if (drawn) {
+        dom?.setVisible(false);
       } else {
-        await backend.presentDice(visualDiceForEvent(record), context);
+        const fallback = tiles();
+        webgl?.setVisible(false);
+        fallback.setVisible(true);
+        drawn = await draw(fallback);
       }
       announcer?.announce(formatEventAnnouncement(record));
     },
     dispose() {
       disposed = true;
-      backend.dispose();
+      webgl?.dispose();
+      dom?.dispose();
       announcer?.dispose();
     },
   };

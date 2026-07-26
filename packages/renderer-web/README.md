@@ -29,17 +29,17 @@ presenter.dispose();
 | Option            | Type                                | Default  | Meaning                                                                 |
 | ----------------- | ----------------------------------- | -------- | ----------------------------------------------------------------------- |
 | `container`       | `HTMLElement`                       | required | Element the presenter renders into.                                     |
-| `renderMode`      | `"auto" \| "webgl" \| "dom"`        | `"auto"` | `auto` uses WebGL when available, otherwise the DOM tile fallback.      |
+| `renderMode`      | `"auto" \| "webgl" \| "dom"`        | `"auto"` | `auto` uses WebGL when it is available *and* a theme supplies models.   |
 | `reducedMotion`   | `"auto" \| "animate" \| "reduce"`   | `"auto"` | `auto` honors the platform's `prefers-reduced-motion`.                  |
 | `announceResults` | `boolean`                           | `true`   | Maintain a visually hidden `aria-live` region announcing every result.  |
-| `theme`           | `DiceTheme`                         | built-in | Colors plus optional 3D models (see Themes).                            |
+| `theme`           | `DiceTheme`                         | none     | Colors plus the 3D models; required for WebGL (see Themes).             |
 | `colors`          | `{ die?: string; label?: string }`  | theme    | Color overrides; take precedence over the theme.                        |
 
 `present(event, { signal })` accepts an `AbortSignal`; aborting rejects the promise with an `"AbortError"`-named error. A failed or aborted presentation never invalidates the resolved event.
 
 ## How outcomes stay authoritative
 
-Every record is re-validated (`validateEventRecord`) before display. Die meshes are built from shared polyhedron data, and the tumble animation hands off to a rotation that ends **exactly** at the resolved face's orientation — the outcome is honored by construction, not by reading the physics. Presentation motion is intentionally non-deterministic (ARCHITECTURE.md permits this); the record is the replayable truth.
+Every record is re-validated (`validateEventRecord`) before display. The tumble animation hands off to a rotation that ends **exactly** at the resolved face's orientation — the outcome is honored by construction, not by reading the physics. Presentation motion is intentionally non-deterministic (ARCHITECTURE.md permits this); the record is the replayable truth.
 
 ## Themes and 3D models (ADR-0010)
 
@@ -54,24 +54,17 @@ const presenter = createDicePresenter({
 });
 ```
 
-Two themes ship with the package:
+`forgeTheme` ships with the package and covers d4–d20 plus a two-faced coin, in `ivory` (default), `red`, `blue`, `green` and `yellow`. One model per die serves every colour — the theme swaps the texture atlas rather than the mesh — so adding a palette costs a few PNGs, not another set of models.
 
-| Theme | Covers | Art |
-| --- | --- | --- |
-| `forgeTheme({ baseUrl, color })` | d4–d20 **and** a two-faced coin | first-party, MIT, in `assets/forge/` |
-| `kayKitTheme({ baseUrl, color, d6Style })` | d4, d6, d8, d20 | KayKit Board Game Bits, CC0 |
+**A theme is required for 3D.** This package ships code, not art, so without one — or for a roll a theme cannot cover — the presenter uses the DOM tiles instead (ADR-0012). `createDicePresenter({ container })` with no theme reports `mode: "dom"`.
 
-`forgeTheme` colours are `ivory` (default), `red`, `blue`, `green` and `yellow`. One model per die serves every colour — the theme swaps the texture atlas rather than the mesh — so adding a palette costs a few PNGs, not another set of models.
-
-**This package ships no art.** `baseUrl` points at wherever your app serves the model files from — copy them out of the repository's [`assets/`](../../assets) directory (or your own pack) and serve them statically. `forgeTheme` expects `assets/forge/` (models, plus `textures/<colour>/`); `kayKitTheme` expects the KayKit Board Game Bits files. Provenance and licences for both are in [`assets/LICENSES.md`](../../assets/LICENSES.md).
+**This package ships no art.** `baseUrl` points at wherever your app serves the model files from — copy them out of the repository's [`assets/forge/`](../../assets/forge) directory (or use your own pack) and serve them statically. Provenance and licences are in [`assets/LICENSES.md`](../../assets/LICENSES.md).
 
 A themed coin is optional too: `DiceTheme.coin` names a model whose heads, tails and rim materials are textured separately, and the two rotations that turn each face up. Without one, coin flips use the built-in cylinder.
 
-Coverage is per shape. The DiceForge set covers everything; KayKit provides d4, d6, d8 and d20, so a d10, d12 or percentile die in the same roll renders with the built-in procedural geometry in the theme's colours — mixed presentation is expected, not an error.
+Coverage is per shape, and it has to be complete: if a theme cannot draw every die in a roll, the presenter falls back to tiles for that whole roll rather than mixing art styles. The first-party set covers every shape the core resolves.
 
-The d6 comes in three styles — `numerals` (default), `pips-a`, and `pips-b` — selected with `kayKitTheme({ baseUrl, color, d6Style })`. The pip dice take their color from the pack's shared palette texture, so all four colors need `boardgame_bits_texture.png` present alongside the models.
-
-Custom model sets implement `DieModelSet`. A model is used only when its shape has both a URL **and** a rotation table of exactly `shape` entries; anything else falls back to procedural dice, as does any load or parse failure. That rule is what keeps a model from ever showing a face the core did not resolve. To calibrate a new pack, use the maintainer tool at `examples/web-demo/calibrate.html` — it derives the table from the mesh, and `?verify=1` re-renders straight from the shipped table so each cell can be checked against its expected value.
+Custom model sets implement `DieModelSet`. A model is used only when its shape has both a URL **and** a rotation table of exactly `shape` entries; anything less, or a load failure, drops the roll to tiles. That rule is what keeps a model from ever showing a face the core did not resolve. `examples/web-demo/devtools.html?forge=d20` checks a pack's models against their table.
 
 ## How a roll is presented
 
@@ -87,8 +80,8 @@ A coin is not rolled but tossed: it rests flat, is thrown into the air spinning 
 
 ## Fallback tiers
 
-1. **WebGL** — Three.js dice with numbered faces; dropped dice render dimmed; d100 appears as the classic percentile pair (tens + units d10, `100` = `00` + `0`).
-2. **DOM** — without WebGL (or with `renderMode: "dom"`), dice render as labeled tiles with the same kept/dropped states.
+1. **WebGL** — themed 3D dice; dropped dice render dimmed; d100 appears as the classic percentile pair (tens + units d10, `100` = `00` + `0`).
+2. **DOM** — without WebGL, without a theme, or with `renderMode: "dom"`, dice render as labeled tiles with the same kept/dropped states.
 3. **Reduced motion** — animations are skipped and results appear immediately; announcements still fire.
 
 In a hidden tab, browsers pause `requestAnimationFrame`, so an animated WebGL presentation completes when the tab becomes visible again (the animation is time-based and finishes immediately on resume).
@@ -100,9 +93,6 @@ A `role="status"` / `aria-live="polite"` region announces results in plain langu
 ## Known presentation limitations (v0.2 scope)
 
 - Dice are stylized rather than physically simulated: they tumble toward the resolved face instead of bouncing to it (a physics presenter is a future plugin category).
-- Built-in procedural dice have sharp edges — no bevels or rounded corners. They are meant as a clean, dependency-free default and as the fallback for shapes a theme does not cover; a model set looks better where one exists.
-- Procedural dice use the classic 1/6-opposite layout on the d6 only; other shapes number faces in construction order.
-- Labels on non-top faces may appear rotated; only the landing face is yawed to read upright.
 - A roll mixing d4s with other shapes uses the top-down camera, which is the harder angle for reading a d4.
 - Die sizes match to within about 1%, except the d6, which renders roughly 6% large. The camera is a perspective one, and a cube carries most of its silhouette in the top face nearest the lens; a narrow field of view reduces the effect but cannot remove it without going orthographic.
 

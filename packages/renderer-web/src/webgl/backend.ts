@@ -1,16 +1,10 @@
 import {
   AmbientLight,
-  BufferGeometry,
-  CanvasTexture,
   Color,
-  CylinderGeometry,
   DirectionalLight,
-  Float32BufferAttribute,
-  FrontSide,
   Group,
   HemisphereLight,
   Mesh,
-  MeshPhysicalMaterial,
   MeshStandardMaterial,
   type Object3D,
   PCFSoftShadowMap,
@@ -19,19 +13,11 @@ import {
   Quaternion,
   Scene,
   ShadowMaterial,
-  SRGBColorSpace,
   Vector3,
   WebGLRenderer,
 } from "three";
 import type { PresentContext, PresenterBackend, VisualCoin, VisualDie } from "../backend.js";
-import { dieGeometry, dot, subtract } from "../math/geometry.js";
-import {
-  apparentScale,
-  faceBasis,
-  faceTriangles,
-  faceUpQuaternion,
-  restingSilhouette,
-} from "../math/orientation.js";
+import { restingSilhouette } from "../math/orientation.js";
 import type { CoinModel, DieModelSet } from "../theme.js";
 import { hasCalibratedModel } from "../theme.js";
 import {
@@ -44,11 +30,9 @@ import {
 
 export type WebglBackendOptions = {
   readonly container: HTMLElement;
-  readonly dieColor: string;
-  readonly labelColor: string;
-  /** Optional theme models; shapes without a calibrated model render procedurally. */
+  /** The theme's models. A shape without one is not drawn by this backend. */
   readonly models?: DieModelSet | undefined;
-  /** Optional themed coin; without one the built-in cylinder is used. */
+  /** The theme's coin. Without one, coin flips are not drawn by this backend. */
   readonly coin?: CoinModel | undefined;
 };
 
@@ -86,203 +70,6 @@ function abortError(): Error {
   return error;
 }
 
-const textureCache = new Map<string, CanvasTexture>();
-
-/**
- * Numeral on a die face. Textures are cached across dice and never disposed:
- * the set of labels is small and bounded, and sharing keeps a 20-face die from
- * allocating twenty canvases per roll.
- */
-function labelTexture(
-  text: string,
-  dieColor: string,
-  labelColor: string,
-  fit: number,
-): CanvasTexture {
-  const key = `${text}|${dieColor}|${labelColor}|${fit.toFixed(2)}`;
-  const cached = textureCache.get(key);
-  if (cached) return cached;
-  const size = 512;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    // Soft vertical gradient reads as a curved, moulded face rather than a decal.
-    const base = new Color(dieColor);
-    const light = base.clone().lerp(new Color("#ffffff"), 0.1);
-    const dark = base.clone().lerp(new Color("#000000"), 0.12);
-    const gradient = ctx.createLinearGradient(0, 0, 0, size);
-    gradient.addColorStop(0, `#${light.getHexString()}`);
-    gradient.addColorStop(1, `#${dark.getHexString()}`);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, size, size);
-
-    const centre = size / 2;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    // UVs map a face's corner distance to 0.5, so its inscribed circle has
-    // radius `0.5 * fit`. Keep the numeral inside that circle: triangles get a
-    // smaller numeral than squares, and it never spills over an edge.
-    const room = size * fit;
-    const fontSize = text.length > 1 ? room * 0.6 : room * 0.85;
-    ctx.font = `600 ${fontSize}px "Segoe UI", system-ui, sans-serif`;
-    ctx.fillStyle = labelColor;
-    ctx.fillText(text, centre, centre);
-    if (text === "6" || text === "9") {
-      ctx.fillRect(
-        centre - fontSize * 0.28,
-        centre + fontSize * 0.44,
-        fontSize * 0.56,
-        size * 0.02,
-      );
-    }
-  }
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  texture.anisotropy = 4;
-  textureCache.set(key, texture);
-  return texture;
-}
-
-function dieMaterial(map: CanvasTexture): MeshPhysicalMaterial {
-  return new MeshPhysicalMaterial({
-    map,
-    roughness: 0.42,
-    metalness: 0,
-    clearcoat: 0.55,
-    clearcoatRoughness: 0.35,
-    // Faces are wound outward, so back faces can be culled: a die is a closed
-    // solid and should never show its own interior.
-    side: FrontSide,
-  });
-}
-
-/**
- * Builds a die mesh from the shared polyhedron data: one material group per
- * face, each mapped to a numbered texture, with UVs projected onto the face
- * plane so labels sit centered on their faces.
- */
-type Point2 = { u: number; v: number };
-
-/** Distance from a point to a line segment, used to find a face's inradius. */
-function distanceToEdge(point: Point2, a: Point2, b: Point2): number {
-  const edgeU = b.u - a.u;
-  const edgeV = b.v - a.v;
-  const lengthSq = edgeU * edgeU + edgeV * edgeV;
-  const t =
-    lengthSq === 0
-      ? 0
-      : Math.min(1, Math.max(0, ((point.u - a.u) * edgeU + (point.v - a.v) * edgeV) / lengthSq));
-  return Math.hypot(a.u + t * edgeU - point.u, a.v + t * edgeV - point.v);
-}
-
-function buildDieMesh(die: VisualDie, dieColor: string, labelColor: string): Mesh {
-  const data = dieGeometry(die.shape);
-  const positions: number[] = [];
-  const uvs: number[] = [];
-  const fits: number[] = [];
-  const geometry = new BufferGeometry();
-  let vertexCursor = 0;
-  data.faces.forEach((face, faceIndex) => {
-    const basis = faceBasis(data, faceIndex);
-    const corners = face.map((vertexIndex) => data.vertices[vertexIndex]);
-    const origin = corners[0];
-    if (!origin || corners.some((corner) => corner === undefined)) return;
-    const projected = corners.map((corner) => {
-      const offset = subtract(corner as [number, number, number], origin);
-      return { u: dot(offset, basis.u), v: dot(offset, basis.v) };
-    });
-    // Centre on the polygon's centroid, not its bounding box: on a triangle
-    // those differ, and the numeral would drift off the face.
-    const centroid: Point2 = {
-      u: projected.reduce((sum, p) => sum + p.u, 0) / projected.length,
-      v: projected.reduce((sum, p) => sum + p.v, 0) / projected.length,
-    };
-    const radius =
-      Math.max(...projected.map((p) => Math.hypot(p.u - centroid.u, p.v - centroid.v))) || 1;
-    const inradius = Math.min(
-      ...projected.map((p, index) =>
-        distanceToEdge(centroid, p, projected[(index + 1) % projected.length] ?? p),
-      ),
-    );
-    fits[faceIndex] = Math.min(1, Math.max(0.25, inradius / radius));
-    const toUv = (p: Point2): [number, number] => [
-      0.5 + (0.5 * (p.u - centroid.u)) / radius,
-      0.5 + (0.5 * (p.v - centroid.v)) / radius,
-    ];
-    // Look corners up by vertex index, since triangles come back wound outward
-    // rather than in the polygon's original corner order.
-    const byVertex = new Map(face.map((vertexIndex, corner) => [vertexIndex, corner]));
-    const triangles = faceTriangles(data, faceIndex);
-    for (const triangle of triangles) {
-      for (const vertexIndex of triangle) {
-        const corner = byVertex.get(vertexIndex) ?? 0;
-        const position = corners[corner];
-        const uv = toUv(projected[corner] ?? centroid);
-        if (position) positions.push(...position);
-        uvs.push(...uv);
-      }
-    }
-    geometry.addGroup(vertexCursor, triangles.length * 3, faceIndex);
-    vertexCursor += triangles.length * 3;
-  });
-  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
-  geometry.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
-  geometry.computeVertexNormals();
-  const materials = data.faces.map((_, faceIndex) =>
-    dieMaterial(
-      labelTexture(die.labels[faceIndex] ?? "", dieColor, labelColor, fits[faceIndex] ?? 0.7),
-    ),
-  );
-  const mesh = new Mesh(geometry, materials);
-  mesh.castShadow = true;
-  mesh.userData.ownsGeometry = true;
-  return mesh;
-}
-
-function buildCoinMesh(coin: VisualCoin, dieColor: string, labelColor: string): Mesh {
-  const geometry = new CylinderGeometry(1.3, 1.3, 0.22, 48);
-  const rim = new MeshPhysicalMaterial({
-    color: dieColor,
-    roughness: 0.35,
-    metalness: 0.35,
-    clearcoat: 0.5,
-  });
-  const heads = dieMaterial(labelTexture("H", dieColor, labelColor, 0.7));
-  const tails = dieMaterial(labelTexture("T", dieColor, labelColor, 0.7));
-  // CylinderGeometry material order: side, top, bottom.
-  const mesh = new Mesh(geometry, [rim, heads, tails]);
-  mesh.castShadow = true;
-  mesh.userData.ownsGeometry = true;
-  mesh.userData.finalOrientation =
-    coin.outcome === "heads"
-      ? new Quaternion()
-      : new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), Math.PI);
-  return mesh;
-}
-
-/**
- * Final die orientation: the resolved face up, then yawed so its label reads
- * upright from the camera.
- */
-function finalDieOrientation(die: VisualDie): Quaternion {
-  const upright = faceUpQuaternion(die.shape, die.face);
-  const basis = faceBasis(dieGeometry(die.shape), die.face - 1);
-  const labelUp = new Vector3(...basis.v).applyQuaternion(upright);
-  labelUp.y = 0;
-  if (labelUp.lengthSq() < 1e-9) return upright;
-  labelUp.normalize();
-  // Rotate the label's up direction to point away from the camera (-Z).
-  const yaw = Math.atan2(labelUp.x, labelUp.z) - Math.PI;
-  return new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), yaw).multiply(upright);
-}
-
-/**
- * A coin toss instead of a die tumble: the coin sits flat, is thrown, spins end
- * over end, and comes down on its result. `turns` counts half turns, so its
- * parity decides which face is up when the arc ends.
- */
 type FlipPlan = {
   readonly heads: Quaternion;
   readonly turns: number;
@@ -353,7 +140,7 @@ function applyDropReveal(entry: DieEntry, progress: number): void {
 }
 
 export function createWebglBackend(options: WebglBackendOptions): PresenterBackend {
-  const { container, dieColor, labelColor, models, coin: coinModel } = options;
+  const { container, models, coin: coinModel } = options;
   const renderer = new WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio ?? 1, 2));
   const width = container.clientWidth || 640;
@@ -562,38 +349,32 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
 
   async function resolveDieObject(
     die: VisualDie,
-  ): Promise<{ object: Object3D; final: Quaternion }> {
-    if (hasCalibratedModel(models, die.shape)) {
-      const url = models.urls[die.shape];
-      const tuple = models.faceRotations[die.shape]?.[die.face - 1];
-      const model = url ? await loadDieModel(url) : null;
-      if (model && tuple) {
-        const object = instantiateDieModel(model);
-        // Even the set out by what each model actually covers on screen, not by
-        // its nominal size: bevelling eats into a sharp-cornered solid more
-        // than a round one, so equal bounding boxes do not look equal.
-        const poses = (models.faceRotations[die.shape] ?? []).map(
-          (q) => new Quaternion(q[0], q[1], q[2], q[3]),
-        );
-        object.scale.multiplyScalar(
-          modelSilhouetteScale(url ?? `d${die.shape}`, object, poses, restingSilhouette(20)),
-        );
-        const textureUrl =
-          (die.role === "tens" ? models.tensTextureUrl : undefined) ??
-          models.textureUrls?.[die.shape];
-        if (textureUrl) {
-          const texture = await loadThemeTexture(textureUrl);
-          if (texture) applyTexture(object, texture);
-        }
-        return { object, final: new Quaternion(tuple[0], tuple[1], tuple[2], tuple[3]) };
-      }
+  ): Promise<{ object: Object3D; final: Quaternion } | null> {
+    if (!hasCalibratedModel(models, die.shape)) return null;
+    const url = models.urls[die.shape];
+    const tuple = models.faceRotations[die.shape]?.[die.face - 1];
+    const model = url ? await loadDieModel(url) : null;
+    if (!model || !tuple) return null;
+    const object = instantiateDieModel(model);
+    // Even the set out by what each model actually covers on screen, not by
+    // its nominal size: bevelling eats into a sharp-cornered solid more
+    // than a round one, so equal bounding boxes do not look equal.
+    const poses = (models.faceRotations[die.shape] ?? []).map(
+      (q) => new Quaternion(q[0], q[1], q[2], q[3]),
+    );
+    object.scale.multiplyScalar(
+      modelSilhouetteScale(url ?? `d${die.shape}`, object, poses, restingSilhouette(20)),
+    );
+    const textureUrl =
+      (die.role === "tens" ? models.tensTextureUrl : undefined) ?? models.textureUrls?.[die.shape];
+    if (textureUrl) {
+      const texture = await loadThemeTexture(textureUrl);
+      if (texture) applyTexture(object, texture);
     }
-    const mesh = buildDieMesh(die, dieColor, labelColor);
-    mesh.scale.setScalar(apparentScale(die.shape));
-    return { object: mesh, final: finalDieOrientation(die) };
+    return { object, final: new Quaternion(tuple[0], tuple[1], tuple[2], tuple[3]) };
   }
 
-  /** Themed coin model, or null to fall back to the built-in cylinder. */
+  /** Themed coin model, or null when the theme has none. */
   async function resolveCoinObject(
     outcome: "heads" | "tails",
   ): Promise<{ object: Object3D; final: Quaternion } | null> {
@@ -617,40 +398,50 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
       // Resolve models (network) before touching the scene so the previous
       // result stays visible until the new roll is ready to animate.
       const resolved = await Promise.all(dice.map((die) => resolveDieObject(die)));
+      // A theme that cannot draw every die is not usable for this roll: the
+      // presenter falls back wholesale rather than mixing art styles or, worse,
+      // leaving a resolved die off the table.
+      if (resolved.some((entry) => entry === null)) return false;
       clearDice();
       const entries = resolved.map((entry, index) =>
-        toEntry(entry.object, entry.final, index, dice.length, dice[index]?.kept ?? true),
+        toEntry(
+          (entry as { object: Object3D }).object,
+          (entry as { final: Quaternion }).final,
+          index,
+          dice.length,
+          dice[index]?.kept ?? true,
+        ),
       );
       // A d4 shows its value on the side, so only an all-d4 roll gets the low
       // angled view; anything else is read from above.
       elevationDeg = dice.every((die) => die.shape === 4) ? ANGLED_ELEVATION : TOP_DOWN_ELEVATION;
-      const widest = Math.max(...dice.map((die) => apparentScale(die.shape)), 1);
       framedRadius =
         entries.reduce(
           (max, entry) =>
             Math.max(max, Math.hypot(entry.restingPosition.x, entry.restingPosition.z)),
           0,
-        ) +
-        DIE_RADIUS * widest;
+        ) + DIE_RADIUS;
       frameCamera();
-      return animate(entries, context);
+      await animate(entries, context);
+      return true;
     },
     async presentCoin(coin, context) {
       const themed = await resolveCoinObject(coin.outcome);
+      if (!themed) return false;
       clearDice();
-      const mesh = themed?.object ?? buildCoinMesh(coin, dieColor, labelColor);
-      const finalOrientation = themed?.final ?? (mesh.userData.finalOrientation as Quaternion);
       // Start resting heads-up and choose the number of half turns by parity, so
       // the toss lands on the resolved face without correcting mid-air.
-      const heads = themed
-        ? new Quaternion(...(coinModel?.rotations[0] ?? [0, 0, 0, 1]))
-        : new Quaternion();
+      const heads = new Quaternion(...(coinModel?.rotations[0] ?? [0, 0, 0, 1]));
       const wholeTurns = 4 + 2 * Math.floor(Math.random() * 2);
       const turns = coin.outcome === "heads" ? wholeTurns : wholeTurns + 1;
       elevationDeg = TOP_DOWN_ELEVATION;
       framedRadius = DIE_RADIUS;
       frameCamera();
-      return animate([toEntry(mesh, finalOrientation, 0, 1, true, { heads, turns })], context);
+      await animate([toEntry(themed.object, themed.final, 0, 1, true, { heads, turns })], context);
+      return true;
+    },
+    setVisible(visible: boolean) {
+      renderer.domElement.style.display = visible ? "block" : "none";
     },
     dispose() {
       cancelActive?.();

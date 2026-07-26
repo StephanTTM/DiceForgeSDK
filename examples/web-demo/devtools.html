@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DiceForge devtools</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 16px;
+      }
+      canvas {
+        border: 1px solid #888;
+        max-width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>DiceForge devtools</h1>
+    <p>
+      Maintainer page. <code>?preview=1&amp;theme=ivory&amp;notation=4d6dl1</code> renders one roll
+      through the presenter; <code>?forge=d20</code> checks a shipped model against its rotation
+      table. Results land on <code>window.__diceforge</code>.
+    </p>
+    <div id="out"></div>
+    <script type="module" src="./devtools.ts"></script>
+  </body>
+</html>
