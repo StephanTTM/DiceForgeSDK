@@ -74,7 +74,7 @@ npm run demo:react   # the same, inside React
 
 ## Project status
 
-**0.1.0** is on npm — [`@diceforge-sdk/core`](https://www.npmjs.com/package/@diceforge-sdk/core) and [`@diceforge-sdk/renderer-web`](https://www.npmjs.com/package/@diceforge-sdk/renderer-web). Everything under "browser presentation" and "themes" above has landed since and is awaiting a 0.2.0 release.
+**0.2.0** is on npm — [`@diceforge-sdk/core`](https://www.npmjs.com/package/@diceforge-sdk/core) and [`@diceforge-sdk/renderer-web`](https://www.npmjs.com/package/@diceforge-sdk/renderer-web) — completing the web presentation milestone: the Three.js presenter, themes, the first-party dice, and the React and browser examples. See the [changelog](CHANGELOG.md).
 
 APIs are experimental before 1.0 and may change between minor versions. Serialized records carry a `schemaVersion` so stored results survive those changes.
 

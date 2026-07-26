@@ -49,7 +49,7 @@ Maintainers may request an ADR for changes affecting the core boundary, plugin c
 
 Do not add third-party art, models, textures, or audio without a documented license that permits the intended redistribution. Record every pack in [`assets/LICENSES.md`](assets/LICENSES.md) with its author, source URL, license, retrieval date, and any conditions the author asks for. Assets live in `assets/` and are served by the host application; they are never bundled into a published npm package (ADR-0010).
 
-A theme that ships 3D models must include a calibrated face-rotation table so each value has a proven orientation — use the maintainer tool at `examples/web-demo/calibrate.html`, and verify with `?verify=1`, which re-renders from the shipped table so every cell can be checked against its expected value. Uncalibrated shapes must fall back to the built-in dice rather than guess.
+A theme that ships 3D models must include a face-rotation table so each value has a proven orientation. The first-party dice get theirs from the generator, which numbers faces itself and emits the table with the models (`tools/blender/emit_rotations.py`); a test compares the emitted table against the model manifest so the two cannot drift. For a hand-made model set, check each shape with the maintainer page at `examples/web-demo/devtools.html?forge=d20`, which renders every value from the shipped table so each face can be read back against its expected number. A shape without a table is not covered: the presenter falls back to DOM tiles for the whole roll rather than guess an orientation (ADR-0012).
 
 ## Community standards
 
