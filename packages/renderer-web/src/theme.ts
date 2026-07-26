@@ -20,6 +20,11 @@ export type DieModelSet = {
    */
   readonly textureUrls?: Partial<Record<ShapedDieSides, string>>;
   /**
+   * Texture for the tens half of a percentile pair, which reads 00-90 rather
+   * than 0-9. Without one, both dice of a d100 use the plain d10 atlas.
+   */
+  readonly tensTextureUrl?: string;
+  /**
    * Calibrated orientation table per shape: `faceRotations[shape][value - 1]`
    * rotates the normalized model so that face value points up (+Y). A model
    * is used only when its shape's table has exactly `shape` entries.
@@ -91,7 +96,12 @@ export function forgeTheme(options: { baseUrl: string; color?: ForgeColor }): Di
   return {
     name: `forge-${color}`,
     colors: FORGE_ACCENTS[color],
-    models: { urls, textureUrls, faceRotations: FORGE_FACE_ROTATIONS },
+    models: {
+      urls,
+      textureUrls,
+      tensTextureUrl: `${base}/textures/${color}/d10_tens.png`,
+      faceRotations: FORGE_FACE_ROTATIONS,
+    },
     coin: {
       url: `${base}/coin.glb`,
       textures: {

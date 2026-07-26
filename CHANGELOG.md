@@ -26,6 +26,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Dice in a mixed roll no longer look like a mismatched set. They shared a bounding box, but a compact solid fills more of one, so a d6 covered well over twice the table area of a d8. Each die is now scaled so its resting footprint matches (`apparentScale`), for both model themes and the built-in dice.
+- A percentile roll's tens die reads 00–90 instead of repeating the units die's 0–9, via `DieModelSet.tensTextureUrl` and a generated atlas per colour.
 - Themed dice ignored a theme change: only one shape took the new colour while the rest kept the previous one. Cloning a model shares its materials with the loader's cache, so applying a texture repainted every die of that shape ever shown, and clearing the scene disposed materials the cache still needed. Each presented die now owns its materials.
 - The coin no longer spins on the spot. It rests flat, is tossed into the air spinning end over end, and drops back down onto its result; the number of half turns is picked by parity so it lands on the resolved face without correcting mid-flight.
 - Bevel width is now proportional to each solid's face size instead of a single absolute value, which left the d10's large faces looking unrounded at the setting that suited the d20's small ones.

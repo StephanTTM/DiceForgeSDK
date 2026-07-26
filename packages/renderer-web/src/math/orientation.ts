@@ -79,6 +79,68 @@ export function faceTriangles(data: PolyhedronData, faceIndex: number): [number,
   return triangles;
 }
 
+/** Area of the convex hull of 2D points, via the monotone chain. */
+function hullArea(points: readonly (readonly [number, number])[]): number {
+  const sorted = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (sorted.length < 3) return 0;
+  const cross2 = (
+    o: readonly [number, number],
+    a: readonly [number, number],
+    b: readonly [number, number],
+  ) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const build = (sequence: readonly (readonly [number, number])[]) => {
+    const chain: (readonly [number, number])[] = [];
+    for (const point of sequence) {
+      while (chain.length >= 2) {
+        const a = chain[chain.length - 2];
+        const b = chain[chain.length - 1];
+        if (a && b && cross2(a, b, point) <= 0) chain.pop();
+        else break;
+      }
+      chain.push(point);
+    }
+    return chain;
+  };
+  const hull = [...build(sorted).slice(0, -1), ...build([...sorted].reverse()).slice(0, -1)];
+  let area = 0;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i];
+    const b = hull[(i + 1) % hull.length];
+    if (a && b) area += a[0] * b[1] - b[0] * a[1];
+  }
+  return Math.abs(area) / 2;
+}
+
+/** Table footprint of a die resting with one face up, seen from above. */
+export function restingFootprint(sides: ShapedDieSides): number {
+  const data = dieGeometry(sides);
+  const up = faceNormal(data, 0);
+  // Any two axes perpendicular to the up direction span the table plane.
+  const seed: Vec3 = Math.abs(up[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  const axisU = normalize(cross(up, seed));
+  const axisV = cross(up, axisU);
+  return hullArea(data.vertices.map((v) => [dot(v, axisU), dot(v, axisV)] as const));
+}
+
+const apparentScales = new Map<ShapedDieSides, number>();
+
+/**
+ * Uniform scale that gives every die the same footprint on the table.
+ *
+ * Solids are built to a common bounding box, but a compact one fills more of
+ * that box: a d6 covers well over twice the area of a d8 at the same nominal
+ * size, which reads as a mismatched set. Equalizing the area each die actually
+ * covers when resting is what makes them look like they belong together. The
+ * d20 is the reference, so it is unchanged.
+ */
+export function apparentScale(sides: ShapedDieSides): number {
+  const cached = apparentScales.get(sides);
+  if (cached !== undefined) return cached;
+  const scale = Math.sqrt(restingFootprint(20) / restingFootprint(sides));
+  apparentScales.set(sides, scale);
+  return scale;
+}
+
 /** In-plane axes of a face, for projecting its polygon into UV space. */
 export function faceBasis(data: PolyhedronData, faceIndex: number): { u: Vec3; v: Vec3 } {
   const face = data.faces[faceIndex];

@@ -77,6 +77,10 @@ Custom model sets implement `DieModelSet`. A model is used only when its shape h
 
 Dice tumble in, then settle into the orientation that shows each resolved face. The camera frames the whole layout automatically and looks down from a steep angle, so the face that counts is the one facing the viewer. A roll made entirely of d4s is the exception: those are read from the side, so they get a lower, angled view.
 
+Dice are sized so each covers the same area of table when resting, rather than sharing a bounding box — a compact solid fills more of its box, so a d6 would otherwise dwarf a d8. This applies to both the built-in dice and model themes, so a mixed roll looks like one set.
+
+A percentile roll is shown as the classic pair of d10s. The tens die reads 00–90, so a theme can give it its own atlas via `DieModelSet.tensTextureUrl`; `forgeTheme` does. Without one, both dice fall back to the plain 0–9 atlas.
+
 A coin is not rolled but tossed: it rests flat, is thrown into the air spinning end over end, and drops back onto the same spot. The number of half turns is chosen by parity so the toss lands on the resolved face without any mid-air correction.
 
 **Dropped dice are revealed only after the roll lands.** Every die looks identical while it is in motion; once all of them have settled, a short pause passes and then dice excluded by a keep/drop selection darken and shrink slightly. They stay on the table, fully opaque, so the whole roll can still be read — nothing disappears, nothing turns see-through, and nothing gives the outcome away early. Under reduced motion there is no animation at all: the final state, dimming included, appears immediately.
@@ -100,8 +104,7 @@ A `role="status"` / `aria-live="polite"` region announces results in plain langu
 - Procedural dice use the classic 1/6-opposite layout on the d6 only; other shapes number faces in construction order.
 - Labels on non-top faces may appear rotated; only the landing face is yawed to read upright.
 - A roll mixing d4s with other shapes uses the top-down camera, which is the harder angle for reading a d4.
-- Model dice are scaled so each has the same longest bounding-box axis. That leaves a d4 and d6 looking slightly larger than a d20 next to them, since a compact solid fills more of its box.
-- A percentile roll shows two d10s carrying the same 0–9 atlas; a dedicated 00–90 tens texture is not wired up yet.
+- A d4 still reads as the most prominent die in a mixed roll: its footprint matches the others, but a flat triangle facing the camera looks larger than a many-faceted solid of the same area. Real d4s have the same quirk.
 
 ## Compatibility
 

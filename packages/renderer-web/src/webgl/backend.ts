@@ -25,7 +25,7 @@ import {
 } from "three";
 import type { PresentContext, PresenterBackend, VisualCoin, VisualDie } from "../backend.js";
 import { dieGeometry, dot, subtract } from "../math/geometry.js";
-import { faceBasis, faceTriangles, faceUpQuaternion } from "../math/orientation.js";
+import { apparentScale, faceBasis, faceTriangles, faceUpQuaternion } from "../math/orientation.js";
 import type { CoinModel, DieModelSet } from "../theme.js";
 import { hasCalibratedModel } from "../theme.js";
 import { applyTexture, instantiateDieModel, loadDieModel, loadThemeTexture } from "./models.js";
@@ -553,7 +553,12 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
       const model = url ? await loadDieModel(url) : null;
       if (model && tuple) {
         const object = instantiateDieModel(model);
-        const textureUrl = models.textureUrls?.[die.shape];
+        // Models arrive at a common bounding box; even the set out so each die
+        // covers the same area of table.
+        object.scale.multiplyScalar(apparentScale(die.shape));
+        const textureUrl =
+          (die.role === "tens" ? models.tensTextureUrl : undefined) ??
+          models.textureUrls?.[die.shape];
         if (textureUrl) {
           const texture = await loadThemeTexture(textureUrl);
           if (texture) applyTexture(object, texture);
@@ -561,7 +566,9 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
         return { object, final: new Quaternion(tuple[0], tuple[1], tuple[2], tuple[3]) };
       }
     }
-    return { object: buildDieMesh(die, dieColor, labelColor), final: finalDieOrientation(die) };
+    const mesh = buildDieMesh(die, dieColor, labelColor);
+    mesh.scale.setScalar(apparentScale(die.shape));
+    return { object: mesh, final: finalDieOrientation(die) };
   }
 
   /** Themed coin model, or null to fall back to the built-in cylinder. */
@@ -595,12 +602,14 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
       // A d4 shows its value on the side, so only an all-d4 roll gets the low
       // angled view; anything else is read from above.
       elevationDeg = dice.every((die) => die.shape === 4) ? ANGLED_ELEVATION : TOP_DOWN_ELEVATION;
+      const widest = Math.max(...dice.map((die) => apparentScale(die.shape)), 1);
       framedRadius =
         entries.reduce(
           (max, entry) =>
             Math.max(max, Math.hypot(entry.restingPosition.x, entry.restingPosition.z)),
           0,
-        ) + DIE_RADIUS;
+        ) +
+        DIE_RADIUS * widest;
       frameCamera();
       return animate(entries, context);
     },

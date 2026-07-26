@@ -104,7 +104,14 @@ def draw_glyph(draw: ImageDraw.ImageDraw, text: str, centre, budget: float, colo
 
 
 def die_label(die: str, value: int) -> str:
-    """d10 shows 0-9 like a real percentile die; everything else shows its value."""
+    """d10 shows 0-9 like a real percentile die; everything else shows its value.
+
+    `d10_tens` is the tens half of a percentile pair, reading 00-90: the same
+    faces as the plain d10 with a nought appended, so face 4 reads "40" and the
+    face reading "0" reads "00".
+    """
+    if die == "d10_tens":
+        return f"{value % 10}0"
     if die == "d10":
         return str(value % 10)
     return str(value)
@@ -164,6 +171,12 @@ def main() -> None:
             atlas = build_die_atlas(die, entry, body, ink)
             atlas.save(os.path.join(out_dir, f"{die}.png"), optimize=True)
             written += 1
+            if die == "d10":
+                # Same model and UV layout, different glyphs: the tens half of a
+                # percentile pair.
+                tens = build_die_atlas("d10_tens", entry, body, ink)
+                tens.save(os.path.join(out_dir, "d10_tens.png"), optimize=True)
+                written += 1
         for name, image in build_coin_faces(body, ink).items():
             image.save(os.path.join(out_dir, f"coin_{name}.png"), optimize=True)
             written += 1

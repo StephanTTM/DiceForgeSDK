@@ -11,6 +11,11 @@ export type VisualDie = {
   /** Text for every face, index i labels face i + 1. */
   readonly labels: readonly string[];
   readonly kept: boolean;
+  /**
+   * Which half of a percentile pair this die is, when a d100 is shown as two
+   * d10s. The tens die reads 00-90 and so needs its own texture.
+   */
+  readonly role?: "tens" | "units";
 };
 
 export type VisualCoin = { readonly outcome: "heads" | "tails" };
@@ -56,8 +61,20 @@ export function visualDiceForEvent(event: RollResult): VisualDie[] {
     for (const die of group.dice) {
       if (die.sides === 100) {
         const pair = percentileDisplay(die.value);
-        dice.push({ shape: 10, face: pair.tens.face, labels: tensLabels(), kept: die.kept });
-        dice.push({ shape: 10, face: pair.units.face, labels: unitsLabels(), kept: die.kept });
+        dice.push({
+          shape: 10,
+          face: pair.tens.face,
+          labels: tensLabels(),
+          kept: die.kept,
+          role: "tens",
+        });
+        dice.push({
+          shape: 10,
+          face: pair.units.face,
+          labels: unitsLabels(),
+          kept: die.kept,
+          role: "units",
+        });
       } else {
         dice.push({
           shape: die.sides,

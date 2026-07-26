@@ -1,8 +1,14 @@
 import { Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import type { ShapedDieSides, Vec3 } from "./geometry.js";
-import { dieGeometry, dot, faceCentroid, subtract } from "./geometry.js";
-import { faceNormal, faceTriangles, faceUpQuaternion } from "./orientation.js";
+import { DIE_SIZE, dieGeometry, dot, faceCentroid, subtract } from "./geometry.js";
+import {
+  apparentScale,
+  faceNormal,
+  faceTriangles,
+  faceUpQuaternion,
+  restingFootprint,
+} from "./orientation.js";
 
 const ALL_SHAPES: readonly ShapedDieSides[] = [4, 6, 8, 10, 12, 20];
 
@@ -74,6 +80,44 @@ describe("faceTriangles", () => {
           expect(winding.dot(outward), `d${sides} face ${faceIndex + 1}`).toBeGreaterThan(0);
         }
       });
+    }
+  });
+});
+
+describe("apparentScale", () => {
+  /**
+   * The point of the scale: every die should cover the same area of table when
+   * resting, so a set does not look mismatched. Measured the same way the
+   * scale is derived, but independently of the cached result.
+   */
+  /** Pins the projection and hull maths against shapes whose area is known. */
+  it("measures a resting footprint correctly", () => {
+    // A cube resting face-up covers a square of its own edge length.
+    expect(restingFootprint(6)).toBeCloseTo(DIE_SIZE * DIE_SIZE, 6);
+    // A tetrahedron covers an equilateral triangle on the edge of its face.
+    const edge = DIE_SIZE * Math.SQRT2;
+    expect(restingFootprint(4)).toBeCloseTo((Math.sqrt(3) / 4) * edge * edge, 6);
+  });
+
+  it("gives every die the same resting footprint once scaled", () => {
+    const reference = restingFootprint(20);
+    for (const sides of ALL_SHAPES) {
+      const scaled = restingFootprint(sides) * apparentScale(sides) ** 2;
+      expect(scaled, `d${sides}`).toBeCloseTo(reference, 6);
+    }
+  });
+
+  it("leaves the d20 as the reference and resizes the outliers", () => {
+    expect(apparentScale(20)).toBeCloseTo(1, 6);
+    // A d8 covers far less table than a d6 at the same bounding box, so it
+    // must grow while the d6 shrinks.
+    expect(apparentScale(8)).toBeGreaterThan(1.2);
+    expect(apparentScale(6)).toBeLessThan(1);
+  });
+
+  it("is stable across calls", () => {
+    for (const sides of ALL_SHAPES) {
+      expect(apparentScale(sides)).toBe(apparentScale(sides));
     }
   });
 });

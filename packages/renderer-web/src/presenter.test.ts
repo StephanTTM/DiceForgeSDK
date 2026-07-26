@@ -81,6 +81,18 @@ describe("createDicePresenter (DOM backend)", () => {
     presenter.dispose();
   });
 
+  it("labels a percentile pair as tens and units", async () => {
+    const container = makeContainer();
+    const presenter = createDicePresenter({ container, reducedMotion: "reduce" });
+    await presenter.present(percentileRoll(42));
+    const values = [...container.querySelectorAll('[data-diceforge="die-value"]')].map(
+      (node) => node.textContent,
+    );
+    // The tens die reads 40, not 4 — that is what the dedicated atlas exists for.
+    expect(values).toEqual(["40", "2"]);
+    presenter.dispose();
+  });
+
   it("presents coin flips", async () => {
     const container = makeContainer();
     const presenter = createDicePresenter({ container, reducedMotion: "reduce" });

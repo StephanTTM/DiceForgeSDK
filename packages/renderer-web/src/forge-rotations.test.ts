@@ -102,6 +102,13 @@ describe("forgeTheme", () => {
     expect(theme.coin?.textures?.tails).toBe("/forge/textures/blue/coin_tails.png");
   });
 
+  it("gives the percentile tens die its own 00-90 texture", () => {
+    const theme = forgeTheme({ baseUrl: "/forge", color: "red" });
+    expect(theme.models?.tensTextureUrl).toBe("/forge/textures/red/d10_tens.png");
+    // It must differ from the plain d10 atlas, or the pair would read 0-9 twice.
+    expect(theme.models?.tensTextureUrl).not.toBe(theme.models?.textureUrls?.[10]);
+  });
+
   it("defaults to ivory and offers every published colour", () => {
     expect(forgeTheme({ baseUrl: "/forge" }).name).toBe("forge-ivory");
     for (const color of FORGE_COLORS) {
