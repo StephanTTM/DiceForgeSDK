@@ -2,60 +2,98 @@
 
 > One dice API for web apps and game engines.
 
-DiceForge SDK is an open-source, offline-first toolkit for deterministic dice rolls and optional 3D presentation. Its renderer-agnostic core can run headlessly; adapters make the same roll experience easy to integrate with web applications, Unity, and Godot.
+[![CI](https://github.com/StephanTTM/DiceForgeSDK/actions/workflows/ci.yml/badge.svg)](https://github.com/StephanTTM/DiceForgeSDK/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@diceforge-sdk/core.svg?label=%40diceforge-sdk%2Fcore)](https://www.npmjs.com/package/@diceforge-sdk/core)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Why DiceForge?
-
-- **Renderer-agnostic core** — rules, randomness, roll state, and replay data do not depend on a graphics library or engine.
-- **Offline first** — local rolls work without a service or account. Networking is an optional plugin concern.
-- **Easy integration** — one consistent API, with focused adapters instead of application-specific forks.
-- **Visuals are optional** — resolve a trustworthy headless result, then animate that result when a renderer is available.
-- **Extensible by design** — physics, renderers, dice definitions, themes, audio, and integrations are replaceable plugins.
-
-## Implemented today (`@diceforge-sdk/core`)
-
-- Standard polyhedral dice — d4, d6, d8, d10, d12, d20, d100/percentile — plus coin flips, resolved fully headlessly.
-- Dice notation with modifiers and keep/drop (`2d20kh1+3` for advantage, `4d6dl1`, `d%`), with positioned parse errors.
-- Injected randomness: a reproducible seeded source (same seed ⇒ same results on every platform) and a non-seeded system source, with provenance recorded in every result.
-- Immutable, schema-versioned event records with validating JSON serialization for storage, replay, and future presentation.
-- A browser presenter (`@diceforge-sdk/renderer-web`): Three.js 3D dice whose tumble always lands on the core-resolved face, with a no-WebGL DOM fallback, reduced-motion support, and aria-live announcements.
-- Themes: a first-party textured die set covering every shape plus a two-faced coin (five colors), or bring your own glTF models with a face table. Art is never bundled into the packages.
-
-Planned next: stable plugin contracts, custom dice definitions, and replay records, then Unity and Godot adapters. See [ROADMAP.md](ROADMAP.md).
-
-## Quick start (headless)
-
-```bash
-npm install @diceforge-sdk/core
-```
+Roll dice deterministically, then — optionally — show them in 3D. The engine resolves every outcome headlessly, with no renderer, network, or DOM in sight; the presenter animates that already-decided result. Because the two are separate, the same roll behaves identically in a test, a server, and a browser.
 
 ```ts
 import { createDiceEngine, createSeededRandomSource } from "@diceforge-sdk/core";
 
 const engine = createDiceEngine({ random: createSeededRandomSource("table-42") });
 
-const roll = engine.roll("2d20kh1+3"); // { total, groups, provenance, ... } — frozen and serializable
-const flip = engine.flipCoin();        // { outcome: "heads" | "tails", ... }
+engine.roll("2d20kh1+3"); // advantage, +3 — frozen, serializable, replayable
+engine.flipCoin();        // { outcome: "heads" | "tails", ... }
 ```
 
-A runnable version lives in [examples/headless/main.mjs](examples/headless/main.mjs) (`npm run example`). For the visual side, `npm run demo:web` serves a browser demo ([examples/web-demo](examples/web-demo)) with 3D dice, coin flips, and toggles for the DOM and reduced-motion fallbacks. Full contracts, the notation grammar, and determinism guarantees are documented in [API.md](API.md) and [packages/renderer-web/README.md](packages/renderer-web/README.md).
+## Why it is built this way
+
+- **The result is decided before anything is drawn.** Presentation consumes a resolved record and cannot change it — a die's animation ends on the face the engine already chose, by construction rather than by correction.
+- **Deterministic where it matters.** The same seed produces the same rolls on every platform and release. Golden tests lock the generator; changing it is a documented breaking change.
+- **Offline and dependency-light.** The core has zero runtime dependencies and never touches the network. Multiplayer is an opt-in plugin concern, not a baseline assumption.
+- **Trustworthy records.** Results are deeply frozen and schema-versioned; deserialization re-checks totals, so a record you load is a record you can rely on.
+- **Extensible by design.** Renderers, themes, physics, audio and transports sit behind small contracts instead of forks.
+
+## Install
+
+```bash
+npm install @diceforge-sdk/core            # headless engine, zero dependencies
+npm install @diceforge-sdk/renderer-web    # + browser presentation (pulls in three.js)
+```
+
+Both are ESM-only. The core runs anywhere with ES2022 — Node 20+, browsers, workers; the renderer needs a DOM, and uses WebGL when it can.
+
+## What works today
+
+| Area | Status |
+| --- | --- |
+| Dice d4–d20, d100/percentile, coin flips | Resolved headlessly, fully tested |
+| Notation `2d20kh1+3`, `4d6dl1`, `d%` | Grammar v1, with positioned parse errors |
+| Seeded + system randomness | Reproducible across platforms, provenance recorded per result |
+| Serialization and replay records | `schemaVersion: 1`, validated on read |
+| Browser presentation | Three.js dice, DOM fallback, reduced motion, aria-live announcements |
+| Themes | First-party textured set: every shape plus a two-faced coin, in five colours |
+| Unity / Godot adapters | Not started — see [ROADMAP.md](ROADMAP.md) |
+
+## Showing dice in the browser
+
+```ts
+import { createDicePresenter, forgeTheme } from "@diceforge-sdk/renderer-web";
+
+const presenter = createDicePresenter({
+  container: document.querySelector("#stage")!,
+  theme: forgeTheme({ baseUrl: "/dice-assets" }),
+});
+
+await presenter.present(engine.roll("4d6dl1"));
+```
+
+**3D needs art, and the packages do not ship any.** Copy [`assets/forge/`](assets/forge) into whatever your app serves statically and point `baseUrl` at it. Without a theme the presenter still works — it falls back to accessible labelled tiles and reports `mode: "dom"` — but there is nothing to draw in 3D ([ADR-0010](DECISIONS.md), [ADR-0012](DECISIONS.md)).
+
+Full options, fallback behaviour and theming are in the [renderer README](packages/renderer-web/README.md).
+
+## Try it
+
+```bash
+npm ci
+npm run example      # headless: seeded rolls and serialization, in the terminal
+npm run demo:web     # browser demo: 3D dice, themes, fallbacks
+npm run demo:react   # the same, inside React
+```
 
 ## Project status
 
-Version 0.1.0 is published to npm as [`@diceforge-sdk/core`](https://www.npmjs.com/package/@diceforge-sdk/core) and [`@diceforge-sdk/renderer-web`](https://www.npmjs.com/package/@diceforge-sdk/renderer-web). APIs are experimental pre-1.0 and may change between minor versions; serialized records carry a `schemaVersion` for compatibility. See [ROADMAP.md](ROADMAP.md) and [TASKS.md](TASKS.md).
+**0.1.0** is on npm — [`@diceforge-sdk/core`](https://www.npmjs.com/package/@diceforge-sdk/core) and [`@diceforge-sdk/renderer-web`](https://www.npmjs.com/package/@diceforge-sdk/renderer-web). Everything under "browser presentation" and "themes" above has landed since and is awaiting a 0.2.0 release.
 
-## Repository guides
+APIs are experimental before 1.0 and may change between minor versions. Serialized records carry a `schemaVersion` so stored results survive those changes.
 
-- [Architecture](ARCHITECTURE.md)
-- [Contributing](CONTRIBUTING.md)
-- [Code of Conduct](CODE_OF_CONDUCT.md)
-- [Changelog](CHANGELOG.md)
+## Documentation
 
-## Assets and third-party content
+| | |
+| --- | --- |
+| [API.md](API.md) | Public contracts, notation grammar, determinism guarantees |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Package boundaries and the rules that keep the core portable |
+| [DECISIONS.md](DECISIONS.md) | Architecture decision records — why things are the way they are |
+| [ROADMAP.md](ROADMAP.md) · [TASKS.md](TASKS.md) | Where this is going, and what is in flight |
+| [CONTRIBUTING.md](CONTRIBUTING.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | How to build, test, and take part |
+| [CHANGELOG.md](CHANGELOG.md) | What changed, and when |
 
-Art lives in [`assets/`](assets), is served by the host application, and is never bundled into a published package (ADR-0010). Every pack's license, author, and source is recorded in [`assets/LICENSES.md`](assets/LICENSES.md).
+Two pieces of tooling have their own guides: the [Blender dice generator](tools/blender/README.md), which produces the first-party models and textures, and the [visual regression suite](tools/vrt/README.md), which catches renderer changes that unit tests cannot see.
 
-The dice are first-party and MIT licensed, generated by the Blender pipeline in [tools/blender](tools/blender). 3D presentation needs a theme to draw with; without one the presenter falls back to accessible 2D tiles (ADR-0012).
+## Assets and licensing
+
+Art lives in [`assets/`](assets), is served by the host application, and is never bundled into a published package. The dice are first-party and MIT licensed, generated by the [Blender pipeline](tools/blender/README.md). Provenance for everything in that directory is recorded in [`assets/LICENSES.md`](assets/LICENSES.md).
 
 ## License
 
