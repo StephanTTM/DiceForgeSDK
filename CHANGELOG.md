@@ -14,6 +14,7 @@ the path taken to get there.
 - `forgeTheme({ baseUrl, color })`: a first-party textured die set covering every shape the core resolves — d4 through d20 plus a coin whose heads and tails are textured independently — in ivory, red, blue, green and yellow. One model per die serves all colours: a theme swaps the texture atlas, not the mesh (`DieModelSet.textureUrls`, `DiceTheme.tensTextureUrl`, `DiceTheme.coin`).
 - A committed Blender pipeline that generates those dice and their textures (`tools/blender/`, ADR-0011). Faces are numbered so opposite faces sum to N+1, which makes the exported rotation table exact by construction rather than hand-calibrated; `emit_rotations.py` emits the renderer's tables and a test compares them against the manifest so the two cannot drift.
 - Percentile rolls show the classic pair of d10s, with the tens die reading 00–90 from its own atlas.
+- Visual regression suite (`npm run vrt`): eight scenes rendered through the real presenter in headless Chromium and compared to committed PNGs, covering face orientation, per-theme texturing, the dropped-die reveal, relative die sizes, the percentile pair, the coin, camera framing and the DOM fallback. Runs deterministically — zero differing pixels between runs — and writes annotated diffs when a scene changes. Not in CI yet: baselines are specific to the browser that drew them.
 - A theme picker in the browser demo, and a maintainer page (`examples/web-demo/devtools.html`) that renders a roll through the real presenter or checks a shipped model against its rotation table.
 
 ### Changed

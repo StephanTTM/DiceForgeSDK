@@ -2,7 +2,7 @@
   "name": "diceforge-sdk",
   "private": true,
   "version": "0.0.0",
-  "description": "DiceForge SDK monorepo — offline-first, renderer-agnostic dice and coin-flip engine.",
+  "description": "DiceForge SDK monorepo \u2014 offline-first, renderer-agnostic dice and coin-flip engine.",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -21,13 +21,18 @@
     "build": "tsc -p packages/core/tsconfig.build.json && tsc -p packages/renderer-web/tsconfig.build.json",
     "example": "npm run build && node examples/headless/main.mjs",
     "demo:web": "npm run build && vite examples/web-demo",
-    "demo:react": "npm run build && vite examples/react-demo"
+    "demo:react": "npm run build && vite examples/react-demo",
+    "vrt": "node tools/vrt/run.mjs",
+    "vrt:update": "node tools/vrt/run.mjs --update"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.5",
     "@types/node": "^26.1.1",
     "@vitest/coverage-v8": "^4.1.10",
     "jsdom": "^29.1.1",
+    "pixelmatch": "^7.2.0",
+    "playwright": "^1.62.0",
+    "pngjs": "^7.0.0",
     "typescript": "^7.0.2",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"

@@ -29,9 +29,10 @@ npm test               # Vitest (npm run test:coverage for coverage); resolves p
 npm run build          # compile @diceforge-sdk/core and @diceforge-sdk/renderer-web to dist
 npm run example        # build, then run the headless example
 npm run demo:web       # build, then serve the browser demo (Vite)
+npm run vrt            # visual regression: renderer output vs committed baselines
 ```
 
-All of these must pass before a pull request; CI runs the same gates on Node 20 and 24. Seeded-RNG golden tests lock the reproducibility contract — never update those constants without a superseding ADR (see ADR-0005).
+All of these must pass before a pull request; CI runs the same gates on Node 20 and 24 — except `vrt`, whose baselines are specific to the browser that drew them (see [tools/vrt/README.md](tools/vrt/README.md)). Run it locally whenever you touch the renderer or the dice assets, and commit the updated baselines with the change that caused them. Seeded-RNG golden tests lock the reproducibility contract — never update those constants without a superseding ADR (see ADR-0005).
 
 ## Pull requests
 

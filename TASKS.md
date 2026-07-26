@@ -47,7 +47,8 @@ Remaining before tagging 0.1.0:
 - [x] Give procedural dice beveled edges, or retire them. (retired, along with the KayKit pack — ADR-0012)
 - [ ] Replay support.
 - [ ] Optional multiplayer transport plugin research.
-- [ ] Browser-based visual regression testing for the renderer. (in progress)
+- [x] Browser-based visual regression testing for the renderer. (`npm run vrt`, 8 scenes, Playwright + committed baselines)
+- [ ] Run the visual regression suite in CI, with baselines generated inside the CI container image so they are platform-stable.
 
 ## Task maintenance
 

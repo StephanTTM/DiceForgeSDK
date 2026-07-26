@@ -9,3 +9,6 @@ Thumbs.db
 # Blender / Python tooling leftovers
 __pycache__/
 *.blend1
+
+# Visual regression output (baselines are committed, results are not)
+tools/vrt/output/
