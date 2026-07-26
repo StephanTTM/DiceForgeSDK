@@ -2,7 +2,7 @@ import { Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import type { ShapedDieSides, Vec3 } from "./geometry.js";
 import { dieGeometry, dot, faceCentroid, subtract } from "./geometry.js";
-import { faceNormal, faceUpQuaternion } from "./orientation.js";
+import { faceNormal, faceTriangles, faceUpQuaternion } from "./orientation.js";
 
 const ALL_SHAPES: readonly ShapedDieSides[] = [4, 6, 8, 10, 12, 20];
 
@@ -41,6 +41,38 @@ describe("dieGeometry", () => {
           expect(dot(normal, other)).toBeLessThan(0.9999);
         }
         seen.push(normal);
+      });
+    }
+  });
+});
+
+describe("faceTriangles", () => {
+  it("covers each face with a fan of triangles", () => {
+    for (const sides of ALL_SHAPES) {
+      const data = dieGeometry(sides);
+      data.faces.forEach((face, faceIndex) => {
+        expect(faceTriangles(data, faceIndex)).toHaveLength(face.length - 2);
+      });
+    }
+  });
+
+  /**
+   * Renderers derive lighting normals from winding, so every triangle must be
+   * wound outward. A stray inward triangle is lit from inside the die and shows
+   * through it — the die looks broken rather than solid.
+   */
+  it("winds every triangle outward", () => {
+    for (const sides of ALL_SHAPES) {
+      const data = dieGeometry(sides);
+      data.faces.forEach((_, faceIndex) => {
+        const outward = new Vector3(...faceNormal(data, faceIndex));
+        for (const [a, b, c] of faceTriangles(data, faceIndex)) {
+          const va = new Vector3(...(data.vertices[a] ?? [0, 0, 0]));
+          const vb = new Vector3(...(data.vertices[b] ?? [0, 0, 0]));
+          const vc = new Vector3(...(data.vertices[c] ?? [0, 0, 0]));
+          const winding = vb.clone().sub(va).cross(vc.clone().sub(va));
+          expect(winding.dot(outward), `d${sides} face ${faceIndex + 1}`).toBeGreaterThan(0);
+        }
       });
     }
   });

@@ -5,8 +5,8 @@ import {
   Color,
   CylinderGeometry,
   DirectionalLight,
-  DoubleSide,
   Float32BufferAttribute,
+  FrontSide,
   Group,
   HemisphereLight,
   Mesh,
@@ -25,7 +25,7 @@ import {
 } from "three";
 import type { PresentContext, PresenterBackend, VisualCoin, VisualDie } from "../backend.js";
 import { dieGeometry, dot, subtract } from "../math/geometry.js";
-import { faceBasis, faceUpQuaternion } from "../math/orientation.js";
+import { faceBasis, faceTriangles, faceUpQuaternion } from "../math/orientation.js";
 import type { DieModelSet } from "../theme.js";
 import { hasCalibratedModel } from "../theme.js";
 import { instantiateDieModel, loadDieModel } from "./models.js";
@@ -133,7 +133,9 @@ function dieMaterial(map: CanvasTexture): MeshPhysicalMaterial {
     metalness: 0,
     clearcoat: 0.55,
     clearcoatRoughness: 0.35,
-    side: DoubleSide,
+    // Faces are wound outward, so back faces can be culled: a die is a closed
+    // solid and should never show its own interior.
+    side: FrontSide,
   });
 }
 
@@ -190,17 +192,21 @@ function buildDieMesh(die: VisualDie, dieColor: string, labelColor: string): Mes
       0.5 + (0.5 * (p.u - centroid.u)) / radius,
       0.5 + (0.5 * (p.v - centroid.v)) / radius,
     ];
-    const triangleCount = face.length - 2;
-    for (let i = 0; i < triangleCount; i++) {
-      for (const cornerIndex of [0, i + 1, i + 2]) {
-        const corner = corners[cornerIndex];
-        const uv = toUv(projected[cornerIndex] ?? centroid);
-        if (corner) positions.push(...corner);
+    // Look corners up by vertex index, since triangles come back wound outward
+    // rather than in the polygon's original corner order.
+    const byVertex = new Map(face.map((vertexIndex, corner) => [vertexIndex, corner]));
+    const triangles = faceTriangles(data, faceIndex);
+    for (const triangle of triangles) {
+      for (const vertexIndex of triangle) {
+        const corner = byVertex.get(vertexIndex) ?? 0;
+        const position = corners[corner];
+        const uv = toUv(projected[corner] ?? centroid);
+        if (position) positions.push(...position);
         uvs.push(...uv);
       }
     }
-    geometry.addGroup(vertexCursor, triangleCount * 3, faceIndex);
-    vertexCursor += triangleCount * 3;
+    geometry.addGroup(vertexCursor, triangles.length * 3, faceIndex);
+    vertexCursor += triangles.length * 3;
   });
   geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
   geometry.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
@@ -300,17 +306,18 @@ function ownedMaterials(object: Object3D): MeshStandardMaterial[] {
 }
 
 /**
- * Fades a dropped die back: it dims, desaturates, and shrinks slightly, staying
- * visible so the roll can still be read. `progress` runs 0 (as rolled) to 1.
+ * Pushes a dropped die into the background: it darkens and shrinks slightly,
+ * staying fully opaque so the roll can still be read. Opacity is deliberately
+ * untouched — a see-through die reveals its own back faces and reads as a
+ * rendering glitch rather than as "this one does not count".
+ * `progress` runs 0 (as rolled) to 1.
  */
 function applyDropReveal(entry: DieEntry, progress: number): void {
   const k = easeOutCubic(clamp01(progress));
-  entry.object.scale.copy(entry.baseScale).multiplyScalar(1 - 0.16 * k);
+  entry.object.scale.copy(entry.baseScale).multiplyScalar(1 - 0.18 * k);
   entry.dimMaterials.forEach((material, index) => {
     const base = entry.baseColors[index];
-    if (base) material.color.copy(base).lerp(new Color(0x11131a), 0.62 * k);
-    material.transparent = k > 0.001;
-    material.opacity = 1 - 0.42 * k;
+    if (base) material.color.copy(base).lerp(new Color(0x2a2e38), 0.72 * k);
     material.needsUpdate = true;
   });
 }

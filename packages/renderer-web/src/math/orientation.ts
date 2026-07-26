@@ -49,6 +49,39 @@ export function faceUpQuaternion(sides: ShapedDieSides, value: number): Quaterni
   return new Quaternion().setFromUnitVectors(new Vector3(...normal), UP);
 }
 
+/**
+ * Fans a face into triangles wound counter-clockwise when seen from outside
+ * the die. The source polygon lists corners in whichever order each solid was
+ * authored, so winding must be corrected here: renderers derive lighting
+ * normals from it, and an inward-facing triangle is lit from within and shows
+ * through the solid whenever a material is not fully opaque.
+ */
+export function faceTriangles(
+  data: PolyhedronData,
+  faceIndex: number,
+): [number, number, number][] {
+  const face = data.faces[faceIndex];
+  if (!face) {
+    throw new DiceForgeError("invalid-argument", `face ${faceIndex} does not exist`);
+  }
+  const outward = faceNormal(data, faceIndex);
+  const triangles: [number, number, number][] = [];
+  for (let i = 1; i + 1 < face.length; i++) {
+    const a = face[0] ?? -1;
+    const b = face[i] ?? -1;
+    const c = face[i + 1] ?? -1;
+    const va = data.vertices[a];
+    const vb = data.vertices[b];
+    const vc = data.vertices[c];
+    if (!va || !vb || !vc) {
+      throw new DiceForgeError("invalid-argument", "face references a missing vertex");
+    }
+    const winding = cross(subtract(vb, va), subtract(vc, va));
+    triangles.push(dot(winding, outward) >= 0 ? [a, b, c] : [a, c, b]);
+  }
+  return triangles;
+}
+
 /** In-plane axes of a face, for projecting its polygon into UV space. */
 export function faceBasis(data: PolyhedronData, faceIndex: number): { u: Vec3; v: Vec3 } {
   const face = data.faces[faceIndex];

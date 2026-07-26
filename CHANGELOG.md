@@ -23,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Dropped dice no longer render translucent. They were dimmed partly by lowering opacity, which — with double-sided materials — let a die's own interior and back faces show through, reading as a rendering glitch. Dropped dice are now fully opaque and dimmed by color alone.
+- Half of the procedural d10's triangles were wound inward, so their lighting normals faced into the solid. All faces are now wound outward (`faceTriangles`), which also lets dice render with back-face culling as the closed solids they are.
 - Procedural die labels could sit partly off a triangular face, and each shape rendered at a different physical size.
 
 ## [0.1.0] - 2026-07-25
