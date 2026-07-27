@@ -14,6 +14,11 @@
     "verbatimModuleSyntax": true,
     "declaration": true,
     "sourceMap": true,
+    // Published packages ship `dist` and not `src`, so a map that merely points
+    // at "../src/*.ts" resolves to nothing in a consumer's project — some
+    // bundlers warn, and none of them can show the source. Inlining the text
+    // makes each map self-contained, whatever a bundler does with paths.
+    "inlineSources": true,
     "skipLibCheck": true
   }
 }

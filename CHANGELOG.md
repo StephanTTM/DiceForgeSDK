@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Published source maps referenced `../src/*.ts`, which packages ship `dist` and not `src` — so the maps resolved to nothing in a consumer's project, and some bundlers warned about them. They now carry the TypeScript inline (`inlineSources`), so stepping into the SDK works whatever a bundler does with relative paths. Tarballs grow by roughly half: `@diceforge-sdk/core` from 31 kB to 49 kB packed, `renderer-web` from 38 kB to 58 kB.
+
 ## [0.4.0] - 2026-07-27
 
 The extensibility milestone: dice a game system can define for itself, notation
