@@ -6,6 +6,7 @@
   "license": "MIT",
   "type": "module",
   "dependencies": {
+    "@diceforge-sdk/assets-forge": "*",
     "@diceforge-sdk/core": "*",
     "@diceforge-sdk/renderer-web": "*",
     "react": "^19.2.8",

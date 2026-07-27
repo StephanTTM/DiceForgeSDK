@@ -1,13 +1,13 @@
 {
-  "name": "@diceforge-sdk/renderer-web",
+  "name": "@diceforge-sdk/assets-forge",
   "version": "0.3.0",
-  "description": "Browser presenter for DiceForge: Three.js 3D dice with outcome-first animation, DOM fallback, reduced-motion support, and accessible announcements.",
+  "description": "The first-party DiceForge die set: d4-d20 models, a two-faced coin, and texture atlases in five colours, resolved to URLs your bundler emits.",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/StephanTTM/DiceForgeSDK.git",
-    "directory": "packages/renderer-web"
+    "directory": "packages/assets-forge"
   },
   "homepage": "https://github.com/StephanTTM/DiceForgeSDK#readme",
   "bugs": "https://github.com/StephanTTM/DiceForgeSDK/issues",
@@ -20,10 +20,13 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./forge/*": "./forge/*",
+    "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "forge"
   ],
   "sideEffects": false,
   "engines": {
@@ -32,9 +35,10 @@
   "keywords": [
     "dice",
     "3d",
-    "threejs",
-    "webgl",
-    "renderer",
+    "gltf",
+    "assets",
+    "models",
+    "textures",
     "tabletop"
   ],
   "scripts": {
@@ -42,11 +46,7 @@
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run"
   },
-  "dependencies": {
-    "@diceforge-sdk/core": "^0.3.0",
-    "three": "^0.182.0"
-  },
   "devDependencies": {
-    "@types/three": "^0.182.0"
+    "@diceforge-sdk/renderer-web": "^0.3.0"
   }
 }

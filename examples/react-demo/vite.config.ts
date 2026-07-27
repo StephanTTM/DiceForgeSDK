@@ -4,7 +4,6 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
-  publicDir: "../../assets",
   resolve: {
     // Run against workspace source, so the demo never shows a stale dist build.
     alias: {
@@ -13,6 +12,11 @@ export default defineConfig({
       ),
       "@diceforge-sdk/renderer-web": fileURLToPath(
         new URL("../../packages/renderer-web/src/index.ts", import.meta.url),
+      ),
+      // The dice come from the asset package, exactly as they would in an app;
+      // Vite emits the .glb and .png files it resolves through it.
+      "@diceforge-sdk/assets-forge": fileURLToPath(
+        new URL("../../packages/assets-forge/src/index.ts", import.meta.url),
       ),
     },
   },

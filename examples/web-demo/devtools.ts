@@ -7,6 +7,13 @@
 // Both modes publish their result on `window.__diceforge` once ready, so a
 // script can wait for it rather than guessing at timings.
 
+import type { ForgeShape } from "@diceforge-sdk/assets-forge";
+import {
+  FORGE_COIN_URL,
+  FORGE_FACE_ROTATIONS_URL,
+  FORGE_MODEL_URLS,
+  forgeAssets,
+} from "@diceforge-sdk/assets-forge";
 import { createDiceEngine, createSeededRandomSource } from "@diceforge-sdk/core";
 import { createDicePresenter, type ForgeColor, forgeTheme } from "@diceforge-sdk/renderer-web";
 import {
@@ -54,7 +61,7 @@ async function preview(): Promise<void> {
     container: stage,
     renderMode: (params.get("render") ?? "webgl") as "auto" | "webgl" | "dom",
     reducedMotion: "reduce",
-    ...(forgeColor ? { theme: forgeTheme({ baseUrl: "/forge", color: forgeColor }) } : {}),
+    ...(forgeColor ? { theme: forgeTheme(forgeAssets({ color: forgeColor })) } : {}),
   });
   const engine = createDiceEngine({
     random: createSeededRandomSource(params.get("seed") ?? "table-42"),
@@ -123,9 +130,12 @@ function faceClusters(root: Object3D, expected: number): Vector3[] {
  */
 async function forgeCheck(): Promise<void> {
   const name = params.get("forge") ?? "d20";
-  const manifest = await (await fetch("/forge/face-rotations.json")).json();
+  const manifest = await (await fetch(FORGE_FACE_ROTATIONS_URL)).json();
   const entry = manifest[name];
-  const gltf = await new GLTFLoader().loadAsync(`/forge/${name}.glb`);
+  const url =
+    name === "coin" ? FORGE_COIN_URL : FORGE_MODEL_URLS[Number(name.slice(1)) as ForgeShape];
+  if (!url) throw new Error(`no model for ${name}`);
+  const gltf = await new GLTFLoader().loadAsync(url);
   const model = gltf.scene;
   const box = new Box3().setFromObject(model);
   const size = box.getSize(new Vector3());

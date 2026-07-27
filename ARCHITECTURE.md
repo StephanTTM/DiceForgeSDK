@@ -49,6 +49,7 @@ packages/
   core/                 rules, notation, resolver, event schemas   [implemented]
   plugin-contracts/     optional extension interfaces              [presenter contract lives in core for now — ADR-0008]
   renderer-web/         web rendering integration                  [implemented — also serves as the browser adapter, ADR-0007]
+  assets-forge/         the first-party die set, art only          [implemented — optional, no code depends on it, ADR-0013]
   adapter-unity/        Unity-facing integration                   [future]
   adapter-godot/        Godot-facing integration                   [future]
   testing/              test fixtures and conformance suites       [future]
@@ -57,6 +58,8 @@ docs/                   user and contributor documentation         [future]
 ```
 
 This is a target structure, not a reason to create empty packages prematurely. `packages/core` (npm workspace `@diceforge-sdk/core`) ships the ADR-0004 toolchain: ESM-only `tsc` output, Vitest tests colocated as `*.test.ts`, Biome lint/format.
+
+Art is a package, not a dependency. `packages/assets-forge` carries models and textures and exports URLs; nothing imports it — the renderer accepts the URL shape structurally, so installing the engine or the renderer still pulls in no art (ADR-0013). The dependency arrow points from the application at both, never between them.
 
 ## Compatibility rules
 

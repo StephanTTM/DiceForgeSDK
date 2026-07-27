@@ -4,11 +4,12 @@ import { Quaternion, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import { FORGE_COIN_ROTATIONS, FORGE_FACE_ROTATIONS } from "./forge-rotations.js";
 import type { ShapedDieSides } from "./math/geometry.js";
+import type { ForgeAssetUrls } from "./theme.js";
 import { FORGE_COLORS, forgeTheme, hasCalibratedModel } from "./theme.js";
 
 const manifest = JSON.parse(
   readFileSync(
-    fileURLToPath(new URL("../../../assets/forge/face-rotations.json", import.meta.url)),
+    fileURLToPath(new URL("../../assets-forge/forge/face-rotations.json", import.meta.url)),
     "utf8",
   ),
 ) as Record<
@@ -24,7 +25,7 @@ describe("generated forge rotation tables", () => {
    * one without rerunning the generator, the renderer would orient dice with
    * stale data — so the two are compared directly.
    */
-  it("matches assets/forge/face-rotations.json", () => {
+  it("matches the manifest shipped in @diceforge-sdk/assets-forge", () => {
     for (const shape of FORGE_SHAPES) {
       const fromManifest = manifest[`d${shape}`]?.rotations;
       const fromSource = FORGE_FACE_ROTATIONS[shape];
@@ -116,5 +117,68 @@ describe("forgeTheme", () => {
       expect(theme.colors.die).toMatch(/^#[0-9a-f]{6}$/i);
       expect(theme.colors.label).toMatch(/^#[0-9a-f]{6}$/i);
     }
+  });
+
+  /**
+   * `@diceforge-sdk/assets-forge` hands over URLs a bundler emitted, which are
+   * hashed and share no common prefix — so they arrive as an explicit map
+   * rather than a base directory (ADR-0013).
+   */
+  it("accepts explicit URLs instead of a base directory", () => {
+    const urls: ForgeAssetUrls = {
+      dice: { 4: "/a.glb", 6: "/b.glb", 8: "/c.glb", 10: "/d.glb", 12: "/e.glb", 20: "/f.glb" },
+      diceTextures: {
+        4: "/a.png",
+        6: "/b.png",
+        8: "/c.png",
+        10: "/d.png",
+        12: "/e.png",
+        20: "/f.png",
+      },
+      tensTexture: "/tens.png",
+      coin: "/coin.glb",
+      coinTextures: { heads: "/h.png", tails: "/t.png", rim: "/r.png" },
+    };
+    const theme = forgeTheme({ urls, color: "green" });
+
+    expect(theme.name).toBe("forge-green");
+    expect(theme.models?.urls[20]).toBe("/f.glb");
+    expect(theme.models?.textureUrls?.[12]).toBe("/e.png");
+    expect(theme.models?.tensTextureUrl).toBe("/tens.png");
+    expect(theme.coin?.textures?.rim).toBe("/r.png");
+    // Whichever way the art is addressed, the rotation tables are the same.
+    for (const shape of FORGE_SHAPES) {
+      expect(hasCalibratedModel(theme.models, shape), `d${shape}`).toBe(true);
+    }
+  });
+
+  it("derives the same theme from a base directory as from its URLs", () => {
+    const fromBase = forgeTheme({ baseUrl: "/forge", color: "red" });
+    const urls: ForgeAssetUrls = {
+      dice: {
+        4: "/forge/d4.glb",
+        6: "/forge/d6.glb",
+        8: "/forge/d8.glb",
+        10: "/forge/d10.glb",
+        12: "/forge/d12.glb",
+        20: "/forge/d20.glb",
+      },
+      diceTextures: {
+        4: "/forge/textures/red/d4.png",
+        6: "/forge/textures/red/d6.png",
+        8: "/forge/textures/red/d8.png",
+        10: "/forge/textures/red/d10.png",
+        12: "/forge/textures/red/d12.png",
+        20: "/forge/textures/red/d20.png",
+      },
+      tensTexture: "/forge/textures/red/d10_tens.png",
+      coin: "/forge/coin.glb",
+      coinTextures: {
+        heads: "/forge/textures/red/coin_heads.png",
+        tails: "/forge/textures/red/coin_tails.png",
+        rim: "/forge/textures/red/coin_rim.png",
+      },
+    };
+    expect(forgeTheme({ urls, color: "red" })).toEqual(fromBase);
   });
 });

@@ -19,6 +19,7 @@ This roadmap states intent, not release promises. Priorities favor a small relia
 
 ## Extensibility — 0.3.0
 
+- Publish the first-party dice as an optional asset package so 3D works from `npm install`. *(shipped)*
 - Stabilize plugin contracts and capability discovery.
 - Add custom dice definitions and notation extensions.
 - Add replay records and schema-versioning policy.

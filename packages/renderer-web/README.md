@@ -41,24 +41,31 @@ presenter.dispose();
 
 Every record is re-validated (`validateEventRecord`) before display. The tumble animation hands off to a rotation that ends **exactly** at the resolved face's orientation — the outcome is honored by construction, not by reading the physics. Presentation motion is intentionally non-deterministic (ARCHITECTURE.md permits this); the record is the replayable truth.
 
-## Themes and 3D models (ADR-0010)
+## Themes and 3D models (ADR-0010, ADR-0013)
 
 A theme is plain data: colors, plus an optional set of glTF model URLs with a **calibrated face-rotation table** that says which orientation shows which value. Models load lazily on first use and are cached.
 
 ```ts
+import { forgeAssets } from "@diceforge-sdk/assets-forge";
 import { createDicePresenter, forgeTheme } from "@diceforge-sdk/renderer-web";
 
 const presenter = createDicePresenter({
   container,
-  theme: forgeTheme({ baseUrl: "/dice-assets/forge", color: "blue" }),
+  theme: forgeTheme(forgeAssets({ color: "blue" })),
 });
 ```
 
-`forgeTheme` ships with the package and covers d4–d20 plus a two-faced coin, in `ivory` (default), `red`, `blue`, `green` and `yellow`. One model per die serves every colour — the theme swaps the texture atlas rather than the mesh — so adding a palette costs a few PNGs, not another set of models.
+`forgeTheme` covers d4–d20 plus a two-faced coin, in `ivory` (default), `red`, `blue`, `green` and `yellow`. One model per die serves every colour — the theme swaps the texture atlas rather than the mesh — so adding a palette costs a few PNGs, not another set of models.
 
-**A theme is required for 3D.** This package ships code, not art, so without one — or for a roll a theme cannot cover — the presenter uses the DOM tiles instead (ADR-0012). `createDicePresenter({ container })` with no theme reports `mode: "dom"`.
+**A theme is required for 3D.** Without one — or for a roll a theme cannot cover — the presenter uses the DOM tiles instead (ADR-0012). `createDicePresenter({ container })` with no theme reports `mode: "dom"`.
 
-**This package ships no art.** `baseUrl` points at wherever your app serves the model files from — copy them out of the repository's [`assets/forge/`](../../assets/forge) directory (or use your own pack) and serve them statically. Provenance and licences are in [`assets/LICENSES.md`](../../assets/LICENSES.md).
+**This package ships no art.** The dice live in [`@diceforge-sdk/assets-forge`](../assets-forge/README.md), an optional install whose URLs your bundler emits (ADR-0013). To serve the files yourself instead — a CDN, a `public/` directory, your own pack — give `forgeTheme` a directory rather than URLs:
+
+```ts
+forgeTheme({ baseUrl: "/dice-assets/forge", color: "blue" });
+```
+
+Both forms produce the same theme. Licences and provenance are in [`assets/LICENSES.md`](../../assets/LICENSES.md).
 
 A themed coin is optional too: `DiceTheme.coin` names a model whose heads, tails and rim materials are textured separately, and the two rotations that turn each face up. Without one, coin flips use the built-in cylinder.
 

@@ -15,10 +15,10 @@
   "scripts": {
     "check": "biome check .",
     "format": "biome format --write .",
-    "typecheck": "npm run build && tsc -p packages/core/tsconfig.json --noEmit && tsc -p packages/renderer-web/tsconfig.json --noEmit && tsc -p examples/web-demo/tsconfig.json --noEmit && tsc -p examples/react-demo/tsconfig.json --noEmit",
+    "typecheck": "npm run build && tsc -p packages/core/tsconfig.json --noEmit && tsc -p packages/renderer-web/tsconfig.json --noEmit && tsc -p packages/assets-forge/tsconfig.json --noEmit && tsc -p examples/web-demo/tsconfig.json --noEmit && tsc -p examples/react-demo/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "build": "tsc -p packages/core/tsconfig.build.json && tsc -p packages/renderer-web/tsconfig.build.json",
+    "build": "tsc -p packages/core/tsconfig.build.json && tsc -p packages/renderer-web/tsconfig.build.json && tsc -p packages/assets-forge/tsconfig.build.json",
     "example": "npm run build && node examples/headless/main.mjs",
     "demo:web": "npm run build && vite examples/web-demo",
     "demo:react": "npm run build && vite examples/react-demo",

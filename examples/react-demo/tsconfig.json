@@ -6,7 +6,8 @@
     "noEmit": true,
     "paths": {
       "@diceforge-sdk/core": ["../../packages/core/src/index.ts"],
-      "@diceforge-sdk/renderer-web": ["../../packages/renderer-web/src/index.ts"]
+      "@diceforge-sdk/renderer-web": ["../../packages/renderer-web/src/index.ts"],
+      "@diceforge-sdk/assets-forge": ["../../packages/assets-forge/src/index.ts"]
     }
   },
   "include": ["src"]

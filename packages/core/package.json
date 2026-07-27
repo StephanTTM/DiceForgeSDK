@@ -1,6 +1,6 @@
 {
   "name": "@diceforge-sdk/core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Headless, renderer-agnostic dice and coin-flip engine with seedable RNG, dice notation, and schema-versioned event records.",
   "license": "MIT",
   "type": "module",

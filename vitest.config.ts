@@ -9,6 +9,9 @@ export default defineConfig({
       "@diceforge-sdk/renderer-web": fileURLToPath(
         new URL("packages/renderer-web/src/index.ts", import.meta.url),
       ),
+      "@diceforge-sdk/assets-forge": fileURLToPath(
+        new URL("packages/assets-forge/src/index.ts", import.meta.url),
+      ),
     },
   },
   test: {

@@ -147,6 +147,26 @@ Type-only exports from the core (`InteractionPresenter`, `PresentationOptions`, 
 
 The first implementation is [`@diceforge-sdk/renderer-web`](packages/renderer-web/README.md): Three.js 3D dice with outcome-first animation, a DOM fallback, reduced-motion support, and aria-live announcements (ADR-0007).
 
+### Themes and art (ADR-0010, ADR-0013)
+
+```ts
+// @diceforge-sdk/renderer-web
+function forgeTheme(options: ForgeThemeOptions): DiceTheme;
+
+type ForgeThemeOptions =
+  | { baseUrl: string; color?: ForgeColor } // art the application serves
+  | { urls: ForgeAssetUrls; color?: ForgeColor }; // art resolved by a bundler
+
+// @diceforge-sdk/assets-forge
+function forgeAssets(options?: { color?: ForgeColor }): { color: ForgeColor; urls: ForgeAssetUrls };
+```
+
+A theme is plain data — never a vendor object — so it stays serializable and inspectable. 3D requires one: with no theme, or for a shape a theme cannot cover, the presenter falls back to DOM tiles for the whole event (ADR-0012).
+
+Art is never bundled into `core` or `renderer-web`. The first-party dice are published separately as [`@diceforge-sdk/assets-forge`](packages/assets-forge/README.md), which carries the files and returns the URLs a bundler emitted for them; `forgeTheme(forgeAssets({ color }))` is the everyday path. The renderer does not depend on that package — it accepts the URL shape structurally — so either side can be swapped for a custom pack.
+
+Compatibility: the two spellings of `forgeTheme` produce identical themes, and `baseUrl` keeps working unchanged. `DieModelSet` still requires a complete face-rotation table per shape, which is what stops a model from ever showing a face the core did not resolve. Model geometry and textures may change between minor versions before 1.0; pin an exact `assets-forge` version if a visual diff would break your tests.
+
 ## API documentation checklist
 
 For each public export, document purpose, parameters, return shape, errors, determinism behavior, examples, platform support, and stability level.

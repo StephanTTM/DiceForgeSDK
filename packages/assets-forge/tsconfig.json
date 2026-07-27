@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // DOM for `URL` and `import.meta.url`, which browsers and Node both provide;
+    // nothing here touches the document. Node types are for tests only (they
+    // check the shipped files against disk) and tsconfig.build.json drops those.
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"]
+}

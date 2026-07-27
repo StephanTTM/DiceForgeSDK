@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-26
+
+3D dice now work from `npm install`.
+
+### Added
+
+- `@diceforge-sdk/assets-forge`: the first-party die set as an optional package — d4 through d20, a two-faced coin, and a texture atlas per colour. `forgeAssets({ color })` returns the URLs your bundler emitted for those files, so nothing has to be copied into a public directory or hosted: `forgeTheme(forgeAssets({ color: "red" }))` is the whole setup (ADR-0013). The package has no dependencies and no renderer code, and neither `core` nor `renderer-web` depends on it — an install of either still carries no art.
+- `forgeTheme()` accepts explicit URLs (`{ urls, color }`) as well as a directory (`{ baseUrl, color }`), because bundler-emitted files are hashed and share no common prefix. Both forms produce identical themes. New exported types: `ForgeAssetUrls`, `ForgeThemeOptions`.
+
+### Changed
+
+- The generated dice moved from `assets/forge/` to `packages/assets-forge/forge/`, which is now their canonical home: the Blender pipeline writes there, and `assets/` keeps the licensing record. Applications that serve their own copy are unaffected — `baseUrl` still works and is still the way to use a custom pack.
+- Both example apps consume the asset package the way an application would, so the demo and the visual regression suite exercise the same resolution path a user gets.
+- CI and release workflows run `actions/checkout@v5` and `actions/setup-node@v5`; the v4 line was being forced onto Node 24 with a deprecation warning.
+
 ## [0.2.0] - 2026-07-26
 
 The web presentation milestone. Entries describe the net change since 0.1.0,

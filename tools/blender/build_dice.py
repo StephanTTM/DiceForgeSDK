@@ -4,7 +4,7 @@ Run headlessly from the repository root:
 
     blender --background --factory-startup --python tools/blender/build_dice.py
 
-Produces, under `assets/forge/`:
+Produces, under `packages/assets-forge/forge/`:
   * `<name>.glb`          one model per die and the coin
   * `face-rotations.json` the face-up orientation table plus UV atlas metadata
 
@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dice_shapes as ds  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-OUT_DIR = os.path.join(REPO, "assets", "forge")
+OUT_DIR = os.path.join(REPO, "packages", "assets-forge", "forge")
 BLEND_PATH = os.path.join(REPO, "tools", "blender", "diceforge-dice.blend")
 
 DIE_SIZE = 2.1

@@ -1,6 +1,6 @@
 # DiceForge die generator (Blender)
 
-Generates the first-party die set — d4, d6, d8, d10, d12, d20 and a two-faced coin — into `assets/forge/`, together with the face-up rotation table the web renderer needs.
+Generates the first-party die set — d4, d6, d8, d10, d12, d20 and a two-faced coin — into `packages/assets-forge/forge/`, together with the face-up rotation table the web renderer needs.
 
 ## Regenerating
 
@@ -16,10 +16,10 @@ Outputs, all overwritten in place:
 
 | File | Written by | Contents |
 | --- | --- | --- |
-| `assets/forge/<name>.glb` | `build_dice` | one model per die, plus `coin.glb` |
-| `assets/forge/face-rotations.json` | `build_dice` | face-up rotations, UV atlas layout, coin materials |
+| `packages/assets-forge/forge/<name>.glb` | `build_dice` | one model per die, plus `coin.glb` |
+| `packages/assets-forge/forge/face-rotations.json` | `build_dice` | face-up rotations, UV atlas layout, coin materials |
 | `tools/blender/diceforge-dice.blend` | `build_dice` | the scene, for inspecting or hand-editing |
-| `assets/forge/textures/<colour>/*.png` | `build_textures` | one atlas per die, plus coin heads/tails/rim |
+| `packages/assets-forge/forge/textures/<colour>/*.png` | `build_textures` | one atlas per die, plus coin heads/tails/rim |
 | `packages/renderer-web/src/forge-rotations.ts` | `emit_rotations` | the rotation tables the renderer imports |
 
 `forge-rotations.test.ts` compares the emitted TypeScript against the manifest, so forgetting step 3 fails the test suite rather than shipping stale orientations.

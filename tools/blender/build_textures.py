@@ -4,8 +4,8 @@ Run from the repository root (plain Python, no Blender needed):
 
     python tools/blender/build_textures.py
 
-Reads `assets/forge/face-rotations.json` — written by `build_dice.py` — and
-paints one atlas per die per colour into `assets/forge/textures/`, plus the
+Reads `packages/assets-forge/forge/face-rotations.json` — written by `build_dice.py` — and
+paints one atlas per die per colour into `packages/assets-forge/forge/textures/`, plus the
 coin's heads, tails and rim.
 
 Each face owns a square tile of the atlas. The manifest's per-face `fit` is the
@@ -23,7 +23,7 @@ import sys
 from PIL import Image, ImageDraw, ImageFont
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-FORGE_DIR = os.path.join(REPO, "assets", "forge")
+FORGE_DIR = os.path.join(REPO, "packages", "assets-forge", "forge")
 TEXTURE_DIR = os.path.join(FORGE_DIR, "textures")
 TILE = 256
 SUPERSAMPLE = 2  # draw large, downscale: cheap, effective anti-aliasing

@@ -1,7 +1,12 @@
+import { forgeAssets } from "@diceforge-sdk/assets-forge";
 import type { DiceEngine, InteractionEvent } from "@diceforge-sdk/core";
 import { createDiceEngine, createSeededRandomSource, DiceForgeError } from "@diceforge-sdk/core";
 import type { DicePresenter } from "@diceforge-sdk/renderer-web";
-import { createDicePresenter, formatEventAnnouncement } from "@diceforge-sdk/renderer-web";
+import {
+  createDicePresenter,
+  forgeTheme,
+  formatEventAnnouncement,
+} from "@diceforge-sdk/renderer-web";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 /**
@@ -18,7 +23,12 @@ function useDicePresenter(): {
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const presenter = createDicePresenter({ container });
+    // The installed die set is the whole 3D setup: no copying, no hosting, and
+    // no paths to configure. Drop the theme and the presenter shows 2D tiles.
+    const presenter = createDicePresenter({
+      container,
+      theme: forgeTheme(forgeAssets({ color: "blue" })),
+    });
     presenterRef.current = presenter;
     return () => {
       presenterRef.current = null;

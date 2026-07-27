@@ -14,5 +14,13 @@ export {
 export { FORGE_COIN_ROTATIONS, FORGE_FACE_ROTATIONS } from "./forge-rotations.js";
 export type { DicePresenter, DicePresenterOptions } from "./presenter.js";
 export { createDicePresenter } from "./presenter.js";
-export type { CoinModel, DiceTheme, DieModelSet, ForgeColor, QuaternionTuple } from "./theme.js";
+export type {
+  CoinModel,
+  DiceTheme,
+  DieModelSet,
+  ForgeAssetUrls,
+  ForgeColor,
+  ForgeThemeOptions,
+  QuaternionTuple,
+} from "./theme.js";
 export { FORGE_COLORS, forgeTheme, hasCalibratedModel } from "./theme.js";
