@@ -39,12 +39,13 @@ Both are ESM-only. The core runs anywhere with ES2022 — Node 20+, browsers, wo
 
 | Area | Status |
 | --- | --- |
-| Dice d4–d20, d100/percentile, coin flips | Resolved headlessly, fully tested |
-| Notation `2d20kh1+3`, `4d6dl1`, `d%` | Grammar v1, with positioned parse errors |
+| Dice d4–d20, d100/percentile, any face count, custom dice, coin flips | Resolved headlessly, fully tested |
+| Notation `2d20kh1+3`, `4d6dl1`, `4d6r1!`, `d%` | Grammar v1.2: keep/drop, exploding, rerolls, positioned parse errors |
 | Seeded + system randomness | Reproducible across platforms, provenance recorded per result |
 | Serialization and replay | `schemaVersion: 2`, validated on read; sessions replay without re-rolling |
 | Browser presentation | Three.js dice, DOM fallback, reduced motion, aria-live announcements |
 | Themes | First-party textured set: every shape plus a two-faced coin, in five colours, installable from npm |
+| Plugin conformance suite | `@diceforge-sdk/testing` — checks a presenter against the contract it declares |
 | Unity / Godot adapters | Not started — see [ROADMAP.md](ROADMAP.md) |
 
 ## Showing dice in the browser
@@ -76,7 +77,7 @@ npm run demo:react   # the same, inside React
 
 ## Project status
 
-**0.3.0** is on npm: [`@diceforge-sdk/core`](https://www.npmjs.com/package/@diceforge-sdk/core), [`@diceforge-sdk/renderer-web`](https://www.npmjs.com/package/@diceforge-sdk/renderer-web), and the optional [`@diceforge-sdk/assets-forge`](https://www.npmjs.com/package/@diceforge-sdk/assets-forge). 0.2.0 completed the web presentation milestone — the Three.js presenter, themes, the first-party dice, and the React and browser examples; 0.3.0 made those dice installable. See the [changelog](CHANGELOG.md).
+**0.4.0** is on npm — the engine [`@diceforge-sdk/core`](https://www.npmjs.com/package/@diceforge-sdk/core), the browser presenter [`@diceforge-sdk/renderer-web`](https://www.npmjs.com/package/@diceforge-sdk/renderer-web), and two optional packages: the dice themselves in [`@diceforge-sdk/assets-forge`](https://www.npmjs.com/package/@diceforge-sdk/assets-forge) and the plugin conformance suite in [`@diceforge-sdk/testing`](https://www.npmjs.com/package/@diceforge-sdk/testing). 0.2.0 completed browser presentation, 0.3.0 made the dice installable, and 0.4.0 is the extensibility milestone: custom dice, exploding and reroll notation, replayable sessions, and a presenter contract a third party can be held to. See the [changelog](CHANGELOG.md), which lists what to check when upgrading.
 
 APIs are experimental before 1.0 and may change between minor versions. Serialized records carry a `schemaVersion` so stored results survive those changes.
 

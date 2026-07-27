@@ -1,6 +1,6 @@
 {
   "name": "@diceforge-sdk/testing",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Conformance tests for DiceForge plugins: check that a presenter honors the InteractionPresenter contract it declares.",
   "license": "MIT",
   "type": "module",
@@ -43,9 +43,9 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "@diceforge-sdk/core": "^0.3.0"
+    "@diceforge-sdk/core": "^0.4.0"
   },
   "devDependencies": {
-    "@diceforge-sdk/core": "^0.3.0"
+    "@diceforge-sdk/core": "^0.4.0"
   }
 }

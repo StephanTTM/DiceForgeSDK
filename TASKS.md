@@ -31,21 +31,25 @@ Remaining before tagging 0.1.0:
 - [x] Theme/asset loading as an optional presentation concern. (`DiceTheme` + lazy glTF models with calibrated face tables, KayKit CC0 pack — ADR-0010)
 - [x] Publish 0.1.0 to npm. (`@diceforge-sdk/core` + `@diceforge-sdk/renderer-web` live 2026-07-25; `v0.1.0` tagged; trusted publishing configured; release workflow verified green and idempotent — ADR-0009)
 
-## Next: extensibility — 0.3.0
+## Extensibility — 0.4.0 (released 2026-07-27)
 
 - [x] Add capability discovery so an adapter can ask what a presenter supports instead of feature-detecting it. (`PresenterCapabilities` + `presentationSupport()` in core, declared per instance by the web renderer — ADR-0014)
-- [ ] Extend the contract to the plugin categories beyond presentation (physics, audio, transport) once a second implementation exists to shape it — ARCHITECTURE lists them, but nothing implements them yet.
 - [x] Custom dice definitions. (`defineDie` + `createDiceEngine({ dice })`, `4d{fate}`, any face count 2..1000, event schema v2 with a v1 read path — ADR-0015)
 - [x] Notation extensions beyond grammar v1 (exploding dice, rerolls). (`4d6!`, `4d6r1`, `4d6ro1`; any modifier order, capped chains, extras recorded in rolled order — ADR-0016)
 - [x] Replay support: re-present a stored record without re-resolving it. (`SessionRecord`, `createSession`, `serializeSession`/`deserializeSession`, `replaySession`; replay draws no randomness — ADR-0017)
 - [x] Plugin-author documentation and a compatibility test kit a third-party renderer can run against. (`@diceforge-sdk/testing`: runner-agnostic conformance checks + the presenter-authoring guide; `renderer-web` runs it against itself — ADR-0014)
 - [x] Decide whether the first-party dice ship as an optional `@diceforge-sdk/assets-forge` package or stay repository-only. (shipped as a package — ADR-0013; `forgeTheme(forgeAssets({ color }))` needs no copying, `baseUrl` still serves custom packs)
 
+## Next
+
+- [ ] Extend the plugin contracts to the categories beyond presentation (physics, audio, transport) once a second implementation exists to shape them — ARCHITECTURE lists them, but nothing implements them yet.
+- [ ] Physics-based presenter plugin exploration (realistic motion behind the same presenter contract). The hard part is not the dependency: the outcome is already decided, so a simulation must land on it without visibly correcting itself (ADR-0007), and replay semantics say the motion need not repeat (ADR-0017).
+- [ ] Run the visual regression suite in CI, with baselines generated inside the CI container image so they are platform-stable.
+
 ## Backlog
 
-- [ ] Physics-based presenter plugin exploration (realistic motion behind the same presenter contract).
-- [ ] Unity adapter exploration and package distribution plan. (0.4.0)
-- [ ] Godot adapter exploration and package distribution plan. (0.4.0)
+- [ ] Unity adapter exploration and package distribution plan. (engine adapters milestone)
+- [ ] Godot adapter exploration and package distribution plan. (engine adapters milestone)
 - [x] Theme/asset pack policy and licensing checklist. (ADR-0010, `assets/LICENSES.md`, CONTRIBUTING)
 - [x] Add the missing `boardgame_bits_texture.png` so the KayKit D6_A/D6_B pip styles can be offered. (`d6Style: "pips-a" | "pips-b"`)
 - [x] Calibrate d10/d12 models so themes can cover every shape. (superseded: first-party set generated for every shape, tables exact by construction — ADR-0011)
@@ -54,8 +58,7 @@ Remaining before tagging 0.1.0:
 - [x] Even out apparent die sizes. (`modelSilhouetteScale` equalizes each die's on-screen silhouette, measured from the loaded mesh)
 - [x] Give procedural dice beveled edges, or retire them. (retired, along with the KayKit pack — ADR-0012)
 - [ ] Optional multiplayer transport plugin research. (beyond 1.0)
-- [x] Browser-based visual regression testing for the renderer. (`npm run vrt`, 8 scenes, Playwright + committed baselines)
-- [ ] Run the visual regression suite in CI, with baselines generated inside the CI container image so they are platform-stable.
+- [x] Browser-based visual regression testing for the renderer. (`npm run vrt`, 9 scenes, Playwright + committed baselines)
 
 ## Task maintenance
 

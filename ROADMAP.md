@@ -17,13 +17,17 @@ This roadmap states intent, not release promises. Priorities favor a small relia
 - Support theme and asset loading as optional presentation concerns.
 - Add clear graceful fallback behavior for headless or reduced-motion contexts.
 
-## Extensibility — 0.3.0
+## Extensibility — 0.3.0 and 0.4.0 *(shipped)*
 
-- Publish the first-party dice as an optional asset package so 3D works from `npm install`. *(shipped)*
+- Publish the first-party dice as an optional asset package so 3D works from `npm install`.
 - Stabilize plugin contracts and capability discovery.
 - Add custom dice definitions and notation extensions.
 - Add replay records and schema-versioning policy.
 - Publish plugin-author documentation and compatibility tests.
+
+Still open from this line: contracts for the plugin categories beyond
+presentation — physics, audio, transport — which wait on a second
+implementation to shape them rather than being guessed at in advance.
 
 ## Engine adapters — 0.4.0
 

@@ -6,30 +6,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-27
+
+The extensibility milestone: dice a game system can define for itself, notation
+for how they are rolled, sessions that replay, and contracts a third-party
+plugin can be held to.
+
+**Upgrading:** stored records still read — a version 1 record deserializes and
+comes back as version 2 with the same numbers. Two things need attention.
+Consumers who annotated a die size as `DieSides` should widen it to `number`
+(that type still names the sizes with a standard shape). Anyone who implemented
+`InteractionPresenter` must now declare `capabilities`; the conformance suite in
+`@diceforge-sdk/testing` will say what is missing.
+
 ### Added
 
-- Custom die definitions (ADR-0015): `defineDie({ id, faces })` describes a die by its faces, each with a `value` it contributes and an optional `label` it reads as, and `createDiceEngine({ dice })` makes them rollable as `4d{fate}`. Faces may repeat, so weighting a value means listing it twice; values may be negative or zero, which is what Fate/Fudge, symbol and Sicherman dice need. Rolling one consumes exactly one random number per die, so a seed replays identically whichever dice a system uses.
-- Notation accepts any face count from 2 to `MAX_DIE_FACES` (1000): `d3` and `d30` need no setup. `d1` and `d0` are rejected with an error pointing at the modifier that was probably meant.
-- Exploding dice and rerolls (ADR-0016). `4d6!` adds a die for every highest face, chaining; `4d6r1` rerolls 1s until they are not, `4d6ro1` rerolls each die at most once, and `r2` means "reroll 1s and 2s". Modifiers may be written in any order and always apply as reroll, then explode, then keep/drop — `4d6kh3r1` normalizes to `4d6r1kh3`. Both features are capped (10 per die) so a hostile expression cannot hang the engine, and neither draws a random number when it is not used, so existing seeds still mean what they meant.
-- Extra dice appear in `group.dice` in rolled order with `source: "reroll" | "explosion"`, and a roll a reroll threw away keeps its place with `rerolled: true` — so a roll reads back exactly as it happened rather than as a tidied summary. Both fields are additive, so the event schema stays at version 2.
+- **Custom die definitions** (ADR-0015): `defineDie({ id, faces })` describes a die by its faces, each with a `value` it contributes and an optional `label` it reads as, and `createDiceEngine({ dice })` makes them rollable as `4d{fate}`. Faces may repeat, so weighting a value means listing it twice; values may be negative or zero, which is what Fate/Fudge, symbol and Sicherman dice need. Rolling one consumes exactly one random number per die, so a seed replays identically whichever dice a system uses.
+- Notation accepts **any face count** from 2 to `MAX_DIE_FACES` (1000): `d3` and `d30` need no setup. `d1` and `d0` are rejected with an error pointing at the modifier that was probably meant.
+- **Exploding dice and rerolls** (ADR-0016): `4d6!` adds a die for every highest face, chaining; `4d6r1` rerolls 1s until they are not, `4d6ro1` rerolls each die at most once, and `r2` means "reroll 1s and 2s". Modifiers may be written in any order and always apply as reroll, then explode, then keep/drop — `4d6kh3r1` normalizes to `4d6r1kh3`. Both are capped at 10 per die so a hostile expression cannot hang the engine, and neither draws a random number when it is not used, so existing seeds still mean what they meant.
+- Extra dice appear in `group.dice` in rolled order with `source: "reroll" | "explosion"`, and a roll a reroll threw away keeps its place with `rerolled: true` — a roll reads back as it happened rather than as a tidied summary.
+- **Replay** (ADR-0017): `createSession(events)` turns a log of resolved events into a versioned, serializable artifact, and `replaySession(session, presenter)` presents it again. A replay consumes no randomness — it shows outcomes that were already decided, so watching a session back leaves a seeded engine's next roll unchanged — and it reproduces results only, never the motion. Events are validated entering and leaving a session, and an invalid one is reported by index. The engine still records nothing itself, so it keeps holding no state beyond its random source.
+- **Capability discovery** (ADR-0014): every presenter carries `capabilities` — the event kinds it accepts, the die sizes it can show, the media it may use (`"3d" | "2d" | "none"`), and whether it cancels, announces, and honors reduced motion. `presentationSupport(capabilities, event)` answers whether an event is covered, and says which die sizes are at fault when it is not. Both are plain data and pure logic, so an application, an adapter, or a conformance suite can ask the same question without constructing a renderer.
+- **`@diceforge-sdk/testing`**: a conformance suite a third-party presenter can run against itself. `assertPresenterConformance(factory)` checks that declared kinds and die sizes really present, that presenting leaves the resolved record byte-identical, that an aborted presentation rejects when cancellation is claimed, and that `dispose()` is idempotent — failing on a timeout rather than hanging when a presentation never settles. Runner-agnostic: the checks return data, so any test framework can assert on them. Its README doubles as the guide to writing a presenter, and `@diceforge-sdk/renderer-web` is its first consumer.
 
-- Replay support (ADR-0017): `createSession(events)` turns a log of resolved events into a versioned, serializable artifact, and `replaySession(session, presenter)` presents it again. A replay consumes no randomness — it shows outcomes that were already decided, so watching a session back leaves a seeded engine's next roll unchanged — and it reproduces results only, never the motion. Events are validated entering and leaving a session, and an invalid one is reported by index. The engine still records nothing itself, so it keeps holding no state beyond its random source.
-- Capability discovery (ADR-0014): every presenter carries `capabilities` — the event kinds it accepts, the die sizes it can show, the media it may use (`"3d" | "2d" | "none"`), and whether it cancels, announces, and honors reduced motion. `presentationSupport(capabilities, event)` in the core answers whether an event is covered, and says which die sizes are at fault when it is not. Both are plain data and pure logic, so an application, an adapter, or a conformance suite can all ask the same question without constructing a renderer.
-- `@diceforge-sdk/renderer-web` declares its capabilities per instance: `media: ["3d", "2d"]` with a 3D theme, `["2d"]` without one, and `announces: false` when announcements are turned off. Tests assert the declaration against what the presenter actually does.
-- `@diceforge-sdk/testing`: a conformance suite a third-party presenter can run against itself. `assertPresenterConformance(factory)` checks that declared kinds and die sizes really present, that presenting leaves the resolved record byte-identical, that an aborted presentation rejects when cancellation is claimed, and that `dispose()` is idempotent — failing on a timeout rather than hanging when a presentation never settles. Runner-agnostic: the checks return data, so any test framework can assert on them. Its README doubles as the guide to writing a presenter, and `@diceforge-sdk/renderer-web` is its first consumer.
+### Changed
+
+- **Breaking (records):** event `schemaVersion` is now **2**. `sides` is any face count and `value` any integer for a custom die (still 1..sides for a plain one), with new optional `die`, `label`, `source` and `rerolled` fields. Version 1 records still deserialize and come back as version 2 with the same numbers; an older core rejects a version 2 record as an unsupported version rather than misreading it. `SUPPORTED_SCHEMA_VERSIONS` lists what a core reads.
+- **Breaking (types):** `DieOutcome.sides` and `RollGroupOutcome.sides` widen from the seven-size union to `number`. `DieSides` still names the sizes with a standard physical shape.
+- **Breaking (contract):** implementing `InteractionPresenter` now requires a `capabilities` field, and `PresenterCapabilities.dieSides` accepts `"any"` — which `@diceforge-sdk/renderer-web` declares, because its tiles read whatever a face says.
+- A custom die is never drawn with a numbered 3D model, since a model cannot show a face the die does not have; such rolls fall back to tiles for the whole event.
+- `DicePresenter.mode` remains for browser-specific code, and is now documented as the vendor spelling of `capabilities.media`.
+- `group.dice.length` is the number of dice **rolled**, which modifiers can exceed the count that was asked for; the group's `notation` is what was asked for.
 
 ### Fixed
 
 - A 3D presenter that fell back to tiles for one roll stayed on tiles for every later roll — the WebGL canvas was hidden and never shown again. The fallback is per event, which unusual and custom dice make easy to reach. A visual regression scene now covers it, and the suite captures the canvas only when it is actually visible, so a hidden one can no longer be photographed as though it had rendered.
-
-### Changed
-
-- **Breaking (records):** event `schemaVersion` is now **2**. `sides` is any face count and `value` any integer for a custom die (still 1..sides for a plain one), with new optional `die` and `label` fields. Version 1 records still deserialize and come back as version 2 with the same numbers; an older core rejects a version 2 record as an unsupported version rather than misreading it. `SUPPORTED_SCHEMA_VERSIONS` lists what a core reads.
-- **Breaking (types):** `DieOutcome.sides` and `RollGroupOutcome.sides` widen from the seven-size union to `number`. `DieSides` still names the sizes with a standard physical shape.
-- **Breaking (contract):** `PresenterCapabilities.dieSides` accepts `"any"`, which `@diceforge-sdk/renderer-web` now declares — its tiles read whatever a face says.
-- A custom die is never drawn with a numbered 3D model, since a model cannot show a face the die does not have; such rolls fall back to tiles for the whole event.
-- **Breaking (contract):** implementing `InteractionPresenter` now requires a `capabilities` field. Consumers are unaffected; the only implementation is first-party, and the presenter API is documented as experimental before 1.0.
-- `DicePresenter.mode` remains for browser-specific code, and is now documented as the vendor spelling of `capabilities.media`.
 
 ## [0.3.0] - 2026-07-26
 
