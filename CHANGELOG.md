@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Published source maps referenced `../src/*.ts`, which packages ship `dist` and not `src` — so the maps resolved to nothing in a consumer's project, and some bundlers warned about them. They now carry the TypeScript inline (`inlineSources`), so stepping into the SDK works whatever a bundler does with relative paths. Tarballs grow by roughly half: `@diceforge-sdk/core` from 31 kB to 49 kB packed, `renderer-web` from 38 kB to 58 kB.
+- A stray NUL byte sat in the browser demo's seed sentinel, where it read as a space in every editor. It worked, but it made git treat a TypeScript file as binary — no diffs, no line-ending handling. Replaced with a named `STALE_SEED` constant.
+- `.gitattributes` pins LF line endings and marks the models, textures and VRT baselines binary. Without it, a contributor with git's Windows default `core.autocrlf=true` gets a working tree Biome rejects on every checkout, for files they never edited.
 
 ## [0.4.0] - 2026-07-27
 

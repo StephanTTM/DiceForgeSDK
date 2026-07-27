@@ -35,6 +35,8 @@ npm run physics        # headless physics measurement for ADR-0018 (tools/physic
 
 All of these must pass before a pull request; CI runs the same gates on Node 20 and 24 — except `vrt`, whose baselines are specific to the browser that drew them (see [tools/vrt/README.md](tools/vrt/README.md)). Run it locally whenever you touch the renderer or the dice assets, and commit the updated baselines with the change that caused them. Seeded-RNG golden tests lock the reproducibility contract — never update those constants without a superseding ADR (see ADR-0005).
 
+Line endings are LF everywhere and `.gitattributes` enforces it, so `core.autocrlf` — which git's Windows installer turns on by default — cannot leave you with a working tree Biome rejects for files you never touched. If you cloned before that file existed, `git add --renormalize .` will settle it once.
+
 ## Pull requests
 
 Use a clear title and include:

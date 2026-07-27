@@ -1,0 +1,14 @@
+# Line endings are LF everywhere, in the repository and in the working tree.
+#
+# Biome formats to LF, so a contributor with `core.autocrlf=true` — the Windows
+# installer's default — gets a working tree the formatter rejects on every
+# checkout, for files they never touched. Pinning it here settles it for
+# everyone regardless of their local git config.
+* text=auto eol=lf
+
+# Generated dice models, VRT baselines, and the Blender source. Marked
+# explicitly rather than left to git's content sniffing: a false "text" guess
+# would rewrite bytes inside them.
+*.png binary
+*.glb binary
+*.blend binary
