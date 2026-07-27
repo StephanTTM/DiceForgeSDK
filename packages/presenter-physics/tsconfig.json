@@ -1,6 +1,8 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    // DOM for the canvas and live region; the simulation itself needs neither.
+    "lib": ["ES2022", "DOM"],
     "rootDir": "src",
     "outDir": "dist"
   },

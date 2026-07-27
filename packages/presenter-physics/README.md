@@ -34,7 +34,7 @@ Each `PhysicsDie` carries the `remap` to apply to its mesh, the recorded `frames
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `dieRadius` | `1` | Circumradius in your units; every distance is scaled to match |
-| `trayRadius` | `dieRadius × (4 + 0.8√n)` | The dice cannot leave it, so a camera framed on it never moves |
+| `trayRadius` | `dieWidth × (5 + 0.8√n)` | The dice cannot leave it, so a camera framed on it never moves |
 | `random` | `Math.random` | Pass a seeded source and the same throw reproduces exactly |
 | `frameRate` | `60` | Recording rate |
 | `maxDuration` | `8` s | Longest roll to record |
@@ -59,9 +59,28 @@ That is not only for speed, though it is 500× faster than colliding a bevelled 
 
 Because the physics decides nothing, the two need not match. A themed die may be bevelled, hollowed, or missing whole faces for effect and still roll correctly. The one constraint is scale: line the model's face planes up with the collider's, or it will hover or sink.
 
-## What it does not do
+## The presenter
 
-This package produces motion. It does not draw anything, and it is not yet an `InteractionPresenter` — pair it with a renderer that can play the frames. Coin flips are not simulated; hand those to `@diceforge-sdk/renderer-web`.
+`createPhysicsPresenter` plays that motion, so most applications never touch `simulateRoll` directly:
+
+```ts
+import { createPhysicsPresenter } from "@diceforge-sdk/presenter-physics";
+
+const presenter = createPhysicsPresenter({
+  container: document.querySelector("#stage")!,
+  theme: forgeTheme(forgeAssets({ color: "red" })),
+});
+
+await presenter.present(engine.roll("4d6"));
+```
+
+It draws only what it can honestly simulate. A coin flip, a custom die, an unusual face count, a missing theme or a browser without WebGL all go to `@diceforge-sdk/renderer-web`, which already does them well — delegating rather than reimplementing is why this package is small. The result is announced exactly once, whichever of the two drew it.
+
+Reduced motion jumps to the final pose instead of playing the roll, and `present(event, { signal })` cancels like any other presenter.
+
+## Known rough edge
+
+The camera frames the whole tray so it never has to move between rolls, and a circular tray has to fit the shorter axis of the canvas. On a wide, short stage that leaves most of the width empty and the dice looking distant. A tray shaped to the viewport would fill the frame better; since it changes what is simulated, it is worth measuring rather than guessing.
 
 ## Licence
 

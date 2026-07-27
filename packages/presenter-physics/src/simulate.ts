@@ -93,8 +93,18 @@ const SLEEP_SPEED = 0.02;
 const SLEEP_TIME = 0.15;
 const TRAY_WALLS = 8;
 
+/**
+ * Measured: a tray of about `dieWidth × (5 + 0.8√n)` settles every trial in
+ * roughly a second with 96-100% of dice resting square on a face.
+ *
+ * The floor of five is what a *single* die needs — the case the harness never
+ * tried, since it swept five dice and up. At four die-widths one die rattles
+ * between the walls and finishes leaning about a fifth of the time; at seven it
+ * has room to bounce for a second before it stops. Five is the sweet spot at
+ * every count from one to ten.
+ */
 function defaultTrayRadius(dieRadius: number, count: number): number {
-  return dieRadius * (4 + 0.8 * Math.sqrt(count));
+  return dieRadius * 2 * (5 + 0.8 * Math.sqrt(count));
 }
 
 function collider(shape: ShapedDieSides): ConvexPolyhedron {

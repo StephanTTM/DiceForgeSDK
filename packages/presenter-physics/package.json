@@ -46,9 +46,14 @@
     "cannon-es": "^0.20.0"
   },
   "peerDependencies": {
-    "@diceforge-sdk/renderer-web": "^0.4.0"
+    "@diceforge-sdk/core": "^0.4.0",
+    "@diceforge-sdk/renderer-web": "^0.4.0",
+    "three": "^0.182.0"
   },
   "devDependencies": {
-    "@diceforge-sdk/renderer-web": "^0.4.0"
+    "@diceforge-sdk/core": "^0.4.0",
+    "@diceforge-sdk/renderer-web": "^0.4.0",
+    "@diceforge-sdk/testing": "^0.4.0",
+    "@types/three": "^0.182.0"
   }
 }

@@ -8,6 +8,7 @@
   "dependencies": {
     "@diceforge-sdk/assets-forge": "*",
     "@diceforge-sdk/core": "*",
+    "@diceforge-sdk/presenter-physics": "*",
     "@diceforge-sdk/renderer-web": "*"
   }
 }

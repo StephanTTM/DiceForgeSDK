@@ -9,7 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `@diceforge-sdk/presenter-physics`: dice that tumble for real and still land on the outcome the engine decided (ADR-0018). `simulateRoll(dice, options)` runs the whole roll headlessly with cannon-es and hands back a recorded trajectory plus, for each die, the rotation to apply to its mesh *inside* its collider so the recorded face occupies the place the simulation's face landed in. A symmetry leaves the collider identical, so the physics never notices and nothing is corrected on screen. Recording the trajectory rather than simulating live keeps playback frame-rate independent, makes reduced motion a jump to the last frame, and means the engine need not be deterministic across runs; a whole roll costs 4–44 ms for 1–40 dice.
-- `@diceforge-sdk/renderer-web` exports the die solids (`dieGeometry`, `PolyhedronData`, `ShapedDieSides`, `DIE_SIZE`) for presenters that need the shape itself rather than a picture of it.
+- `createPhysicsPresenter({ container, theme })` turns that motion into a presenter: it plays the recorded trajectory with three.js, applies each die's remap before the first frame, and reveals dropped dice once the roll has landed. Anything it cannot honestly simulate — a coin, a custom die, an unusual face count, no theme, no WebGL — is handed to `@diceforge-sdk/renderer-web` rather than reimplemented, and the result is announced exactly once however it was drawn. It is the second implementation of the presenter contract, and the first thing the conformance suite has been pointed at that it was not designed around.
+- `@diceforge-sdk/renderer-web` exports the pieces a second 3D presenter needs rather than a copy of them: the die solids (`dieGeometry`, `PolyhedronData`, `ShapedDieSides`, `DIE_SIZE`), the model loader and texturing (`loadDieModel`, `instantiateDieModel`, `loadThemeTexture`, `applyTexture`, `modelSilhouetteScale`), and `visualDiceForEvent`.
+- The browser demo has a `physics` renderer option.
 
 ### Fixed
 

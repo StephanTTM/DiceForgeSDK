@@ -21,6 +21,8 @@
  * is ordinary animation with no physics running on screen.
  */
 
+export type { PhysicsPresenter, PhysicsPresenterOptions } from "./playback.js";
+export { createPhysicsPresenter } from "./playback.js";
 export type {
   PhysicsDie,
   PhysicsDieRequest,
