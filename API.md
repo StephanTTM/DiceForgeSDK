@@ -169,6 +169,38 @@ Failure modes: `DiceForgeError` with `code: "invalid-event"` for malformed or in
 
 Compatibility policy (ADR-0006): additive optional fields keep the version; renaming, removing, or re-meaning fields bumps it with documented migration. Version 2 (ADR-0015) widened `sides` and `value` and added `die` and `label`; a version 2 core reads version 1 records unchanged, and a version 1 core rejects version 2 records as an unsupported version rather than misreading them.
 
+## Sessions and replay (ADR-0017)
+
+```ts
+type SessionRecord = { kind: "session"; schemaVersion: 2; events: readonly InteractionEvent[] };
+
+function createSession(events: readonly InteractionEvent[]): SessionRecord;
+function serializeSession(session: SessionRecord): string;
+function deserializeSession(json: string): SessionRecord;
+function validateSessionRecord(value: unknown): SessionRecord;
+
+function replaySession(
+  session: SessionRecord | readonly InteractionEvent[],
+  presenter: InteractionPresenter,
+  options?: { signal?: AbortSignalLike; onEvent?: (event: InteractionEvent, index: number) => void },
+): Promise<void>;
+```
+
+```ts
+const log: InteractionEvent[] = [];
+log.push(engine.roll("2d20kh1+3"));
+log.push(engine.flipCoin());
+
+const stored = serializeSession(createSession(log));      // persist anywhere
+await replaySession(deserializeSession(stored), presenter); // show it again
+```
+
+**Replay re-presents; it does not re-resolve.** It consumes no randomness, so replaying leaves a seeded engine's stream exactly where it was, and it reproduces results only — motion, timing, and the medium the presenter chooses are free to differ. Re-running the same seed through the same expressions is the *other* guarantee, and it belongs to the RNG (ADR-0005).
+
+Every event is validated entering and leaving a session, and an invalid one is reported by index (`events[2] is not a valid event record: …`). Events written by an older schema version are upgraded individually. Sessions hold at most `MAX_SESSION_EVENTS` (10,000) events.
+
+The engine records nothing itself — it holds no state beyond its random source. Keep the events you already have and hand the list to `createSession`.
+
 ## Errors
 
 ```ts

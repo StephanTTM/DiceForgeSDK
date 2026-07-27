@@ -42,7 +42,7 @@ Both are ESM-only. The core runs anywhere with ES2022 — Node 20+, browsers, wo
 | Dice d4–d20, d100/percentile, coin flips | Resolved headlessly, fully tested |
 | Notation `2d20kh1+3`, `4d6dl1`, `d%` | Grammar v1, with positioned parse errors |
 | Seeded + system randomness | Reproducible across platforms, provenance recorded per result |
-| Serialization and replay records | `schemaVersion: 1`, validated on read |
+| Serialization and replay | `schemaVersion: 2`, validated on read; sessions replay without re-rolling |
 | Browser presentation | Three.js dice, DOM fallback, reduced motion, aria-live announcements |
 | Themes | First-party textured set: every shape plus a two-faced coin, in five colours, installable from npm |
 | Unity / Godot adapters | Not started — see [ROADMAP.md](ROADMAP.md) |

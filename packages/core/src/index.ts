@@ -65,3 +65,12 @@ export type {
   SystemProvenance,
 } from "./rng/types.js";
 export { deserializeEvent, serializeEvent, validateEventRecord } from "./serialization.js";
+export type { ReplayOptions, SessionRecord } from "./session.js";
+export {
+  createSession,
+  deserializeSession,
+  MAX_SESSION_EVENTS,
+  replaySession,
+  serializeSession,
+  validateSessionRecord,
+} from "./session.js";
