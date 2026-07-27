@@ -75,16 +75,19 @@ export function validateSessionRecord(value: unknown): SessionRecord {
   return deepFreeze({
     kind: "session",
     schemaVersion: EVENT_SCHEMA_VERSION,
-    events: record.events.map((event, index) => {
-      try {
-        return validateEventRecord(event);
-      } catch (error) {
-        // Say which event, or a long session gives the reader nothing to go on.
-        const reason = error instanceof Error ? error.message : String(error);
-        fail(`events[${index}] is not a valid event record: ${reason}`);
-      }
-    }),
+    events: record.events.map(validateSessionEvent),
   });
+}
+
+/** Validates one stored event, saying which one it was when it fails. */
+function validateSessionEvent(event: unknown, index: number): InteractionEvent {
+  try {
+    return validateEventRecord(event);
+  } catch (error) {
+    // Say which event, or a long session gives the reader nothing to go on.
+    const reason = error instanceof Error ? error.message : String(error);
+    fail(`events[${index}] is not a valid event record: ${reason}`);
+  }
 }
 
 /** Serializes a session to canonical JSON, validating it first. */
