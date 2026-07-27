@@ -45,7 +45,7 @@ Remaining before tagging 0.1.0:
 - [ ] Extend the plugin contracts to the categories beyond presentation (physics, audio, transport) once a second implementation exists to shape them — ARCHITECTURE lists them, but nothing implements them yet.
 - [~] Physics-based presenter plugin exploration. The technique is settled and measured — record the trajectory headlessly, then remap the mesh inside the collider by a symmetry so the recorded face lands where the simulation's did (ADR-0018, **proposed**). Every face pair on all six shapes admits such a remap (`symmetry.test.ts`), and the tables cannot supply it. Still open before implementing:
   - [x] Decide the engine and measure a real roll. (`cannon-es`; `npm run physics` — every shape settles every time in ~0.75 s, scatters 123–269 mm at p95, remaps at 0.0000° error, 28–37 kB of trajectory per roll)
-  - [ ] Measure a bevelled hull from the shipped `.glb` rather than the ideal sharp solid.
+  - [x] Measure a bevelled hull from the shipped `.glb`. (`npm run physics -- --hull=glb`: simulates fine, but the remap fails on all 180 poses and it costs up to 500x more — the collider is the idealised solid and the model is cosmetic, which also frees custom art to have holes or missing faces)
   - [ ] Decide how the camera frames a scatter of ~25 die-widths, and whether the ~0.7 s simulation latency hides behind a throw animation or is simply accepted.
   - [ ] Decide whether it ships as `@diceforge-sdk/presenter-physics`, and how a themed model declares or derives its symmetry rotations.
 - [ ] Run the visual regression suite in CI, with baselines generated inside the CI container image so they are platform-stable.

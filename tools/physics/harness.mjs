@@ -3,6 +3,7 @@
  *
  *   npm run physics            all shapes, default trials
  *   npm run physics -- --shape=20 --dice=5 --trials=40
+ *   npm run physics -- --hull=glb    collide the shipped bevelled models
  *
  * ADR-0018 proposes simulating a roll headlessly, recording the trajectory,
  * and rotating each die's mesh inside its collider by a symmetry so the
@@ -22,6 +23,7 @@
 import { Body, ContactMaterial, ConvexPolyhedron, Material, Plane, Vec3, World } from "cannon-es";
 import { createSeededRandomSource } from "../../packages/core/dist/index.js";
 import { dieGeometry } from "../../packages/renderer-web/dist/math/geometry.js";
+import { convexFromMesh, readGlbMesh } from "./glb.mjs";
 
 const SHAPES = [4, 6, 8, 10, 12, 20];
 
@@ -63,11 +65,49 @@ const args = new Map(
 const TRIALS = Number(args.get("trials") ?? 25);
 const DICE = Number(args.get("dice") ?? 5);
 const ONLY = args.get("shape") ? Number(args.get("shape")) : undefined;
+/** "ideal" is the sharp solid; "glb" is the shipped bevelled model. */
+const HULL = args.get("hull") ?? "ideal";
+
+/** Distance from the centre to the nearest face plane, over the N largest faces. */
+function inradius(data, faceCount) {
+  const centres = data.faces.map((ring) => {
+    const c = ring
+      .reduce(
+        (sum, i) => [
+          sum[0] + data.vertices[i][0],
+          sum[1] + data.vertices[i][1],
+          sum[2] + data.vertices[i][2],
+        ],
+        [0, 0, 0],
+      )
+      .map((v) => v / ring.length);
+    return Math.hypot(...c);
+  });
+  return (
+    centres
+      .sort((a, b) => a - b)
+      .slice(0, faceCount)
+      .reduce((a, b) => a + b, 0) / faceCount
+  );
+}
 
 /** The solid, scaled to die size, with faces wound so normals point outward. */
 function collider(sides) {
-  const data = dieGeometry(sides);
-  const scale = DIE_RADIUS / Math.max(...data.vertices.map((v) => Math.hypot(...v)));
+  const ideal = dieGeometry(sides);
+  const data =
+    HULL === "glb"
+      ? convexFromMesh(
+          readGlbMesh(new URL(`../../packages/assets-forge/forge/d${sides}.glb`, import.meta.url)),
+        )
+      : ideal;
+  // Scaled so the *face planes* coincide, not the bounding radius: bevelling
+  // cuts corners without moving faces, so matching radii would rest a bevelled
+  // die 3-9% higher than the drawn model sits.
+  const scale =
+    (DIE_RADIUS *
+      (inradius(ideal, ideal.faces.length) /
+        Math.max(...ideal.vertices.map((v) => Math.hypot(...v))))) /
+    inradius(data, ideal.faces.length);
   const vertices = data.vertices.map((v) => new Vec3(v[0] * scale, v[1] * scale, v[2] * scale));
   const faces = data.faces.map((face) => {
     const [a, b, c] = face;
@@ -304,7 +344,7 @@ console.log(
   `cannon-es harness — ${TRIALS} trials x ${DICE} dice, ${DIE_RADIUS * 2000}mm dice, ${STEP * 1000}ms steps\n`,
 );
 console.log(
-  "shape   settled   settle s (mean/p95/max)   scatter mm (p95/max)   flatness min   remap err   trajectory",
+  "shape   settled   settle s (mean/p95/max)   scatter mm (p95/max)   flatness min   remap err   trajectory   wall/roll",
 );
 
 const summary = [];
@@ -320,6 +360,7 @@ for (const sides of ONLY ? [ONLY] : SHAPES) {
   let remapFailures = 0;
   let steps = 0;
 
+  const wallStart = performance.now();
   for (let trial = 0; trial < TRIALS; trial++) {
     const result = simulate(sides, DICE, random);
     if (result.settled) settledTrials += 1;
@@ -346,7 +387,8 @@ for (const sides of ONLY ? [ONLY] : SHAPES) {
     worstFlatness.toFixed(3).padEnd(15) +
     (remapFailures ? `${remapFailures} FAILED` : `${worstRemap.toFixed(4)}°`).padEnd(12) +
     // Position and quaternion per die per step, as float64.
-    `${((steps * DICE * 7 * 8) / 1024).toFixed(0)} kB`;
+    `${((steps * DICE * 7 * 8) / 1024).toFixed(0)} kB`.padEnd(13) +
+    `${((performance.now() - wallStart) / TRIALS).toFixed(0)} ms`;
   console.log(row);
   summary.push({ sides, settledTrials, mean, sunk, worstFlatness, remapFailures });
 }
@@ -359,7 +401,7 @@ const remapTotal = summary.reduce((a, s) => a + s.remapFailures, 0);
 console.log(
   remapTotal === 0
     ? "Every resting pose could be remapped onto every face of its die (ADR-0018)."
-    : `${remapTotal} resting poses had no symmetry remap — ADR-0018 does not hold.`,
+    : `${remapTotal} resting poses had no symmetry remap. Expected with --hull=glb: a bevelled model is hundreds of facets, not a solid with faces, and only the idealised solid has the symmetry the remap needs. Collide the solid; draw the model (ADR-0018).`,
 );
 console.log(
   "\nFlatness is the up-face normal's Y at rest: 1.000 is dead flat. A d4 reads 0.333 by",
