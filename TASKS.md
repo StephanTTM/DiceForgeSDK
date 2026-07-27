@@ -43,7 +43,10 @@ Remaining before tagging 0.1.0:
 ## Next
 
 - [ ] Extend the plugin contracts to the categories beyond presentation (physics, audio, transport) once a second implementation exists to shape them — ARCHITECTURE lists them, but nothing implements them yet.
-- [ ] Physics-based presenter plugin exploration (realistic motion behind the same presenter contract). The hard part is not the dependency: the outcome is already decided, so a simulation must land on it without visibly correcting itself (ADR-0007), and replay semantics say the motion need not repeat (ADR-0017).
+- [~] Physics-based presenter plugin exploration. The technique is settled and measured — record the trajectory headlessly, then remap the mesh inside the collider by a symmetry so the recorded face lands where the simulation's did (ADR-0018, **proposed**). Every face pair on all six shapes admits such a remap (`symmetry.test.ts`), and the tables cannot supply it. Still open before implementing:
+  - [ ] Decide the engine: `cannon-es` (MIT, pure JS, 774 kB) or `@dimforge/rapier3d-compat` (Apache-2.0, WASM, 8.2 MB).
+  - [ ] Measure a real roll: settle time for 1-10 dice, whether a bevelled hull collides convincingly at die scale, and how the camera frames dice that scatter.
+  - [ ] Decide whether it ships as `@diceforge-sdk/presenter-physics`, and how a themed model declares or derives its symmetry rotations.
 - [ ] Run the visual regression suite in CI, with baselines generated inside the CI container image so they are platform-stable.
 
 ## Backlog
