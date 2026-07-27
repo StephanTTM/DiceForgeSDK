@@ -1,5 +1,5 @@
+import { MAX_DIE_FACES, MAX_FACE_LABEL_LENGTH, MAX_FACE_VALUE } from "./dice/definition.js";
 import { DiceForgeError } from "./errors.js";
-import { isDieSides } from "./notation/ast.js";
 import type {
   CoinFlipResult,
   DieOutcome,
@@ -7,7 +7,7 @@ import type {
   RollGroupOutcome,
   RollResult,
 } from "./records.js";
-import { deepFreeze, EVENT_SCHEMA_VERSION } from "./records.js";
+import { deepFreeze, EVENT_SCHEMA_VERSION, SUPPORTED_SCHEMA_VERSIONS } from "./records.js";
 import type { RandomProvenance } from "./rng/types.js";
 
 function fail(message: string): never {
@@ -61,31 +61,63 @@ function validateGroup(value: unknown, position: number): RollGroupOutcome {
   const notation = asString(record.notation, `${label}.notation`);
   const sign = asSign(record.sign, `${label}.sign`);
   const sides = asInteger(record.sides, `${label}.sides`);
-  if (!isDieSides(sides)) fail(`${label}.sides has unsupported die size ${sides}`);
+  if (sides < 2 || sides > MAX_DIE_FACES) {
+    fail(`${label}.sides ${sides} is outside 2..${MAX_DIE_FACES}`);
+  }
+  const groupDie = record.die === undefined ? undefined : asString(record.die, `${label}.die`);
   if (!Array.isArray(record.dice) || record.dice.length === 0) {
     fail(`${label}.dice must be a non-empty array`);
   }
   const dice: DieOutcome[] = record.dice.map((die, dieIndex) => {
-    const dieRecord = asObject(die, `${label}.dice[${dieIndex}]`);
-    const dieSides = asInteger(dieRecord.sides, `${label}.dice[${dieIndex}].sides`);
+    const dieLabel = `${label}.dice[${dieIndex}]`;
+    const dieRecord = asObject(die, dieLabel);
+    const dieSides = asInteger(dieRecord.sides, `${dieLabel}.sides`);
     if (dieSides !== sides) {
-      fail(`${label}.dice[${dieIndex}].sides ${dieSides} does not match the group's d${sides}`);
+      fail(`${dieLabel}.sides ${dieSides} does not match the group's ${sides} faces`);
     }
-    const dieValue = asInteger(dieRecord.value, `${label}.dice[${dieIndex}].value`);
-    if (dieValue < 1 || dieValue > sides) {
-      fail(`${label}.dice[${dieIndex}].value ${dieValue} is outside 1..${sides}`);
+    const customDie =
+      dieRecord.die === undefined ? undefined : asString(dieRecord.die, `${dieLabel}.die`);
+    if (customDie !== groupDie) {
+      fail(
+        `${dieLabel}.die ${JSON.stringify(customDie)} does not match the group's ${JSON.stringify(groupDie)}`,
+      );
     }
-    if (typeof dieRecord.kept !== "boolean") {
-      fail(`${label}.dice[${dieIndex}].kept must be a boolean`);
+    const dieValue = asInteger(dieRecord.value, `${dieLabel}.value`);
+    // A plain numeric die must land on one of its own faces. A custom die's
+    // faces are defined elsewhere, so only the magnitude can be checked here.
+    if (customDie === undefined) {
+      if (dieValue < 1 || dieValue > sides)
+        fail(`${dieLabel}.value ${dieValue} is outside 1..${sides}`);
+    } else if (Math.abs(dieValue) > MAX_FACE_VALUE) {
+      fail(`${dieLabel}.value ${dieValue} exceeds ${MAX_FACE_VALUE}`);
     }
-    return { sides, value: dieValue, kept: dieRecord.kept };
+    if (typeof dieRecord.kept !== "boolean") fail(`${dieLabel}.kept must be a boolean`);
+    const faceLabel =
+      dieRecord.label === undefined ? undefined : asString(dieRecord.label, `${dieLabel}.label`);
+    if (faceLabel !== undefined && faceLabel.length > MAX_FACE_LABEL_LENGTH) {
+      fail(`${dieLabel}.label exceeds ${MAX_FACE_LABEL_LENGTH} characters`);
+    }
+    return {
+      sides,
+      value: dieValue,
+      kept: dieRecord.kept,
+      ...(customDie === undefined ? {} : { die: customDie }),
+      ...(faceLabel === undefined ? {} : { label: faceLabel }),
+    };
   });
   const subtotal = asInteger(record.subtotal, `${label}.subtotal`);
   const keptSum = dice.reduce((sum, die) => (die.kept ? sum + die.value : sum), 0);
   if (subtotal !== keptSum) {
     fail(`${label}.subtotal ${subtotal} does not equal the sum of kept dice (${keptSum})`);
   }
-  return { notation, sign, sides, dice, subtotal };
+  return {
+    notation,
+    sign,
+    sides,
+    ...(groupDie === undefined ? {} : { die: groupDie }),
+    dice,
+    subtotal,
+  };
 }
 
 function validateRoll(record: Record<string, unknown>): RollResult {
@@ -136,10 +168,12 @@ export function validateEventRecord(value: unknown): InteractionEvent {
   const record = asObject(value, "event");
   const schemaVersion = record.schemaVersion;
   if (typeof schemaVersion !== "number") fail("schemaVersion must be a number");
-  if (schemaVersion !== EVENT_SCHEMA_VERSION) {
+  // Older records are read and returned as the current version: every version 1
+  // record is already valid version 2 data (ADR-0015).
+  if (!SUPPORTED_SCHEMA_VERSIONS.includes(schemaVersion)) {
     throw new DiceForgeError(
       "unsupported-schema-version",
-      `unsupported event schemaVersion ${schemaVersion}; this core supports version ${EVENT_SCHEMA_VERSION}`,
+      `unsupported event schemaVersion ${schemaVersion}; this core reads versions ${SUPPORTED_SCHEMA_VERSIONS.join(", ")}`,
     );
   }
   if (record.kind === "roll") return deepFreeze(validateRoll(record));

@@ -1,5 +1,4 @@
 import type { PresentContext, PresenterBackend, VisualCoin, VisualDie } from "../backend.js";
-import { topLabel } from "../backend.js";
 
 export type DomBackendOptions = {
   readonly container: HTMLElement;
@@ -114,9 +113,7 @@ export function createDomBackend(options: DomBackendOptions): PresenterBackend {
 
   return {
     async presentDice(dice, context) {
-      const tiles = dice.map((die: VisualDie) =>
-        makeTile(topLabel(die), `d${die.shape}`, die.kept, false),
-      );
+      const tiles = dice.map((die: VisualDie) => makeTile(die.text, die.name, die.kept, false));
       await show(tiles, context);
       // Tiles need no assets, so this backend can always draw a resolved event.
       return true;

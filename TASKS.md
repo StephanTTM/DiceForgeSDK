@@ -35,7 +35,7 @@ Remaining before tagging 0.1.0:
 
 - [x] Add capability discovery so an adapter can ask what a presenter supports instead of feature-detecting it. (`PresenterCapabilities` + `presentationSupport()` in core, declared per instance by the web renderer — ADR-0014)
 - [ ] Extend the contract to the plugin categories beyond presentation (physics, audio, transport) once a second implementation exists to shape it — ARCHITECTURE lists them, but nothing implements them yet.
-- [ ] Custom dice definitions.
+- [x] Custom dice definitions. (`defineDie` + `createDiceEngine({ dice })`, `4d{fate}`, any face count 2..1000, event schema v2 with a v1 read path — ADR-0015)
 - [ ] Notation extensions beyond grammar v1 (exploding dice, rerolls) via plugin contracts.
 - [ ] Replay support: re-present a stored record without re-resolving it.
 - [x] Plugin-author documentation and a compatibility test kit a third-party renderer can run against. (`@diceforge-sdk/testing`: runner-agnostic conformance checks + the presenter-authoring guide; `renderer-web` runs it against itself — ADR-0014)

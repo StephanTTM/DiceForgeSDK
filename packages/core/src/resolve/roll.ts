@@ -1,9 +1,17 @@
+import type { DieRegistry } from "../dice/definition.js";
+import { findDie } from "../dice/definition.js";
+import { DiceForgeError } from "../errors.js";
 import type { DiceExpression, DiceGroupNode, DiceSelection } from "../notation/ast.js";
 import { renderGroupNotation } from "../notation/ast.js";
 import type { DieOutcome, RollGroupOutcome, RollResult } from "../records.js";
 import { deepFreeze, EVENT_SCHEMA_VERSION } from "../records.js";
 import { rollFace } from "../rng/sample.js";
 import type { RandomSource } from "../rng/types.js";
+
+export type ResolveOptions = {
+  /** Custom dice the expression may name (ADR-0015). */
+  readonly dice?: DieRegistry;
+};
 
 function selectKeptFlags(values: readonly number[], selection?: DiceSelection): boolean[] {
   if (!selection) return values.map(() => true);
@@ -24,22 +32,45 @@ function selectKeptFlags(values: readonly number[], selection?: DiceSelection): 
   return flags;
 }
 
-function resolveGroup(term: DiceGroupNode, random: RandomSource): RollGroupOutcome {
-  const values: number[] = [];
-  for (let i = 0; i < term.count; i++) {
-    values.push(rollFace(random, term.sides));
+function resolveGroup(
+  term: DiceGroupNode,
+  random: RandomSource,
+  registry: DieRegistry | undefined,
+): RollGroupOutcome {
+  const definition = term.die === undefined ? undefined : findDie(registry, term.die);
+  if (term.die !== undefined && !definition) {
+    throw new DiceForgeError(
+      "invalid-argument",
+      `unknown die ${JSON.stringify(term.die)}; pass it to createDiceEngine({ dice }) before rolling it`,
+    );
   }
+  const sides = definition?.faces.length ?? term.sides;
+
+  // One RNG draw per die, in order, exactly as a plain numeric die: a custom
+  // die changes what a face is worth, never how many numbers are consumed.
+  const rolled: number[] = [];
+  for (let i = 0; i < term.count; i++) {
+    rolled.push(rollFace(random, sides));
+  }
+  const faces = rolled.map((index) => definition?.faces[index - 1]);
+  const values = rolled.map((index, position) => faces[position]?.value ?? index);
   const keptFlags = selectKeptFlags(values, term.selection);
-  const dice: DieOutcome[] = values.map((value, index) => ({
-    sides: term.sides,
-    value,
-    kept: keptFlags[index] ?? true,
-  }));
+  const dice: DieOutcome[] = values.map((value, index) => {
+    const label = faces[index]?.label;
+    return {
+      sides,
+      value,
+      kept: keptFlags[index] ?? true,
+      ...(definition ? { die: definition.id } : {}),
+      ...(label === undefined ? {} : { label }),
+    };
+  });
   const subtotal = dice.reduce((sum, die) => (die.kept ? sum + die.value : sum), 0);
   return {
-    notation: renderGroupNotation(term),
+    notation: renderGroupNotation(definition ? { ...term, die: definition.id, sides } : term),
     sign: term.sign,
-    sides: term.sides,
+    sides,
+    ...(definition ? { die: definition.id } : {}),
     dice,
     subtotal,
   };
@@ -50,7 +81,11 @@ function resolveGroup(term: DiceGroupNode, random: RandomSource): RollGroupOutco
  * Dice are rolled in term order, left to right, and each group's dice in
  * sequence, so a seeded source always produces the same record.
  */
-export function resolveRoll(expression: DiceExpression, random: RandomSource): RollResult {
+export function resolveRoll(
+  expression: DiceExpression,
+  random: RandomSource,
+  options: ResolveOptions = {},
+): RollResult {
   const groups: RollGroupOutcome[] = [];
   let modifier = 0;
   let diceTotal = 0;
@@ -59,7 +94,7 @@ export function resolveRoll(expression: DiceExpression, random: RandomSource): R
       modifier += term.sign * term.value;
       continue;
     }
-    const group = resolveGroup(term, random);
+    const group = resolveGroup(term, random, options.dice);
     groups.push(group);
     diceTotal += group.sign * group.subtotal;
   }

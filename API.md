@@ -29,27 +29,59 @@ const flip = engine.flipCoin();        // CoinFlipResult
 
 Advanced consumers can call the layers directly: `parseDiceNotation(expression)` returns the AST (`DiceExpression`), and `resolveRoll(ast, random)` / `resolveCoinFlip(random)` produce records from it.
 
-## Dice notation grammar v1
+## Dice notation grammar v1.1
 
 ```ebnf
 expression := [sign] term { sign term }
 sign       := "+" | "-"
 term       := dice | integer
-dice       := [count] "d" (sides | "%") [selection]
+dice       := [count] "d" (faces | "%" | "{" name "}") [selection]
 selection  := ("kh" | "kl" | "dh" | "dl") [count]
 ```
 
 - Case-insensitive; whitespace is allowed around terms and signs, but not inside a dice group.
-- Supported sides: **4, 6, 8, 10, 12, 20, 100**; `d%` is shorthand for `d100`.
+- `faces` is any count from **2 to `MAX_DIE_FACES`** (1000), so `d3` and `d30` work without any setup; `d%` is shorthand for `d100`. `d1` and `d0` are rejected — a constant is a modifier.
+- `{name}` rolls a custom die given to the engine, e.g. `4d{fate}` (see below).
 - `kh`/`kl` keep the highest/lowest N dice; `dh`/`dl` drop them. N defaults to 1 (`2d20kh` = `2d20kh1`). Advantage is `2d20kh1`, disadvantage `2d20kl1`, ability scores `4d6dl1`.
 - Ties select earlier-rolled dice first, so keep/drop is deterministic.
-- Limits (exported as constants): `MAX_DICE_PER_GROUP` 100, `MAX_TERMS` 20, `MAX_MODIFIER` 1,000,000, `MAX_EXPRESSION_LENGTH` 500 characters, and at least one dice group per expression.
+- Limits (exported as constants): `MAX_DICE_PER_GROUP` 100, `MAX_TERMS` 20, `MAX_MODIFIER` 1,000,000, `MAX_EXPRESSION_LENGTH` 500 characters, `MAX_DIE_FACES` 1000, and at least one dice group per expression.
 
 Errors: `DiceNotationError` (extends `DiceForgeError`, `code: "notation"`) with a zero-based `position` pointing into the original expression.
 
+## Custom dice (ADR-0015)
+
+```ts
+const fate = defineDie({
+  id: "fate",
+  faces: [
+    { value: -1, label: "-" }, { value: -1, label: "-" },
+    { value: 0, label: " " }, { value: 0, label: " " },
+    { value: 1, label: "+" }, { value: 1, label: "+" },
+  ],
+});
+
+const engine = createDiceEngine({ random: createSeededRandomSource("table-42"), dice: [fate] });
+engine.roll("4d{fate}"); // total sums face values: -1, 0 and +1
+```
+
+```ts
+type DieFace = { value: number; label?: string };
+type DieDefinition = { id: string; faces: readonly DieFace[] };
+
+function defineDie(definition: { id: string; faces: readonly (DieFace | number)[] }): DieDefinition;
+```
+
+A die is its faces. `value` is what the face adds to a total and may be negative or zero; `label` is how it reads, when that differs. Faces may repeat — a die is a bag, not a set, so weighting a value means listing it twice. `defineDie` freezes the result and rejects names that could be mistaken for notation, dice with fewer than 2 faces, and labels longer than `MAX_FACE_LABEL_LENGTH` (8).
+
+Names are matched case-insensitively, so two dice may not differ only by case. An unknown name is a `DiceNotationError` positioned at the `{`, listing the dice that are defined. `engine.dice` returns the definitions the engine knows.
+
+Rolling a custom die consumes exactly one random number per die, the same as a plain die, so a seed replays identically whichever kind of die a system uses.
+
+Presentation: a custom die is never drawn with a numbered 3D model — the numerals are painted on, and a model cannot show a face the die does not have. Such rolls fall back to 2D tiles, which read the face's label.
+
 ## Result records
 
-All records are deeply frozen (`Object.freeze`), JSON-serializable, and carry `schemaVersion` (`EVENT_SCHEMA_VERSION`, currently `1`).
+All records are deeply frozen (`Object.freeze`), JSON-serializable, and carry `schemaVersion` (`EVENT_SCHEMA_VERSION`, currently `2`). Version 1 records still deserialize and are returned as version 2 (ADR-0015); `SUPPORTED_SCHEMA_VERSIONS` lists what this core reads.
 
 ```ts
 type RollResult = {
@@ -63,14 +95,21 @@ type RollResult = {
 };
 
 type RollGroupOutcome = {
-  notation: string;              // "2d20kh1"
+  notation: string;              // "2d20kh1", "4d{fate}"
   sign: 1 | -1;
-  sides: DieSides;               // 4 | 6 | 8 | 10 | 12 | 20 | 100
+  sides: number;                 // face count, 2..MAX_DIE_FACES
+  die?: string;                  // custom die name, when the group rolled one
   dice: readonly DieOutcome[];   // in rolled order
   subtotal: number;              // sum of kept values, before sign
 };
 
-type DieOutcome = { sides: DieSides; value: number; kept: boolean };
+type DieOutcome = {
+  sides: number;
+  value: number;   // 1..sides for a plain die; any integer for a custom one
+  kept: boolean;
+  die?: string;    // custom die name
+  label?: string;  // how the face reads, when it differs from the value
+};
 
 type CoinFlipResult = {
   kind: "coin-flip";
@@ -119,7 +158,7 @@ type RandomProvenance =
 
 Failure modes: `DiceForgeError` with `code: "invalid-event"` for malformed or inconsistent payloads, `code: "unsupported-schema-version"` for payloads from an incompatible core version.
 
-Compatibility policy (ADR-0006): additive optional fields keep `schemaVersion: 1`; renaming, removing, or re-meaning fields bumps the version with documented migration. Current cores reject future versions cleanly.
+Compatibility policy (ADR-0006): additive optional fields keep the version; renaming, removing, or re-meaning fields bumps it with documented migration. Version 2 (ADR-0015) widened `sides` and `value` and added `die` and `label`; a version 2 core reads version 1 records unchanged, and a version 1 core rejects version 2 records as an unsupported version rather than misreading them.
 
 ## Errors
 
@@ -152,7 +191,7 @@ A presenter maps event data to visuals, motion, audio, or haptics; it must never
 type PresenterCapabilities = {
   implementation: string; // e.g. "@diceforge-sdk/renderer-web"
   kinds: readonly InteractionKind[]; // "roll" | "coin-flip"
-  dieSides: readonly DieSides[]; // sizes it can show, in any medium
+  dieSides: readonly number[] | "any"; // sizes it can show, in any medium
   media: readonly PresentationMedium[]; // "3d" | "2d" | "none", richest first
   cancellable: boolean; // honors PresentationOptions.signal
   announces: boolean; // announces outcomes to assistive technology

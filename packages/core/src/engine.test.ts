@@ -44,7 +44,7 @@ describe("createDiceEngine", () => {
 
   it("throws DiceNotationError for invalid notation", () => {
     const engine = createDiceEngine();
-    expect(() => engine.roll("2d7")).toThrowError(DiceNotationError);
+    expect(() => engine.roll("2d")).toThrowError(DiceNotationError);
     expect(() => engine.roll("")).toThrowError(DiceNotationError);
   });
 

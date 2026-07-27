@@ -128,11 +128,26 @@ describe("checkPresenterConformance", () => {
     expect(checkById(report, "capabilities-die-sides").detail).toContain("duplicates");
   });
 
-  it("catches a die size the core cannot resolve", async () => {
+  it("catches a face count no die can have", async () => {
+    const report = await checkPresenterConformance(() => stub({ capabilities: { dieSides: [1] } }));
+    expect(checkById(report, "capabilities-die-sides").detail).toContain("d1");
+  });
+
+  it("samples unusual sizes from a presenter that claims any", async () => {
+    const presented: number[] = [];
     const report = await checkPresenterConformance(() =>
-      stub({ capabilities: { dieSides: [7 as 6] } }),
+      stub({
+        // This stub's present() ignores the signal, so it must not claim to cancel.
+        capabilities: { dieSides: "any", cancellable: false },
+        present: async (event) => {
+          if (event.kind === "roll") presented.push(...event.groups.map((group) => group.sides));
+        },
+      }),
     );
-    expect(checkById(report, "capabilities-die-sides").detail).toContain("d7");
+    expect(report.passed).toBe(true);
+    // A claim of "any" has to survive sizes with no standard shape.
+    expect(presented).toContain(3);
+    expect(presented).toContain(30);
   });
 
   it("skips the dispose check for a presenter that has none", async () => {

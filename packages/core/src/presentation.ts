@@ -1,4 +1,3 @@
-import type { DieSides } from "./notation/ast.js";
 import type { InteractionEvent } from "./records.js";
 
 /**
@@ -45,8 +44,13 @@ export type PresenterCapabilities = {
   readonly implementation: string;
   /** Event kinds it accepts. A presenter may support rolls but not coin flips. */
   readonly kinds: readonly InteractionKind[];
-  /** Die sizes it can show, in any medium. */
-  readonly dieSides: readonly DieSides[];
+  /**
+   * Die sizes it can show, in any medium, or `"any"` for a presenter that can
+   * show a die of any face count — which a renderer that falls back to text
+   * can honestly claim, and a renderer with a fixed set of models cannot
+   * (ADR-0015).
+   */
+  readonly dieSides: readonly number[] | "any";
   /** Media it may use, richest first. Never empty. */
   readonly media: readonly PresentationMedium[];
   /** Honors `PresentationOptions.signal`: an aborted presentation rejects. */
@@ -68,7 +72,7 @@ export type PresentationSupport =
       /** Human-readable explanation; wording is not API. */
       readonly message: string;
       /** The sizes at fault, when the reason is `"unsupported-die-sides"`. */
-      readonly dieSides?: readonly DieSides[];
+      readonly dieSides?: readonly number[];
     };
 
 /**
@@ -92,10 +96,11 @@ export function presentationSupport(
       message: `${capabilities.implementation} cannot present a ${event.kind} event`,
     };
   }
-  if (event.kind === "roll") {
-    const missing = new Set<DieSides>();
+  const shown = capabilities.dieSides;
+  if (event.kind === "roll" && shown !== "any") {
+    const missing = new Set<number>();
     for (const group of event.groups) {
-      if (!capabilities.dieSides.includes(group.sides)) missing.add(group.sides);
+      if (!shown.includes(group.sides)) missing.add(group.sides);
     }
     if (missing.size > 0) {
       const sides = [...missing].sort((a, b) => a - b);

@@ -350,7 +350,9 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
   async function resolveDieObject(
     die: VisualDie,
   ): Promise<{ object: Object3D; final: Quaternion } | null> {
-    if (!hasCalibratedModel(models, die.shape)) return null;
+    // No shape means no model can show this die honestly (custom faces, or an
+    // unusual face count) - the presenter falls back to tiles for the roll.
+    if (die.shape === undefined || !hasCalibratedModel(models, die.shape)) return null;
     const url = models.urls[die.shape];
     const tuple = models.faceRotations[die.shape]?.[die.face - 1];
     const model = url ? await loadDieModel(url) : null;

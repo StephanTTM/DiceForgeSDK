@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DiceForgeError } from "./errors.js";
 import { parseDiceNotation } from "./notation/parser.js";
+import { EVENT_SCHEMA_VERSION } from "./records.js";
 import { resolveCoinFlip } from "./resolve/coin.js";
 import { resolveRoll } from "./resolve/roll.js";
 import { createSeededRandomSource } from "./rng/seeded.js";
@@ -63,6 +64,51 @@ describe("event serialization", () => {
       "unsupported-schema-version",
       /unsupported event schemaVersion 999/,
     );
+  });
+
+  /**
+   * Records written by 0.3.0 and earlier must keep working: every version 1
+   * record is already valid version 2 data, so reading one returns the same
+   * numbers stamped with the current version (ADR-0015).
+   */
+  it("reads a version 1 record and returns it as the current version", () => {
+    const legacy = {
+      kind: "roll",
+      schemaVersion: 1,
+      expression: "2d20kh1+3",
+      groups: [
+        {
+          notation: "2d20kh1",
+          sign: 1,
+          sides: 20,
+          dice: [
+            { sides: 20, value: 1, kept: false },
+            { sides: 20, value: 19, kept: true },
+          ],
+          subtotal: 19,
+        },
+      ],
+      modifier: 3,
+      total: 22,
+      provenance: { source: "seeded", seed: "table-42", algorithm: "xoshiro128**" },
+    };
+    const restored = deserializeEvent(JSON.stringify(legacy));
+
+    expect(restored.schemaVersion).toBe(EVENT_SCHEMA_VERSION);
+    expect(restored.kind === "roll" && restored.total).toBe(22);
+    expect(restored.kind === "roll" && restored.groups[0]?.dice[1]?.value).toBe(19);
+    // Nothing custom is invented on the way through.
+    expect(restored.kind === "roll" && "die" in (restored.groups[0] ?? {})).toBe(false);
+  });
+
+  it("still rejects a version 1 record whose numbers do not add up", () => {
+    const tampered = {
+      kind: "coin-flip",
+      schemaVersion: 1,
+      outcome: "sideways",
+      provenance: { source: "system", algorithm: "math-random" },
+    };
+    expectFailure(JSON.stringify(tampered), "invalid-event", /outcome must be/);
   });
 
   it("rejects unknown event kinds", () => {

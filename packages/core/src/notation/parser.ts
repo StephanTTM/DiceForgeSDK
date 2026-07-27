@@ -1,13 +1,14 @@
+import type { DieRegistry } from "../dice/definition.js";
+import { findDie, MAX_DIE_FACES } from "../dice/definition.js";
 import { DiceForgeError, DiceNotationError } from "../errors.js";
 import type {
   DiceExpression,
   DiceGroupNode,
   DiceSelection,
-  DieSides,
   ExpressionTerm,
   SelectionMode,
 } from "./ast.js";
-import { isDieSides, renderGroupNotation } from "./ast.js";
+import { renderGroupNotation } from "./ast.js";
 
 export const MAX_EXPRESSION_LENGTH = 500;
 export const MAX_TERMS = 20;
@@ -16,22 +17,34 @@ export const MAX_MODIFIER = 1_000_000;
 
 const SELECTION_MODES: readonly string[] = ["kh", "kl", "dh", "dl"];
 
+export type ParseOptions = {
+  /**
+   * Custom dice the expression may name (ADR-0015). Without it `d{fate}` still
+   * parses — the name is carried in the AST — but nothing can check that the
+   * die exists, so the error surfaces at resolve time instead of here with a
+   * position.
+   */
+  readonly dice?: DieRegistry;
+};
+
 /**
- * Parses dice notation grammar v1 (see API.md for the full grammar):
+ * Parses dice notation grammar v1.1 (see API.md for the full grammar):
  *
  *   expression := [sign] term { sign term }
  *   term       := dice | integer
- *   dice       := [count] ("d" | "D") (sides | "%") [selection]
+ *   dice       := [count] ("d" | "D") (faces | "%" | "{" name "}") [selection]
  *   selection  := ("kh" | "kl" | "dh" | "dl") [count]
  *
  * Case-insensitive; whitespace is allowed around terms and signs but not
  * inside a dice group. "d%" is shorthand for "d100". A selection without a
- * count defaults to 1 ("2d20kh" means "2d20kh1").
+ * count defaults to 1 ("2d20kh" means "2d20kh1"). A face count may be any
+ * number from 2 to MAX_DIE_FACES, so "d3" and "d30" need no registration;
+ * braces name a custom die, "4d{fate}".
  *
  * Throws `DiceNotationError` (code "notation", with a zero-based `position`)
  * for syntax errors and limit violations.
  */
-export function parseDiceNotation(expression: string): DiceExpression {
+export function parseDiceNotation(expression: string, options: ParseOptions = {}): DiceExpression {
   if (typeof expression !== "string") {
     throw new DiceForgeError("invalid-argument", "expression must be a string");
   }
@@ -41,7 +54,7 @@ export function parseDiceNotation(expression: string): DiceExpression {
       MAX_EXPRESSION_LENGTH,
     );
   }
-  return new Parser(expression).parse();
+  return new Parser(expression, options).parse();
 }
 
 function isDigit(char: string): boolean {
@@ -64,10 +77,12 @@ function renderExpression(terms: readonly ExpressionTerm[]): string {
 
 class Parser {
   private readonly source: string;
+  private readonly options: ParseOptions;
   private pos = 0;
 
-  constructor(source: string) {
+  constructor(source: string, options: ParseOptions) {
     this.source = source;
+    this.options = options;
   }
 
   parse(): DiceExpression {
@@ -150,7 +165,7 @@ class Parser {
 
   private readDiceGroup(sign: 1 | -1, count: number, start: number): DiceGroupNode {
     this.pos++; // consume "d"
-    const sides = this.readSides();
+    const die = this.readDie();
     if (count < 1) {
       throw new DiceNotationError("dice count must be at least 1", start);
     }
@@ -158,29 +173,63 @@ class Parser {
       throw new DiceNotationError(`dice count exceeds ${MAX_DICE_PER_GROUP}`, start);
     }
     const selection = this.readSelection(count);
-    return selection
-      ? { type: "dice", sign, count, sides, selection }
-      : { type: "dice", sign, count, sides };
+    return {
+      type: "dice",
+      sign,
+      count,
+      sides: die.sides,
+      ...(die.id === undefined ? {} : { die: die.id }),
+      ...(selection ? { selection } : {}),
+    };
   }
 
-  private readSides(): DieSides {
+  /** The part after "d": a face count, "%", or a braced custom die name. */
+  private readDie(): { sides: number; id?: string } {
     const char = this.peek();
     if (char === "%") {
       this.pos++;
-      return 100;
+      return { sides: 100 };
     }
+    if (char === "{") return this.readNamedDie();
     if (char === undefined || !isDigit(char)) {
-      throw new DiceNotationError('expected a die size after "d"', this.pos);
+      throw new DiceNotationError('expected a die size or {name} after "d"', this.pos);
     }
     const start = this.pos;
-    const value = this.readInteger("die size");
-    if (!isDieSides(value)) {
+    const sides = this.readInteger("die size");
+    if (sides < 2) {
       throw new DiceNotationError(
-        `unsupported die size d${value}; supported dice are d4, d6, d8, d10, d12, d20, d100, and d%`,
+        `d${sides} has no faces to roll; for a constant use a modifier such as "+${sides}"`,
         start,
       );
     }
-    return value;
+    if (sides > MAX_DIE_FACES) {
+      throw new DiceNotationError(`die size exceeds ${MAX_DIE_FACES} faces`, start);
+    }
+    return { sides };
+  }
+
+  private readNamedDie(): { sides: number; id: string } {
+    const start = this.pos;
+    this.pos++; // consume "{"
+    let name = "";
+    while (!this.atEnd() && this.peek() !== "}") {
+      name += this.source[this.pos];
+      this.pos++;
+    }
+    if (this.atEnd()) throw new DiceNotationError('unterminated die name; expected "}"', start);
+    this.pos++; // consume "}"
+    if (name.length === 0) throw new DiceNotationError("die name is empty", start);
+
+    const definition = findDie(this.options.dice, name);
+    if (this.options.dice && !definition) {
+      const known = [...this.options.dice.values()].map((die) => `d{${die.id}}`);
+      const hint =
+        known.length > 0 ? `defined dice are ${known.join(", ")}` : "no dice are defined";
+      throw new DiceNotationError(`unknown die ${JSON.stringify(name)}; ${hint}`, start);
+    }
+    // Without a registry the name is carried through unresolved: only the
+    // caller knows which dice exist, so resolution is where it is rejected.
+    return { sides: definition?.faces.length ?? 0, id: definition?.id ?? name };
   }
 
   private readSelection(diceCount: number): DiceSelection | undefined {

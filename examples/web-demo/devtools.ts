@@ -66,12 +66,23 @@ async function preview(): Promise<void> {
   const engine = createDiceEngine({
     random: createSeededRandomSource(params.get("seed") ?? "table-42"),
   });
+  // An optional warm-up roll, so a scene can capture what the presenter does
+  // *after* something else: a d3 has no model, so it forces the tile fallback
+  // and the captured frame proves 3D comes back (ADR-0015).
+  const first = params.get("first");
+  if (first) await presenter.present(engine.roll(first));
   const event =
     params.get("flip") === "1"
       ? engine.flipCoin()
       : engine.roll(params.get("notation") ?? "4d6dl1");
   await presenter.present(event);
   const canvas = stage.querySelector("canvas");
+  // Only a *visible* canvas is what the user sees. A hidden one still holds
+  // pixels, and reading them would let a roll that fell back to tiles be
+  // captured as though it had rendered in 3D — which is exactly the kind of
+  // regression these scenes exist to catch. Without a dataUrl the runner
+  // screenshots the element instead, so the tiles are captured honestly.
+  const showing = canvas && canvas.style.display !== "none";
   publish({
     mode: presenter.mode,
     expression: event.kind === "roll" ? event.expression : "coin",
@@ -80,7 +91,7 @@ async function preview(): Promise<void> {
         ? event.groups.flatMap((g) => g.dice.map((d) => `${d.value}${d.kept ? "" : " (dropped)"}`))
         : [event.outcome],
     // PNG keeps the alpha channel, so a die's exact silhouette is measurable.
-    dataUrl: canvas?.toDataURL("image/png") ?? null,
+    dataUrl: showing ? (canvas?.toDataURL("image/png") ?? null) : null,
   });
 }
 

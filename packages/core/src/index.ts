@@ -1,3 +1,13 @@
+export type { DieDefinition, DieFace, DieRegistry } from "./dice/definition.js";
+export {
+  createDieRegistry,
+  defineDie,
+  findDie,
+  MAX_DIE_FACES,
+  MAX_DIE_ID_LENGTH,
+  MAX_FACE_LABEL_LENGTH,
+  MAX_FACE_VALUE,
+} from "./dice/definition.js";
 export type { DiceEngine, DiceEngineOptions } from "./engine.js";
 export { createDiceEngine } from "./engine.js";
 export type { DiceForgeErrorCode } from "./errors.js";
@@ -12,6 +22,7 @@ export type {
   SelectionMode,
 } from "./notation/ast.js";
 export { DIE_SIDES, isDieSides, renderGroupNotation } from "./notation/ast.js";
+export type { ParseOptions } from "./notation/parser.js";
 export {
   MAX_DICE_PER_GROUP,
   MAX_EXPRESSION_LENGTH,
@@ -37,8 +48,9 @@ export type {
   RollGroupOutcome,
   RollResult,
 } from "./records.js";
-export { EVENT_SCHEMA_VERSION } from "./records.js";
+export { EVENT_SCHEMA_VERSION, SUPPORTED_SCHEMA_VERSIONS } from "./records.js";
 export { resolveCoinFlip } from "./resolve/coin.js";
+export type { ResolveOptions } from "./resolve/roll.js";
 export { resolveRoll } from "./resolve/roll.js";
 export { createSeededRandomSource } from "./rng/seeded.js";
 export { createSystemRandomSource } from "./rng/system.js";

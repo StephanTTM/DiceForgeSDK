@@ -34,6 +34,11 @@ export const scenes = [
     query: { theme: "yellow", flip: "1", seed: "flip", w: 420, h: 340 },
   },
   {
+    name: "recovers-3d-after-tiles",
+    why: "a roll the models cannot cover falls back to tiles; the next one must return to 3D",
+    query: { theme: "green", first: "1d3", notation: "2d20", seed: "table-42", w: 520, h: 340 },
+  },
+  {
     name: "d4-angled-view",
     why: "an all-d4 roll gets the lower camera those dice are read from",
     query: { theme: "ivory", notation: "3d4", seed: "zz", w: 560, h: 340 },

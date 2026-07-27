@@ -79,10 +79,10 @@ Each check carries a stable `id`, a one-line `title`, a `status` of `"passed" | 
 | --- | --- |
 | `capabilities` | The record exists and its fields have the right types |
 | `capabilities-kinds` | At least one kind, all of them known, no duplicates |
-| `capabilities-die-sides` | At least one size, all resolvable by the core, no duplicates |
+| `capabilities-die-sides` | At least one size, each a possible face count, no duplicates — or `"any"` |
 | `capabilities-media` | At least one medium, all known, no duplicates |
 | `presents-roll` / `presents-coin-flip` | Each declared kind actually presents |
-| `presents-declared-die-sides` | Every declared size actually presents |
+| `presents-declared-die-sides` | Every declared size actually presents; `"any"` is sampled, unusual sizes included |
 | `leaves-the-record-unchanged` | The event serializes identically after presenting |
 | `cancels-when-declared` | An already-aborted presentation rejects (skipped unless `cancellable`) |
 | `dispose-is-idempotent` | `dispose()` twice does not throw (skipped if not implemented) |

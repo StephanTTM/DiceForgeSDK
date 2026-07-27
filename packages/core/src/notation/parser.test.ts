@@ -97,9 +97,12 @@ describe("parseDiceNotation — errors", () => {
     expectNotationError("   ", /expression is empty/);
   });
 
-  it("rejects unsupported die sizes", () => {
-    expectNotationError("2d7", /unsupported die size d7/, 2);
-    expectNotationError("1d3", /unsupported die size d3/);
+  it("rejects die sizes that are not dice", () => {
+    // Any face count is legal now (ADR-0015); a die with fewer than two is not
+    // a die, and the error points at the modifier the author probably meant.
+    expectNotationError("1d1", /d1 has no faces to roll/, 2);
+    expectNotationError("1d0", /d0 has no faces to roll/, 2);
+    expectNotationError("1d1001", /die size exceeds 1000 faces/, 2);
   });
 
   it("rejects invalid dice counts", () => {

@@ -1,13 +1,9 @@
-import type {
-  AbortSignalLike,
-  DieSides,
-  InteractionKind,
-  InteractionPresenter,
-} from "@diceforge-sdk/core";
+import type { AbortSignalLike, InteractionKind, InteractionPresenter } from "@diceforge-sdk/core";
 import {
   createDiceEngine,
   createSeededRandomSource,
   DIE_SIDES,
+  MAX_DIE_FACES,
   serializeEvent,
 } from "@diceforge-sdk/core";
 
@@ -142,13 +138,17 @@ function checkCapabilityShape(presenter: InteractionPresenter): ConformanceCheck
     ),
   );
   checks.push(
-    listCheck(
-      "capabilities-die-sides",
-      "declares die sizes the core can resolve",
-      capabilities.dieSides,
-      (sides) =>
-        DIE_SIDES.includes(sides) ? undefined : `d${sides} is not a size the core resolves`,
-    ),
+    capabilities.dieSides === "any"
+      ? pass("capabilities-die-sides", "declares the die sizes it can show")
+      : listCheck(
+          "capabilities-die-sides",
+          "declares the die sizes it can show",
+          capabilities.dieSides,
+          (sides) =>
+            Number.isInteger(sides) && sides >= 2 && sides <= MAX_DIE_FACES
+              ? undefined
+              : `d${sides} is not a face count a die can have`,
+        ),
   );
   checks.push(
     listCheck(
@@ -205,9 +205,14 @@ export async function checkPresenterConformance(
   const kinds: readonly InteractionKind[] = Array.isArray(capabilities?.kinds)
     ? capabilities.kinds
     : [];
-  const dieSides: readonly DieSides[] = Array.isArray(capabilities?.dieSides)
-    ? capabilities.dieSides
-    : [];
+  // "any" cannot be enumerated, so it is sampled: the standard sizes plus a
+  // couple of unusual ones a claim of "any" has to cover (ADR-0015).
+  const dieSides: readonly number[] =
+    capabilities?.dieSides === "any"
+      ? [...DIE_SIDES, 3, 30]
+      : Array.isArray(capabilities?.dieSides)
+        ? capabilities.dieSides
+        : [];
 
   // Every declared kind must actually present. A declaration is a promise.
   for (const kind of kinds) {
@@ -228,7 +233,10 @@ export async function checkPresenterConformance(
 
   if (kinds.includes("roll")) {
     const id = "presents-declared-die-sides";
-    const title = "presents every die size it declares";
+    const title =
+      capabilities?.dieSides === "any"
+        ? "presents a sample of die sizes, having claimed any"
+        : "presents every die size it declares";
     const broken: string[] = [];
     for (const sides of dieSides) {
       try {

@@ -43,6 +43,8 @@ const check = presentationSupport(presenter.capabilities, roll);
 if (!check.supported) console.warn(check.message);
 ```
 
+`dieSides` is `"any"`: the tiles read whatever a face says, including a `d3`, a `d30`, or a custom die whose faces are symbols (ADR-0015). Such dice are never drawn with a 3D model — a numbered model cannot show a face the die does not have — so a roll containing one lands as tiles even with a theme selected.
+
 `media` is `["3d", "2d"]` only when WebGL is available *and* a theme supplies models; otherwise it is `["2d"]`. Both entries are listed for a 3D presenter because tiles remain the fallback for a roll the theme cannot cover — which is also why `dieSides` lists every size the core resolves regardless of mode. `mode` is the browser-specific spelling of the same answer; `capabilities.media` is the portable one.
 
 ## Options

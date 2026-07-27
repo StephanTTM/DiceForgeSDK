@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { EVENT_SCHEMA_VERSION } from "../records.js";
 import { createSeededRandomSource } from "../rng/seeded.js";
 import type { RandomSource } from "../rng/types.js";
 import { resolveCoinFlip } from "./coin.js";
@@ -40,7 +41,7 @@ describe("resolveCoinFlip", () => {
   it("returns a frozen, schema-versioned record", () => {
     const result = resolveCoinFlip(scriptedSource([0]));
     expect(result.kind).toBe("coin-flip");
-    expect(result.schemaVersion).toBe(1);
+    expect(result.schemaVersion).toBe(EVENT_SCHEMA_VERSION);
     expect(Object.isFrozen(result)).toBe(true);
     expect(Reflect.set(result, "outcome", "tails")).toBe(false);
     expect(result.outcome).toBe("heads");

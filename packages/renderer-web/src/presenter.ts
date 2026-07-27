@@ -3,7 +3,7 @@ import type {
   PresentationOptions,
   PresenterCapabilities,
 } from "@diceforge-sdk/core";
-import { DIE_SIDES, DiceForgeError, validateEventRecord } from "@diceforge-sdk/core";
+import { DiceForgeError, validateEventRecord } from "@diceforge-sdk/core";
 import { createAnnouncer, formatEventAnnouncement } from "./announce.js";
 import type { PresentContext, PresenterBackend } from "./backend.js";
 import { visualDiceForEvent } from "./backend.js";
@@ -48,10 +48,11 @@ export type DicePresenter = InteractionPresenter & {
  * configured differently is a different presenter to an application: without a
  * theme there is no 3D, and announcements can be turned off.
  *
- * Every die size is listed whichever mode is active. The tile backend can draw
- * all of them, and it is always available as a fallback — which is precisely
- * what makes a 3D roll safe to attempt. `media` carries the nuance: a WebGL
- * presenter may still show an individual event flat.
+ * Any die size is claimed whichever mode is active: the tile backend reads
+ * whatever a face says — a d3, a d30, a custom die with symbols — and it is
+ * always available as a fallback, which is precisely what makes a 3D roll safe
+ * to attempt. `media` carries the nuance: a WebGL presenter may still show an
+ * individual event flat, and a die with no honest model always is (ADR-0015).
  *
  * Exported for tests: a WebGL backend cannot be constructed under jsdom, but
  * the declaration it produces can still be checked.
@@ -60,7 +61,7 @@ export function describeCapabilities(mode: RenderMode, announces: boolean): Pres
   return {
     implementation: "@diceforge-sdk/renderer-web",
     kinds: ["roll", "coin-flip"],
-    dieSides: DIE_SIDES,
+    dieSides: "any",
     media: mode === "webgl" ? ["3d", "2d"] : ["2d"],
     cancellable: true,
     announces,
@@ -127,9 +128,13 @@ export function createDicePresenter(options: DicePresenterOptions): DicePresente
           : backend.presentDice(visualDiceForEvent(record), context);
 
       // A themed roll the models cannot cover falls back to tiles for the whole
-      // event, so a resolved die is never simply missing from the table.
+      // event, so a resolved die is never simply missing from the table. The
+      // next roll that models can cover goes back to 3D — the fallback is per
+      // event, not a one-way switch, which a d3 or a custom die makes easy to
+      // hit (ADR-0015).
       let drawn = webgl ? await draw(webgl) : false;
       if (drawn) {
+        webgl?.setVisible(true);
         dom?.setVisible(false);
       } else {
         const fallback = tiles();

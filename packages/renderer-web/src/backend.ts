@@ -3,13 +3,20 @@ import type { MotionMode } from "./capabilities.js";
 import type { ShapedDieSides } from "./math/geometry.js";
 import { percentileDisplay } from "./math/percentile.js";
 
-/** One physical die to display: its shape, the face to land on, and all face labels. */
+/** One physical die to display: what it reads, and the solid to draw it as. */
 export type VisualDie = {
-  readonly shape: ShapedDieSides;
-  /** Face to orient upward, 1..shape. */
+  /**
+   * Solid to draw in 3D. Absent when no model can honestly show this die: an
+   * unusual face count, or a custom die whose faces are not 1..N — a d6 model
+   * would show a numeral the die does not have (ADR-0015).
+   */
+  readonly shape?: ShapedDieSides;
+  /** Face to orient upward, 1..shape. Only meaningful together with `shape`. */
   readonly face: number;
-  /** Text for every face, index i labels face i + 1. */
-  readonly labels: readonly string[];
+  /** What this die reads: "19", "00", "+". */
+  readonly text: string;
+  /** What to call the die, e.g. "d20", "d{fate}". */
+  readonly name: string;
   readonly kept: boolean;
   /**
    * Which half of a percentile pair this die is, when a d100 is shown as two
@@ -41,54 +48,53 @@ export interface PresenterBackend {
   dispose(): void;
 }
 
-export function topLabel(die: VisualDie): string {
-  return die.labels[die.face - 1] ?? String(die.face);
-}
+const SHAPED_SIDES: readonly number[] = [4, 6, 8, 10, 12, 20];
 
-function standardLabels(shape: ShapedDieSides): string[] {
-  return Array.from({ length: shape }, (_, index) => String(index + 1));
-}
-
-/** Tens-percentile d10: faces 1..9 read 10..90, face 10 reads 00. */
-function tensLabels(): string[] {
-  return Array.from({ length: 10 }, (_, index) => (index === 9 ? "00" : `${index + 1}0`));
-}
-
-/** Units-percentile d10: faces 1..9 read 1..9, face 10 reads 0. */
-function unitsLabels(): string[] {
-  return Array.from({ length: 10 }, (_, index) => (index === 9 ? "0" : String(index + 1)));
+/** True for face counts the theme models cover. */
+function isShapedDieSides(sides: number): sides is ShapedDieSides {
+  return SHAPED_SIDES.includes(sides);
 }
 
 /**
  * Expands a resolved roll into physical dice. A d100 die becomes the classic
  * percentile pair (tens + units d10) — pure presentation, the record's value
  * stays authoritative.
+ *
+ * A custom die gets no `shape`: its faces carry values and labels a numbered
+ * model cannot show, so drawing it as a d6 would put a numeral on screen that
+ * the die does not have. The presenter falls back to tiles instead, which read
+ * whatever the face says (ADR-0015).
  */
 export function visualDiceForEvent(event: RollResult): VisualDie[] {
   const dice: VisualDie[] = [];
   for (const group of event.groups) {
     for (const die of group.dice) {
-      if (die.sides === 100) {
+      const name = die.die ? `d{${die.die}}` : `d${die.sides}`;
+      if (die.die === undefined && die.sides === 100) {
         const pair = percentileDisplay(die.value);
         dice.push({
           shape: 10,
           face: pair.tens.face,
-          labels: tensLabels(),
+          text: pair.tens.face === 10 ? "00" : `${pair.tens.face}0`,
+          name,
           kept: die.kept,
           role: "tens",
         });
         dice.push({
           shape: 10,
           face: pair.units.face,
-          labels: unitsLabels(),
+          text: pair.units.face === 10 ? "0" : String(pair.units.face),
+          name,
           kept: die.kept,
           role: "units",
         });
       } else {
+        const shaped = die.die === undefined && isShapedDieSides(die.sides);
         dice.push({
-          shape: die.sides,
+          ...(shaped ? { shape: die.sides as ShapedDieSides } : {}),
           face: die.value,
-          labels: standardLabels(die.sides),
+          text: die.label ?? String(die.value),
+          name,
           kept: die.kept,
         });
       }

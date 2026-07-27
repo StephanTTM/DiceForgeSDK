@@ -5,9 +5,11 @@ import {
   createSeededRandomSource,
   DIE_SIDES,
   DiceForgeError,
+  defineDie,
   presentationSupport,
 } from "@diceforge-sdk/core";
 import { afterEach, describe, expect, it } from "vitest";
+import { visualDiceForEvent } from "./backend.js";
 import { createDicePresenter, describeCapabilities } from "./presenter.js";
 
 function makeContainer(): HTMLElement {
@@ -228,7 +230,8 @@ describe("createDicePresenter (DOM backend)", () => {
       const presenter = createDicePresenter({ container, reducedMotion: "reduce" });
       const engine = createDiceEngine({ random: createSeededRandomSource("every-shape") });
 
-      expect([...presenter.capabilities.dieSides].sort((a, b) => a - b)).toEqual([...DIE_SIDES]);
+      // Tiles read whatever a face says, so no face count is out of reach.
+      expect(presenter.capabilities.dieSides).toBe("any");
       for (const sides of DIE_SIDES) {
         const event = engine.roll(`1d${sides}`);
         expect(presentationSupport(presenter.capabilities, event)).toEqual({ supported: true });
@@ -279,5 +282,77 @@ describe("createDicePresenter (DOM backend)", () => {
     presenter.dispose();
     expect(container.querySelector('[data-diceforge="dom-presenter"]')).toBeNull();
     expect(container.querySelector('[data-diceforge="announcer"]')).toBeNull();
+  });
+});
+
+describe("custom dice (ADR-0015)", () => {
+  const fate = defineDie({
+    id: "fate",
+    faces: [
+      { value: -1, label: "-" },
+      { value: 0, label: " " },
+      { value: 1, label: "+" },
+    ],
+  });
+
+  function customEngine(seed: string) {
+    return createDiceEngine({ random: createSeededRandomSource(seed), dice: [fate] });
+  }
+
+  it("renders a die with an unusual face count", async () => {
+    const container = makeContainer();
+    const presenter = createDicePresenter({ container, reducedMotion: "reduce" });
+    const engine = createDiceEngine({ random: createSeededRandomSource("d3") });
+    const roll = engine.roll("2d3");
+
+    expect(presentationSupport(presenter.capabilities, roll)).toEqual({ supported: true });
+    await presenter.present(roll);
+    const shown = [...container.querySelectorAll('[data-diceforge="die-value"]')].map(
+      (node) => node.textContent,
+    );
+    expect(shown).toEqual(roll.groups[0]?.dice.map((die) => String(die.value)));
+    presenter.dispose();
+  });
+
+  it("shows a custom face by its label, not its value", async () => {
+    const container = makeContainer();
+    const presenter = createDicePresenter({ container, reducedMotion: "reduce" });
+    const roll = customEngine("labels").roll("4d{fate}");
+
+    await presenter.present(roll);
+    const shown = [...container.querySelectorAll('[data-diceforge="die-value"]')].map(
+      (node) => node.textContent,
+    );
+    expect(shown).toEqual(roll.groups[0]?.dice.map((die) => die.label));
+    // A "-1" that reads "-" is the whole point of a label.
+    expect(shown.every((text) => ["-", " ", "+"].includes(text ?? ""))).toBe(true);
+    presenter.dispose();
+  });
+
+  /**
+   * The correctness rule behind the fallback: a custom d6 whose faces read
+   * 2,3,3,4,4,5 must never be drawn with a model numbered 1-6, which would put
+   * a numeral on screen that the die does not have.
+   */
+  it("gives a custom die no 3D shape, whatever its face count", () => {
+    const sicherman = defineDie({ id: "sicherman", faces: [1, 2, 2, 3, 3, 4] });
+    const roll = createDiceEngine({
+      random: createSeededRandomSource("sicherman"),
+      dice: [sicherman],
+    }).roll("2d{sicherman}");
+
+    const visuals = visualDiceForEvent(roll);
+    expect(visuals).toHaveLength(2);
+    for (const visual of visuals) {
+      expect(visual.shape, "a custom die must not borrow a numbered model").toBeUndefined();
+      expect(visual.name).toBe("d{sicherman}");
+    }
+  });
+
+  it("keeps a 3D shape for the plain sizes that have one", () => {
+    const roll = createDiceEngine({ random: createSeededRandomSource("shapes") }).roll("1d20+1d7");
+    const [d20, d7] = visualDiceForEvent(roll);
+    expect(d20?.shape).toBe(20);
+    expect(d7?.shape).toBeUndefined();
   });
 });
