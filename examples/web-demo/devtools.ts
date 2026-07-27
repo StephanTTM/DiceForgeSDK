@@ -2,6 +2,7 @@
 //
 //   ?preview=1  render one roll through the real presenter and expose the
 //               frame, which is what the visual regression suite captures
+//   &physics=1  use the physics presenter for that roll, with a seeded throw
 //   ?forge=d20  check a shipped model against its exported rotation table
 //
 // Both modes publish their result on `window.__diceforge` once ready, so a
@@ -15,6 +16,7 @@ import {
   forgeAssets,
 } from "@diceforge-sdk/assets-forge";
 import { createDiceEngine, createSeededRandomSource } from "@diceforge-sdk/core";
+import { createPhysicsPresenter } from "@diceforge-sdk/presenter-physics";
 import { createDicePresenter, type ForgeColor, forgeTheme } from "@diceforge-sdk/renderer-web";
 import {
   AmbientLight,
@@ -57,12 +59,24 @@ async function preview(): Promise<void> {
   host.append(stage);
 
   const forgeColor = params.get("theme") as ForgeColor | null;
-  const presenter = createDicePresenter({
-    container: stage,
-    renderMode: (params.get("render") ?? "webgl") as "auto" | "webgl" | "dom",
-    reducedMotion: "reduce",
-    ...(forgeColor ? { theme: forgeTheme(forgeAssets({ color: forgeColor })) } : {}),
-  });
+  const theme = forgeColor ? forgeTheme(forgeAssets({ color: forgeColor })) : undefined;
+  // A seeded throw makes a simulated roll as repeatable as a scripted one, so
+  // physics can be pinned by a baseline like everything else (ADR-0018).
+  const throwSource = createSeededRandomSource(params.get("throw") ?? "vrt-throw");
+  const presenter =
+    params.get("physics") === "1"
+      ? createPhysicsPresenter({
+          container: stage,
+          reducedMotion: "reduce",
+          random: () => throwSource.nextUint32() / 0x1_0000_0000,
+          ...(theme ? { theme } : {}),
+        })
+      : createDicePresenter({
+          container: stage,
+          renderMode: (params.get("render") ?? "webgl") as "auto" | "webgl" | "dom",
+          reducedMotion: "reduce",
+          ...(theme ? { theme } : {}),
+        });
   const engine = createDiceEngine({
     random: createSeededRandomSource(params.get("seed") ?? "table-42"),
   });
@@ -76,22 +90,25 @@ async function preview(): Promise<void> {
       ? engine.flipCoin()
       : engine.roll(params.get("notation") ?? "4d6dl1");
   await presenter.present(event);
-  const canvas = stage.querySelector("canvas");
   // Only a *visible* canvas is what the user sees. A hidden one still holds
   // pixels, and reading them would let a roll that fell back to tiles be
   // captured as though it had rendered in 3D — which is exactly the kind of
-  // regression these scenes exist to catch. Without a dataUrl the runner
-  // screenshots the element instead, so the tiles are captured honestly.
-  const showing = canvas && canvas.style.display !== "none";
+  // regression these scenes exist to catch. The physics presenter keeps two
+  // canvases and hides whichever is not drawing, so the visible one is chosen
+  // rather than the first. Without a dataUrl the runner screenshots the
+  // element instead, and the tiles are captured honestly.
+  const showing = [...stage.querySelectorAll("canvas")].find(
+    (node) => node.style.display !== "none",
+  );
   publish({
-    mode: presenter.mode,
+    mode: "mode" in presenter ? presenter.mode : presenter.capabilities.implementation,
     expression: event.kind === "roll" ? event.expression : "coin",
     dice:
       event.kind === "roll"
         ? event.groups.flatMap((g) => g.dice.map((d) => `${d.value}${d.kept ? "" : " (dropped)"}`))
         : [event.outcome],
     // PNG keeps the alpha channel, so a die's exact silhouette is measurable.
-    dataUrl: showing ? (canvas?.toDataURL("image/png") ?? null) : null,
+    dataUrl: showing?.toDataURL("image/png") ?? null,
   });
 }
 

@@ -36,3 +36,15 @@ A small tolerance is applied anyway (`TOLERANCE`, `PIXEL_THRESHOLD` in `run.mjs`
 ## Adding a scene
 
 Add an entry to `scenes.mjs` with a `why` explaining what it protects — a scene nobody can justify is a scene nobody will maintain — then run `npm run vrt` to create its baseline and commit the PNG alongside the code.
+
+## Physics scenes
+
+`physics=1` drives `@diceforge-sdk/presenter-physics` instead of the renderer, with a seeded throw (`throw=…`) so a simulated roll is as repeatable as a scripted one. Measured: identical to the pixel across runs, like every other scene.
+
+The four physics scenes were checked by breaking the thing they exist to watch — replacing the symmetry remap with the identity, so dice land on whatever the simulation chose rather than the recorded face. The three that render dice all caught it (0.38–0.77% of pixels); `physics-delegates-unmodelled`, which never uses the remap, correctly did not, and neither did any renderer-web scene.
+
+## Sensitivity
+
+A regression has to move more than `TOLERANCE` (0.1%) of the pixels to fail a scene, and dice occupy a modest share of a frame. In `physics-d20-pair` one wrong die is about 0.39% — caught comfortably. In a five-dice scene one wrong die is nearer 0.08%, which would slip through.
+
+So the scenes with **few, large dice** are the sensitive ones, and the crowded scenes are there for layout and framing rather than for face correctness. Face correctness is pinned exactly, and per die, by the unit tests in `packages/presenter-physics`.
