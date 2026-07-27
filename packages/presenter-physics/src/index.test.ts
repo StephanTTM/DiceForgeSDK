@@ -103,9 +103,9 @@ describe("simulateRoll", () => {
     );
     for (const die of roll.dice) {
       for (const frame of die.frames) {
-        const distance = Math.hypot(frame.position[0], frame.position[2]);
-        // A die's centre can approach the wall to within its own radius.
-        expect(distance).toBeLessThanOrEqual(roll.trayRadius + 1.001);
+        // A die's centre can approach a wall to within its own radius.
+        expect(Math.abs(frame.position[0])).toBeLessThanOrEqual(roll.tray.halfWidth + 1.001);
+        expect(Math.abs(frame.position[2])).toBeLessThanOrEqual(roll.tray.halfDepth + 1.001);
       }
     }
   });
@@ -115,7 +115,7 @@ describe("simulateRoll", () => {
     const small = simulateRoll(request, { random: seededRandom("scale"), dieRadius: 1 });
     const large = simulateRoll(request, { random: seededRandom("scale"), dieRadius: 10 });
 
-    expect(large.trayRadius).toBeCloseTo(small.trayRadius * 10, 6);
+    expect(large.tray.halfWidth).toBeCloseTo(small.tray.halfWidth * 10, 6);
     const smallLast = small.dice[0]?.frames.at(-1);
     const largeLast = large.dice[0]?.frames.at(-1);
     expect(largeLast?.position[1]).toBeCloseTo((smallLast?.position[1] ?? 0) * 10, 6);

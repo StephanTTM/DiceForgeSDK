@@ -34,7 +34,8 @@ Each `PhysicsDie` carries the `remap` to apply to its mesh, the recorded `frames
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `dieRadius` | `1` | Circumradius in your units; every distance is scaled to match |
-| `trayRadius` | `dieWidth × (5 + 0.8√n)` | The dice cannot leave it, so a camera framed on it never moves |
+| `trayRadius` | `dieWidth × (5 + 0.8√n)` | The tray's shorter half-extent; dice cannot leave it |
+| `trayAspect` | `1` | Width over depth — shape it like your viewport and the dice spread into frame |
 | `random` | `Math.random` | Pass a seeded source and the same throw reproduces exactly |
 | `frameRate` | `60` | Recording rate |
 | `maxDuration` | `8` s | Longest roll to record |
@@ -78,9 +79,11 @@ It draws only what it can honestly simulate. A coin flip, a custom die, an unusu
 
 Reduced motion jumps to the final pose instead of playing the roll, and `present(event, { signal })` cancels like any other presenter.
 
-## Known rough edge
+## Framing
 
-The camera frames the whole tray so it never has to move between rolls, and a circular tray has to fit the shorter axis of the canvas. On a wide, short stage that leaves most of the width empty and the dice looking distant. A tray shaped to the viewport would fill the frame better; since it changes what is simulated, it is worth measuring rather than guessing.
+The tray is rectangular and shaped to the stage, so the dice have somewhere to spread that the camera can see. The camera then frames **where the dice came to rest**, centred on them, rather than the tray: a tray big enough to settle a roll cleanly is far bigger than the dice need, and fitting the walls leaves a d20 at about a twelfth of the frame. A floor keeps a single die from filling the screen, and dice fly in from outside the shot on the way down, which reads as a throw.
+
+The camera therefore shifts a little between rolls. The tray is what bounds how much.
 
 ## Licence
 

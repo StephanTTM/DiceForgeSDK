@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `createPhysicsPresenter({ container, theme })` turns that motion into a presenter: it plays the recorded trajectory with three.js, applies each die's remap before the first frame, and reveals dropped dice once the roll has landed. Anything it cannot honestly simulate — a coin, a custom die, an unusual face count, no theme, no WebGL — is handed to `@diceforge-sdk/renderer-web` rather than reimplemented, and the result is announced exactly once however it was drawn. It is the second implementation of the presenter contract, and the first thing the conformance suite has been pointed at that it was not designed around.
 - `@diceforge-sdk/renderer-web` exports the pieces a second 3D presenter needs rather than a copy of them: the die solids (`dieGeometry`, `PolyhedronData`, `ShapedDieSides`, `DIE_SIZE`), the model loader and texturing (`loadDieModel`, `instantiateDieModel`, `loadThemeTexture`, `applyTexture`, `modelSilhouetteScale`), and `visualDiceForEvent`.
 - The browser demo has a `physics` renderer option.
+- The physics tray is rectangular and can be shaped to the viewport (`trayAspect`), and `PhysicsRoll` reports both the tray and where the dice came to rest, so a camera can frame the dice rather than the walls.
 
 ### Fixed
 

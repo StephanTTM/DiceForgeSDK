@@ -49,7 +49,7 @@ Remaining before tagging 0.1.0:
   - [x] Decide how the camera frames the roll, and what the simulation costs. (`--tray=<mm>`: eight walls cap the scatter so framing is constant and the camera never moves; radius ≈ `die × (4 + 0.8√n)` settles in ~1s at 96–100% seated. There is no pre-roll latency — simulating a whole roll costs 4–44 ms for 1–40 dice; the 0.7–1.5 s is the animation's length)
   - [x] Ship it as `@diceforge-sdk/presenter-physics`. (`simulateRoll` + the symmetry remap, cannon-es, tray-framed, 10 tests; the collider is the idealised solid and the model is cosmetic, so a theme needs no symmetry data of its own)
   - [x] Play the trajectory. (`createPhysicsPresenter` — three.js playback, remap applied before the first frame, dropped dice revealed on landing; coins, custom dice and no-WebGL delegate to `renderer-web`, and it passes the conformance suite with no skips)
-  - [ ] Framing polish: the camera fits the circular tray to the shorter axis, so on a wide canvas most of the width is empty and the dice read small. A tray shaped to the viewport would fill the frame; it changes what is simulated, so it wants measuring rather than guessing.
+  - [x] Framing polish. (Rectangular tray shaped to the viewport — measured to cost nothing in settling — and the camera frames where the dice came to rest, centred on them, instead of the walls. Shaping the tray alone did not help: it makes the tray bigger, so the camera pulls back by the same amount.)
 - [ ] Run the visual regression suite in CI, with baselines generated inside the CI container image so they are platform-stable.
 
 ## Backlog

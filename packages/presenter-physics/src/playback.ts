@@ -180,19 +180,35 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
     return { renderer, scene, camera };
   }
 
-  /** Frames the tray, not the roll: the dice never leave it, so this never moves. */
-  function frame(trayRadius: number): void {
+  /**
+   * Frames where the dice came to rest, not the whole tray.
+   *
+   * A tray big enough to settle a roll cleanly is much bigger than the dice
+   * need, so fitting the walls leaves them looking distant. The camera does
+   * therefore shift a little between rolls, but the tray bounds how far — and
+   * a minimum keeps a single die from filling the screen. Width and depth are
+   * fitted separately, since depth foreshortens by the camera's elevation.
+   */
+  function frame(resting: {
+    center: readonly [number, number];
+    halfWidth: number;
+    halfDepth: number;
+  }): void {
     const active = camera;
     if (!active) return;
+    const angle = (CAMERA_ELEVATION * Math.PI) / 180;
     const vertical = (active.fov * Math.PI) / 180;
     const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * active.aspect);
-    const distance = Math.max(
-      (trayRadius + DIE_RADIUS) / Math.tan(Math.min(vertical, horizontal) / 2),
-      8,
-    );
-    const angle = (CAMERA_ELEVATION * Math.PI) / 180;
-    active.position.set(0, distance * Math.sin(angle), distance * Math.cos(angle));
-    active.lookAt(0, 0, 0);
+    const halfWidth = Math.max(resting.halfWidth, DIE_RADIUS * 3);
+    const halfDepth = Math.max(resting.halfDepth, DIE_RADIUS * 2);
+    const forWidth = (halfWidth * 1.15) / Math.tan(horizontal / 2);
+    const forDepth = (halfDepth * 1.15 * Math.sin(angle)) / Math.tan(vertical / 2);
+    const distance = Math.max(forWidth, forDepth, DIE_RADIUS * 4);
+    // Looking at the middle of the dice, not the middle of the table: a lone
+    // die that rolled into a corner should still be in the middle of the shot.
+    const [centreX, centreZ] = resting.center;
+    active.position.set(centreX, distance * Math.sin(angle), centreZ + distance * Math.cos(angle));
+    active.lookAt(centreX, 0, centreZ);
   }
 
   function clearDice(): void {
@@ -385,6 +401,8 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
         visuals.map((die) => ({ shape: die.shape as ShapedDieSides, face: die.face })),
         {
           dieRadius: DIE_RADIUS,
+          // A tray shaped like the stage, so the dice fill it.
+          trayAspect: (container.clientWidth || 640) / (container.clientHeight || 360),
           ...(options.random ? { random: options.random } : {}),
         },
       );
@@ -407,7 +425,7 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
         diceGroup?.add(die.object);
         pose(die, 0);
       }
-      frame(motion.trayRadius);
+      frame(motion.resting);
       showPhysics(true);
 
       await play(dice, motion.frameRate, reduced ? "reduce" : "animate", signal);

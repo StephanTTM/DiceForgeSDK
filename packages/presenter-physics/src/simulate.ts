@@ -43,13 +43,38 @@ export type PhysicsDie = {
   readonly seated: number;
 };
 
+/** A rectangle on the table: where it sits, and how far it reaches. */
+export type PhysicsBounds = {
+  /** Centre on the table, as [x, z]. */
+  readonly center: readonly [number, number];
+  readonly halfWidth: number;
+  readonly halfDepth: number;
+};
+
+/** The walls the roll happened inside, centred on the origin. */
+export type PhysicsTray = {
+  /** Half-extent along x, in the caller's units. */
+  readonly halfWidth: number;
+  /** Half-extent along z. */
+  readonly halfDepth: number;
+};
+
 export type PhysicsRoll = {
   readonly dice: readonly PhysicsDie[];
   /** Frames per second the trajectory was recorded at. */
   readonly frameRate: number;
   readonly duration: number;
-  /** Radius the dice were confined to, for framing a camera on it. */
-  readonly trayRadius: number;
+  /** What the dice were confined to. */
+  readonly tray: PhysicsTray;
+  /**
+   * Where the dice actually came to rest, as a centre and half-extents.
+   *
+   * Framing this rather than the whole tray is what keeps the dice legible: a
+   * tray big enough to settle a roll cleanly is far bigger than the dice need,
+   * so a camera fitted to the walls leaves them looking distant. Dice fly in
+   * from outside this box on the way down, which reads as a throw.
+   */
+  readonly resting: PhysicsBounds;
   /** False when the roll was still moving when recording stopped. */
   readonly settled: boolean;
 };
@@ -61,11 +86,17 @@ export type SimulateOptions = {
    */
   readonly dieRadius?: number;
   /**
-   * Tray radius, also in the caller's units. Defaults to a size measured to
-   * settle reliably for the number of dice: `dieRadius × (4 + 0.8√n)`.
-   * The dice cannot leave it, so a camera framed on the tray never moves.
+   * The tray's shorter half-extent, in the caller's units. Defaults to a size
+   * measured to settle reliably for the number of dice: `dieWidth × (5 + 0.8√n)`.
    */
   readonly trayRadius?: number;
+  /**
+   * Width over depth. A tray shaped like the viewport fills the frame; a square
+   * one on a wide canvas leaves most of the width empty and the dice looking
+   * distant. The shorter side keeps the measured size, so a roll always has at
+   * least the room it was tuned for. Defaults to 1.
+   */
+  readonly trayAspect?: number;
   /** Uniform random source in [0, 1). Defaults to `Math.random`. */
   readonly random?: () => number;
   /** Recording rate. Defaults to 60. */
@@ -91,7 +122,6 @@ const STEP = 1 / 120;
 const SOLVER_ITERATIONS = 20;
 const SLEEP_SPEED = 0.02;
 const SLEEP_TIME = 0.15;
-const TRAY_WALLS = 8;
 
 /**
  * Measured: a tray of about `dieWidth × (5 + 0.8√n)` settles every trial in
@@ -146,11 +176,17 @@ export function simulateRoll(
   const frameRate = options.frameRate ?? 60;
   const random = options.random ?? Math.random;
   const trayRadius = options.trayRadius ?? defaultTrayRadius(dieRadius, request.length);
+  const aspect = options.trayAspect && options.trayAspect > 0 ? options.trayAspect : 1;
+  const tray: PhysicsTray = {
+    halfWidth: trayRadius * Math.max(aspect, 1),
+    halfDepth: trayRadius * Math.max(1 / aspect, 1),
+  };
   const maxSteps = Math.round((options.maxDuration ?? 8) / STEP);
   const stepsPerFrame = Math.max(1, Math.round(1 / (frameRate * STEP)));
   // Everything below runs in metres; this converts back at the end.
   const toCaller = dieRadius / DIE_RADIUS_M;
-  const trayRadiusM = trayRadius / toCaller;
+  const halfWidthM = tray.halfWidth / toCaller;
+  const halfDepthM = tray.halfDepth / toCaller;
 
   const world = new World({ gravity: new CVec3(0, GRAVITY, 0) });
   world.allowSleep = true;
@@ -169,16 +205,24 @@ export function simulateRoll(
   const floor = new Body({ mass: 0, shape: new Plane(), material: surface });
   floor.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
   world.addBody(floor);
-  for (let i = 0; i < TRAY_WALLS; i++) {
-    const angle = (i / TRAY_WALLS) * Math.PI * 2;
+  // Four walls rather than a ring: a rectangular tray can be shaped to the
+  // viewport, and a camera framed on it wastes nothing.
+  const walls: readonly [number, number, number][] = [
+    [0, halfDepthM, Math.PI],
+    [0, -halfDepthM, 0],
+    [halfWidthM, 0, -Math.PI / 2],
+    [-halfWidthM, 0, Math.PI / 2],
+  ];
+  for (const [x, z, yaw] of walls) {
     const wall = new Body({ mass: 0, shape: new Plane(), material: surface });
-    wall.quaternion.setFromEuler(0, angle + Math.PI, 0);
-    wall.position.set(Math.sin(angle) * trayRadiusM, 0, Math.cos(angle) * trayRadiusM);
+    wall.quaternion.setFromEuler(0, yaw, 0);
+    wall.position.set(x, 0, z);
     world.addBody(wall);
   }
 
   const spread = (magnitude: number) => (random() * 2 - 1) * magnitude;
-  const throwRadius = Math.max(trayRadiusM * 0.35, DIE_RADIUS_M * 2);
+  const throwX = Math.max(halfWidthM * 0.35, DIE_RADIUS_M * 2);
+  const throwZ = Math.max(halfDepthM * 0.35, DIE_RADIUS_M * 2);
   const bodies = request.map((die, index) => {
     const body = new Body({
       mass: 0.004,
@@ -192,11 +236,7 @@ export function simulateRoll(
       sleepSpeedLimit: SLEEP_SPEED,
       sleepTimeLimit: SLEEP_TIME,
     });
-    body.position.set(
-      spread(throwRadius),
-      DIE_RADIUS_M * 11 + index * DIE_RADIUS_M * 4,
-      spread(throwRadius),
-    );
+    body.position.set(spread(throwX), DIE_RADIUS_M * 11 + index * DIE_RADIUS_M * 4, spread(throwZ));
     body.velocity.set(spread(0.6), -0.4, spread(0.6));
     body.angularVelocity.set(spread(28), spread(28), spread(28));
     body.quaternion.setFromEuler(spread(Math.PI), spread(Math.PI), spread(Math.PI));
@@ -258,11 +298,25 @@ export function simulateRoll(
     };
   });
 
+  const span = (axis: 0 | 2): { centre: number; half: number } => {
+    const values = dice.map((die) => die.frames[die.frames.length - 1]?.position[axis] ?? 0);
+    const low = Math.min(...values);
+    const high = Math.max(...values);
+    return { centre: (low + high) / 2, half: (high - low) / 2 + dieRadius };
+  };
+  const x = span(0);
+  const z = span(2);
+
   return {
     dice,
     frameRate,
     duration: steps * STEP,
-    trayRadius,
+    tray,
+    resting: {
+      center: [x.centre, z.centre],
+      halfWidth: x.half,
+      halfDepth: z.half,
+    },
     settled,
   };
 }
