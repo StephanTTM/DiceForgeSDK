@@ -1,8 +1,14 @@
 // @vitest-environment jsdom
 import type { RollResult } from "@diceforge-sdk/core";
-import { createDiceEngine, createSeededRandomSource, DiceForgeError } from "@diceforge-sdk/core";
+import {
+  createDiceEngine,
+  createSeededRandomSource,
+  DIE_SIDES,
+  DiceForgeError,
+  presentationSupport,
+} from "@diceforge-sdk/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { createDicePresenter } from "./presenter.js";
+import { createDicePresenter, describeCapabilities } from "./presenter.js";
 
 function makeContainer(): HTMLElement {
   const container = document.createElement("div");
@@ -175,6 +181,95 @@ describe("createDicePresenter (DOM backend)", () => {
     presenter.dispose();
     const engine = createDiceEngine({ random: createSeededRandomSource("x") });
     await expect(presenter.present(engine.roll("1d6"))).rejects.toThrowError(/disposed/);
+  });
+
+  /**
+   * The point of declaring capabilities is that an application can trust the
+   * declaration instead of feature-detecting. These check the declaration
+   * against what the presenter actually does (ADR-0014).
+   */
+  describe("declared capabilities", () => {
+    it("describes this instance, not the package", () => {
+      const quiet = createDicePresenter({
+        container: makeContainer(),
+        announceResults: false,
+      });
+      const loud = createDicePresenter({ container: makeContainer() });
+
+      expect(quiet.capabilities.announces).toBe(false);
+      expect(loud.capabilities.announces).toBe(true);
+      expect(loud.capabilities.implementation).toBe("@diceforge-sdk/renderer-web");
+      quiet.dispose();
+      loud.dispose();
+    });
+
+    it("reports 2D only without a theme, matching the mode it chose", () => {
+      const presenter = createDicePresenter({ container: makeContainer() });
+      expect(presenter.mode).toBe("dom");
+      expect(presenter.capabilities.media).toEqual(["2d"]);
+      presenter.dispose();
+    });
+
+    /**
+     * jsdom has no WebGL, so the 3D presenter cannot be constructed here — but
+     * what it would declare is a pure function of its mode, and that can be.
+     */
+    it("adds 3D to the media a WebGL instance offers, keeping 2D as the fallback", () => {
+      expect(describeCapabilities("webgl", true).media).toEqual(["3d", "2d"]);
+      expect(describeCapabilities("dom", true).media).toEqual(["2d"]);
+      // Falling back is not a loss of support: both draw every size.
+      expect(describeCapabilities("webgl", true).dieSides).toEqual(
+        describeCapabilities("dom", true).dieSides,
+      );
+    });
+
+    it("claims every die size the core can resolve, and presents them", async () => {
+      const container = makeContainer();
+      const presenter = createDicePresenter({ container, reducedMotion: "reduce" });
+      const engine = createDiceEngine({ random: createSeededRandomSource("every-shape") });
+
+      expect([...presenter.capabilities.dieSides].sort((a, b) => a - b)).toEqual([...DIE_SIDES]);
+      for (const sides of DIE_SIDES) {
+        const event = engine.roll(`1d${sides}`);
+        expect(presentationSupport(presenter.capabilities, event)).toEqual({ supported: true });
+        await presenter.present(event);
+        // A d100 is drawn as a percentile pair, every other size as one die.
+        const drawn = container.querySelectorAll('[data-diceforge="die"]');
+        expect(drawn.length, `d${sides}`).toBe(sides === 100 ? 2 : 1);
+      }
+      presenter.dispose();
+    });
+
+    it("accepts both event kinds it declares", async () => {
+      const container = makeContainer();
+      const presenter = createDicePresenter({ container, reducedMotion: "reduce" });
+      const engine = createDiceEngine({ random: createSeededRandomSource("kinds") });
+
+      expect([...presenter.capabilities.kinds].sort()).toEqual(["coin-flip", "roll"]);
+      const flip = engine.flipCoin();
+      expect(presentationSupport(presenter.capabilities, flip)).toEqual({ supported: true });
+      await presenter.present(flip);
+      expect(container.querySelector('[data-diceforge="die-value"]')?.textContent).toBe(
+        flip.outcome === "heads" ? "H" : "T",
+      );
+      presenter.dispose();
+    });
+
+    it("cancels when it says it cancels", async () => {
+      const presenter = createDicePresenter({
+        container: makeContainer(),
+        reducedMotion: "reduce",
+      });
+      const engine = createDiceEngine({ random: createSeededRandomSource("cancel") });
+      const controller = new AbortController();
+      controller.abort();
+
+      expect(presenter.capabilities.cancellable).toBe(true);
+      await expect(
+        presenter.present(engine.roll("1d6"), { signal: controller.signal }),
+      ).rejects.toMatchObject({ name: "AbortError" });
+      presenter.dispose();
+    });
   });
 
   it("cleans up its DOM on dispose", () => {

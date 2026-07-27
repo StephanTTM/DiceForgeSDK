@@ -1,5 +1,9 @@
-import type { InteractionPresenter, PresentationOptions } from "@diceforge-sdk/core";
-import { DiceForgeError, validateEventRecord } from "@diceforge-sdk/core";
+import type {
+  InteractionPresenter,
+  PresentationOptions,
+  PresenterCapabilities,
+} from "@diceforge-sdk/core";
+import { DIE_SIDES, DiceForgeError, validateEventRecord } from "@diceforge-sdk/core";
 import { createAnnouncer, formatEventAnnouncement } from "./announce.js";
 import type { PresentContext, PresenterBackend } from "./backend.js";
 import { visualDiceForEvent } from "./backend.js";
@@ -20,7 +24,8 @@ export type DicePresenterOptions = {
   readonly announceResults?: boolean;
   /**
    * Theme: colors plus optional lazily-loaded 3D models (WebGL mode only).
-   * Shapes without a calibrated model always render procedurally.
+   * Without one there is nothing to draw in 3D, so the presenter uses tiles
+   * and reports `media: ["2d"]`.
    */
   readonly theme?: DiceTheme;
   /** Color overrides; take precedence over the theme's colors. */
@@ -28,10 +33,40 @@ export type DicePresenterOptions = {
 };
 
 export type DicePresenter = InteractionPresenter & {
-  /** The backend actually in use after capability detection. */
+  /**
+   * The backend actually in use after capability detection. Browser-specific;
+   * `capabilities.media` is the portable form of the same answer, and the one
+   * to reach for in code that should work against any presenter.
+   */
   readonly mode: RenderMode;
   dispose(): void;
 };
+
+/**
+ * What this presenter can do, given the backend it settled on and whether it
+ * announces (ADR-0014). Declared per instance, because the same code
+ * configured differently is a different presenter to an application: without a
+ * theme there is no 3D, and announcements can be turned off.
+ *
+ * Every die size is listed whichever mode is active. The tile backend can draw
+ * all of them, and it is always available as a fallback — which is precisely
+ * what makes a 3D roll safe to attempt. `media` carries the nuance: a WebGL
+ * presenter may still show an individual event flat.
+ *
+ * Exported for tests: a WebGL backend cannot be constructed under jsdom, but
+ * the declaration it produces can still be checked.
+ */
+export function describeCapabilities(mode: RenderMode, announces: boolean): PresenterCapabilities {
+  return {
+    implementation: "@diceforge-sdk/renderer-web",
+    kinds: ["roll", "coin-flip"],
+    dieSides: DIE_SIDES,
+    media: mode === "webgl" ? ["3d", "2d"] : ["2d"],
+    cancellable: true,
+    announces,
+    honorsReducedMotion: true,
+  };
+}
 
 /**
  * Creates a browser presenter for resolved DiceForge events. The presenter
@@ -70,9 +105,11 @@ export function createDicePresenter(options: DicePresenterOptions): DicePresente
   };
 
   const announcer = options.announceResults === false ? undefined : createAnnouncer(container);
+
   let disposed = false;
   return {
     mode,
+    capabilities: describeCapabilities(mode, announcer !== undefined),
     async present(event, presentationOptions?: PresentationOptions) {
       if (disposed) {
         throw new DiceForgeError("invalid-argument", "presenter has been disposed");

@@ -20,7 +20,7 @@ The core owns dice definitions, notation parsing, random-number interfaces, outc
 
 ### Plugins
 
-Plugins implement optional capabilities behind core-defined contracts. Initial plugin categories are renderer, physics/presentation simulation, theme, audio, notation extension, and transport/replay storage. Plugins should declare capabilities, supported core version ranges, and deterministic limitations.
+Plugins implement optional capabilities behind core-defined contracts. Initial plugin categories are renderer, physics/presentation simulation, theme, audio, notation extension, and transport/replay storage. Plugins declare what they can do as data rather than leaving applications to feature-detect: a presenter carries `PresenterCapabilities`, and `presentationSupport(capabilities, event)` in the core answers whether an event is covered (ADR-0014). Contracts are added when a second implementation makes them necessary, not in advance.
 
 ### Adapters
 
@@ -47,7 +47,7 @@ Seeded RNG providers must produce reproducible core results. Presentation physic
 ```text
 packages/
   core/                 rules, notation, resolver, event schemas   [implemented]
-  plugin-contracts/     optional extension interfaces              [presenter contract lives in core for now — ADR-0008]
+  plugin-contracts/     optional extension interfaces              [presenter contract + capabilities live in core — ADR-0008, ADR-0014]
   renderer-web/         web rendering integration                  [implemented — also serves as the browser adapter, ADR-0007]
   assets-forge/         the first-party die set, art only          [implemented — optional, no code depends on it, ADR-0013]
   adapter-unity/        Unity-facing integration                   [future]
@@ -65,5 +65,5 @@ Art is a package, not a dependency. `packages/assets-forge` carries models and t
 
 - Event records must carry a schema version before persistence or transport is introduced.
 - Adapters consume public core contracts only.
-- Plugins must fail clearly when required capabilities or compatible versions are missing.
+- Plugins must fail clearly when required capabilities or compatible versions are missing, and must declare capabilities that match their behavior — a declaration is a contract, not a hint.
 - Breaking public API or serialized-data changes require a decision record and migration guidance.

@@ -21,9 +21,15 @@ export {
 } from "./notation/parser.js";
 export type {
   AbortSignalLike,
+  InteractionKind,
   InteractionPresenter,
+  PresentationMedium,
   PresentationOptions,
+  PresentationSupport,
+  PresentationUnsupportedReason,
+  PresenterCapabilities,
 } from "./presentation.js";
+export { presentationSupport } from "./presentation.js";
 export type {
   CoinFlipResult,
   DieOutcome,

@@ -33,7 +33,8 @@ Remaining before tagging 0.1.0:
 
 ## Next: extensibility — 0.3.0
 
-- [ ] Stabilize the plugin contracts and add capability discovery, so an adapter can ask what a presenter supports instead of feature-detecting it.
+- [x] Add capability discovery so an adapter can ask what a presenter supports instead of feature-detecting it. (`PresenterCapabilities` + `presentationSupport()` in core, declared per instance by the web renderer — ADR-0014)
+- [ ] Extend the contract to the plugin categories beyond presentation (physics, audio, transport) once a second implementation exists to shape it — ARCHITECTURE lists them, but nothing implements them yet.
 - [ ] Custom dice definitions.
 - [ ] Notation extensions beyond grammar v1 (exploding dice, rerolls) via plugin contracts.
 - [ ] Replay support: re-present a stored record without re-resolving it.

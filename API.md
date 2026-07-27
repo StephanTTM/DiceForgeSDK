@@ -132,10 +132,11 @@ class DiceNotationError extends DiceForgeError { position: number } // code: "no
 
 `code` values are stable API; message text is not.
 
-## Presentation contract (implemented — ADR-0008)
+## Presentation contract (implemented — ADR-0008, ADR-0014)
 
 ```ts
 interface InteractionPresenter {
+  readonly capabilities: PresenterCapabilities;
   present(event: InteractionEvent, options?: PresentationOptions): Promise<void>;
   dispose?(): void;
 }
@@ -143,7 +144,38 @@ interface InteractionPresenter {
 type PresentationOptions = { signal?: AbortSignalLike };
 ```
 
-Type-only exports from the core (`InteractionPresenter`, `PresentationOptions`, `AbortSignalLike`). A presenter maps event data to visuals, motion, audio, or haptics; it must never decide or modify outcomes, and a failed or cancelled presentation does not invalidate the resolved event. `AbortSignalLike` is a structural stand-in satisfied by any real `AbortSignal`, so the core's types stay platform-free.
+A presenter maps event data to visuals, motion, audio, or haptics; it must never decide or modify outcomes, and a failed or cancelled presentation does not invalidate the resolved event. `AbortSignalLike` is a structural stand-in satisfied by any real `AbortSignal`, so the core's types stay platform-free.
+
+### Capability discovery (ADR-0014)
+
+```ts
+type PresenterCapabilities = {
+  implementation: string; // e.g. "@diceforge-sdk/renderer-web"
+  kinds: readonly InteractionKind[]; // "roll" | "coin-flip"
+  dieSides: readonly DieSides[]; // sizes it can show, in any medium
+  media: readonly PresentationMedium[]; // "3d" | "2d" | "none", richest first
+  cancellable: boolean; // honors PresentationOptions.signal
+  announces: boolean; // announces outcomes to assistive technology
+  honorsReducedMotion: boolean;
+};
+
+function presentationSupport(
+  capabilities: PresenterCapabilities,
+  event: InteractionEvent,
+): PresentationSupport; // { supported: true } | { supported: false, reason, message, dieSides? }
+```
+
+Ask, do not feature-detect:
+
+```ts
+const check = presentationSupport(presenter.capabilities, roll);
+if (!check.supported) console.warn(check.message); // e.g. cannot present d12
+if (presenter.capabilities.media.includes("3d")) enableTheDiceTrayToggle();
+```
+
+Capabilities describe an **instance**: the web renderer reports `media: ["3d", "2d"]` with a 3D theme and `["2d"]` without one, and `announces: false` when announcements are turned off. Declared support is a floor rather than a promise about a specific frame — a presenter may degrade one presentation to a simpler medium (the web renderer falls back to tiles for a roll its theme cannot cover) as long as it still shows the resolved outcome. `presentationSupport` is pure and platform-free, so applications, adapters, and conformance tests can all use the same definition of "supported".
+
+Stability: `PresenterCapabilities` is expected to gain fields as plugin categories arrive; consumers should read the fields they care about rather than pattern-match whole objects. Adding a required field is a breaking change and gets an ADR.
 
 The first implementation is [`@diceforge-sdk/renderer-web`](packages/renderer-web/README.md): Three.js 3D dice with outcome-first animation, a DOM fallback, reduced-motion support, and aria-live announcements (ADR-0007).
 

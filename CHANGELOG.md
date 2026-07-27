@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Capability discovery (ADR-0014): every presenter carries `capabilities` — the event kinds it accepts, the die sizes it can show, the media it may use (`"3d" | "2d" | "none"`), and whether it cancels, announces, and honors reduced motion. `presentationSupport(capabilities, event)` in the core answers whether an event is covered, and says which die sizes are at fault when it is not. Both are plain data and pure logic, so an application, an adapter, or a conformance suite can all ask the same question without constructing a renderer.
+- `@diceforge-sdk/renderer-web` declares its capabilities per instance: `media: ["3d", "2d"]` with a 3D theme, `["2d"]` without one, and `announces: false` when announcements are turned off. Tests assert the declaration against what the presenter actually does.
+
+### Changed
+
+- **Breaking (contract):** implementing `InteractionPresenter` now requires a `capabilities` field. Consumers are unaffected; the only implementation is first-party, and the presenter API is documented as experimental before 1.0.
+- `DicePresenter.mode` remains for browser-specific code, and is now documented as the vendor spelling of `capabilities.media`.
+
 ## [0.3.0] - 2026-07-26
 
 3D dice now work from `npm install`.

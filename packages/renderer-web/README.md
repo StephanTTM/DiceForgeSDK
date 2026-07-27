@@ -24,6 +24,27 @@ presenter.dispose();
 
 `createDicePresenter` returns the core `InteractionPresenter` contract plus `mode` (the backend actually chosen) and `dispose()`.
 
+## Asking what it can do (ADR-0014)
+
+`presenter.capabilities` describes **this instance**, so an application can ask instead of feature-detect:
+
+```ts
+import { presentationSupport } from "@diceforge-sdk/core";
+
+presenter.capabilities;
+// { implementation: "@diceforge-sdk/renderer-web",
+//   kinds: ["roll", "coin-flip"], dieSides: [4, 6, 8, 10, 12, 20, 100],
+//   media: ["3d", "2d"], cancellable: true, announces: true,
+//   honorsReducedMotion: true }
+
+if (presenter.capabilities.media.includes("3d")) showDiceTrayControls();
+
+const check = presentationSupport(presenter.capabilities, roll);
+if (!check.supported) console.warn(check.message);
+```
+
+`media` is `["3d", "2d"]` only when WebGL is available *and* a theme supplies models; otherwise it is `["2d"]`. Both entries are listed for a 3D presenter because tiles remain the fallback for a roll the theme cannot cover — which is also why `dieSides` lists every size the core resolves regardless of mode. `mode` is the browser-specific spelling of the same answer; `capabilities.media` is the portable one.
+
 ## Options
 
 | Option            | Type                                | Default  | Meaning                                                                 |
