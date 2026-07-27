@@ -38,7 +38,7 @@ Remaining before tagging 0.1.0:
 - [ ] Custom dice definitions.
 - [ ] Notation extensions beyond grammar v1 (exploding dice, rerolls) via plugin contracts.
 - [ ] Replay support: re-present a stored record without re-resolving it.
-- [ ] Plugin-author documentation and a compatibility test kit a third-party renderer can run against.
+- [x] Plugin-author documentation and a compatibility test kit a third-party renderer can run against. (`@diceforge-sdk/testing`: runner-agnostic conformance checks + the presenter-authoring guide; `renderer-web` runs it against itself — ADR-0014)
 - [x] Decide whether the first-party dice ship as an optional `@diceforge-sdk/assets-forge` package or stay repository-only. (shipped as a package — ADR-0013; `forgeTheme(forgeAssets({ color }))` needs no copying, `baseUrl` still serves custom packs)
 
 ## Backlog

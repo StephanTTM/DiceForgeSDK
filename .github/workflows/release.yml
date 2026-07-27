@@ -1,7 +1,7 @@
 name: Release
 
-# Publishes @diceforge-sdk/core, @diceforge-sdk/renderer-web and
-# @diceforge-sdk/assets-forge when a version tag (v*) is pushed. Every package
+# Publishes @diceforge-sdk/core, @diceforge-sdk/renderer-web,
+# @diceforge-sdk/assets-forge and @diceforge-sdk/testing when a version tag (v*) is pushed. Every package
 # releases together at the same version (ADR-0009). Authentication uses npm
 # trusted publishing (GitHub OIDC), which must be configured in each package's
 # npmjs.com settings; provenance links the published artifacts to this workflow
@@ -33,7 +33,7 @@ jobs:
       - name: Verify tag matches package versions
         run: |
           TAG="${GITHUB_REF_NAME#v}"
-          for PKG in packages/core packages/renderer-web packages/assets-forge; do
+          for PKG in packages/core packages/renderer-web packages/assets-forge packages/testing; do
             VERSION=$(node -p "require('./$PKG/package.json').version")
             if [ "$VERSION" != "$TAG" ]; then
               echo "::error::$PKG is $VERSION but tag is $TAG"; exit 1
@@ -42,7 +42,7 @@ jobs:
       - name: Publish packages (idempotent per version)
         run: |
           set -e
-          for DIR in packages/core packages/renderer-web packages/assets-forge; do
+          for DIR in packages/core packages/renderer-web packages/assets-forge packages/testing; do
             NAME=$(node -p "require('./$DIR/package.json').name")
             VERSION=$(node -p "require('./$DIR/package.json').version")
             if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then

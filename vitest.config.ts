@@ -12,6 +12,9 @@ export default defineConfig({
       "@diceforge-sdk/assets-forge": fileURLToPath(
         new URL("packages/assets-forge/src/index.ts", import.meta.url),
       ),
+      "@diceforge-sdk/testing": fileURLToPath(
+        new URL("packages/testing/src/index.ts", import.meta.url),
+      ),
     },
   },
   test: {

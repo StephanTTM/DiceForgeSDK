@@ -175,6 +175,8 @@ if (presenter.capabilities.media.includes("3d")) enableTheDiceTrayToggle();
 
 Capabilities describe an **instance**: the web renderer reports `media: ["3d", "2d"]` with a 3D theme and `["2d"]` without one, and `announces: false` when announcements are turned off. Declared support is a floor rather than a promise about a specific frame — a presenter may degrade one presentation to a simpler medium (the web renderer falls back to tiles for a roll its theme cannot cover) as long as it still shows the resolved outcome. `presentationSupport` is pure and platform-free, so applications, adapters, and conformance tests can all use the same definition of "supported".
 
+Writing a presenter of your own? [`@diceforge-sdk/testing`](packages/testing/README.md) documents the rules and checks an implementation against them — declared kinds and die sizes really present, the record survives untouched, cancellation works if claimed.
+
 Stability: `PresenterCapabilities` is expected to gain fields as plugin categories arrive; consumers should read the fields they care about rather than pattern-match whole objects. Adding a required field is a breaking change and gets an ADR.
 
 The first implementation is [`@diceforge-sdk/renderer-web`](packages/renderer-web/README.md): Three.js 3D dice with outcome-first animation, a DOM fallback, reduced-motion support, and aria-live announcements (ADR-0007).

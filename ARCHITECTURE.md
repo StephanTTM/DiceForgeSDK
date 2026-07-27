@@ -52,7 +52,7 @@ packages/
   assets-forge/         the first-party die set, art only          [implemented — optional, no code depends on it, ADR-0013]
   adapter-unity/        Unity-facing integration                   [future]
   adapter-godot/        Godot-facing integration                   [future]
-  testing/              test fixtures and conformance suites       [future]
+  testing/              plugin conformance suite                   [implemented — ADR-0014]
 examples/               minimal, runnable integration examples     [headless + web demo implemented]
 docs/                   user and contributor documentation         [future]
 ```

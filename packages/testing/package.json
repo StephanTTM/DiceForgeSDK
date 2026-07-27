@@ -1,13 +1,13 @@
 {
-  "name": "@diceforge-sdk/renderer-web",
+  "name": "@diceforge-sdk/testing",
   "version": "0.3.0",
-  "description": "Browser presenter for DiceForge: Three.js 3D dice with outcome-first animation, DOM fallback, reduced-motion support, and accessible announcements.",
+  "description": "Conformance tests for DiceForge plugins: check that a presenter honors the InteractionPresenter contract it declares.",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/StephanTTM/DiceForgeSDK.git",
-    "directory": "packages/renderer-web"
+    "directory": "packages/testing"
   },
   "homepage": "https://github.com/StephanTTM/DiceForgeSDK#readme",
   "bugs": "https://github.com/StephanTTM/DiceForgeSDK/issues",
@@ -31,23 +31,21 @@
   },
   "keywords": [
     "dice",
-    "3d",
-    "threejs",
-    "webgl",
-    "renderer",
-    "tabletop"
+    "diceforge",
+    "conformance",
+    "contract-tests",
+    "plugin",
+    "testing"
   ],
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run"
   },
-  "dependencies": {
-    "@diceforge-sdk/core": "^0.3.0",
-    "three": "^0.182.0"
+  "peerDependencies": {
+    "@diceforge-sdk/core": "^0.3.0"
   },
   "devDependencies": {
-    "@diceforge-sdk/testing": "^0.3.0",
-    "@types/three": "^0.182.0"
+    "@diceforge-sdk/core": "^0.3.0"
   }
 }

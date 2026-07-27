@@ -89,6 +89,7 @@ APIs are experimental before 1.0 and may change between minor versions. Serializ
 | [DECISIONS.md](DECISIONS.md) | Architecture decision records — why things are the way they are |
 | [ROADMAP.md](ROADMAP.md) · [TASKS.md](TASKS.md) | Where this is going, and what is in flight |
 | [CONTRIBUTING.md](CONTRIBUTING.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | How to build, test, and take part |
+| [packages/testing](packages/testing/README.md) | Writing a presenter, and the conformance suite that checks one |
 | [CHANGELOG.md](CHANGELOG.md) | What changed, and when |
 
 Two pieces of tooling have their own guides: the [Blender dice generator](tools/blender/README.md), which produces the first-party models and textures, and the [visual regression suite](tools/vrt/README.md), which catches renderer changes that unit tests cannot see.

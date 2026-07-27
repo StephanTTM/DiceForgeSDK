@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Capability discovery (ADR-0014): every presenter carries `capabilities` — the event kinds it accepts, the die sizes it can show, the media it may use (`"3d" | "2d" | "none"`), and whether it cancels, announces, and honors reduced motion. `presentationSupport(capabilities, event)` in the core answers whether an event is covered, and says which die sizes are at fault when it is not. Both are plain data and pure logic, so an application, an adapter, or a conformance suite can all ask the same question without constructing a renderer.
 - `@diceforge-sdk/renderer-web` declares its capabilities per instance: `media: ["3d", "2d"]` with a 3D theme, `["2d"]` without one, and `announces: false` when announcements are turned off. Tests assert the declaration against what the presenter actually does.
+- `@diceforge-sdk/testing`: a conformance suite a third-party presenter can run against itself. `assertPresenterConformance(factory)` checks that declared kinds and die sizes really present, that presenting leaves the resolved record byte-identical, that an aborted presentation rejects when cancellation is claimed, and that `dispose()` is idempotent — failing on a timeout rather than hanging when a presentation never settles. Runner-agnostic: the checks return data, so any test framework can assert on them. Its README doubles as the guide to writing a presenter, and `@diceforge-sdk/renderer-web` is its first consumer.
 
 ### Changed
 

@@ -45,6 +45,10 @@ Use a clear title and include:
 
 Maintainers may request an ADR for changes affecting the core boundary, plugin contracts, public API, result schemas, or supported platforms.
 
+## Plugin and renderer contributions
+
+A presenter — in this repository or your own — must pass the conformance suite in [`@diceforge-sdk/testing`](packages/testing/README.md), which checks that its declared capabilities match its behavior. `packages/renderer-web/src/conformance.test.ts` is the pattern: one factory, one assertion. The suite cannot see a screen, so it does not replace an implementation's own tests for the thing that matters most — that the face shown is the face the record holds.
+
 ## Asset contributions
 
 Do not add third-party art, models, textures, or audio without a documented license that permits the intended redistribution. Record every pack in [`assets/LICENSES.md`](assets/LICENSES.md) with its author, source URL, license, retrieval date, and any conditions the author asks for.
