@@ -29,13 +29,16 @@ const flip = engine.flipCoin();        // CoinFlipResult
 
 Advanced consumers can call the layers directly: `parseDiceNotation(expression)` returns the AST (`DiceExpression`), and `resolveRoll(ast, random)` / `resolveCoinFlip(random)` produce records from it.
 
-## Dice notation grammar v1.1
+## Dice notation grammar v1.2
 
 ```ebnf
 expression := [sign] term { sign term }
 sign       := "+" | "-"
 term       := dice | integer
-dice       := [count] "d" (faces | "%" | "{" name "}") [selection]
+dice       := [count] "d" (faces | "%" | "{" name "}") { modifier }
+modifier   := reroll | explode | selection
+reroll     := "r" ["o"] threshold
+explode    := "!"
 selection  := ("kh" | "kl" | "dh" | "dl") [count]
 ```
 
@@ -43,8 +46,12 @@ selection  := ("kh" | "kl" | "dh" | "dl") [count]
 - `faces` is any count from **2 to `MAX_DIE_FACES`** (1000), so `d3` and `d30` work without any setup; `d%` is shorthand for `d100`. `d1` and `d0` are rejected — a constant is a modifier.
 - `{name}` rolls a custom die given to the engine, e.g. `4d{fate}` (see below).
 - `kh`/`kl` keep the highest/lowest N dice; `dh`/`dl` drop them. N defaults to 1 (`2d20kh` = `2d20kh1`). Advantage is `2d20kh1`, disadvantage `2d20kl1`, ability scores `4d6dl1`.
+- `!` **explodes**: a die reading its highest face adds another die, which may explode in turn — `4d6!`. Chains stop at `MAX_EXPLOSIONS_PER_DIE` (10).
+- `r<n>` **rerolls** a die reading `n` or below, repeating up to `MAX_REROLLS_PER_DIE` (10); `ro<n>` rerolls each die at most once. "Reroll 1s and 2s" is `r2`.
+- Modifiers may be written in any order and always apply as **reroll, then explode, then keep/drop**. Each may appear once. Canonical notation prints them in that order, so `4d6kh3r1` normalizes to `4d6r1kh3`.
 - Ties select earlier-rolled dice first, so keep/drop is deterministic.
-- Limits (exported as constants): `MAX_DICE_PER_GROUP` 100, `MAX_TERMS` 20, `MAX_MODIFIER` 1,000,000, `MAX_EXPRESSION_LENGTH` 500 characters, `MAX_DIE_FACES` 1000, and at least one dice group per expression.
+- Limits (exported as constants): `MAX_DICE_PER_GROUP` 100, `MAX_TERMS` 20, `MAX_MODIFIER` 1,000,000, `MAX_EXPRESSION_LENGTH` 500 characters, `MAX_DIE_FACES` 1000, `MAX_EXPLOSIONS_PER_DIE` 10, `MAX_REROLLS_PER_DIE` 10, `MAX_EXTRA_DICE_PER_GROUP` 100, and at least one dice group per expression.
+- Rejected as mistakes rather than honored: a reroll threshold that covers every face (`4d6r6`) or none (`4d6r0`), and `!` on a die whose every face is its highest.
 
 Errors: `DiceNotationError` (extends `DiceForgeError`, `code: "notation"`) with a zero-based `position` pointing into the original expression.
 
@@ -86,7 +93,7 @@ All records are deeply frozen (`Object.freeze`), JSON-serializable, and carry `s
 ```ts
 type RollResult = {
   kind: "roll";
-  schemaVersion: 1;
+  schemaVersion: 2;
   expression: string;            // canonical form, e.g. "2d20kh1+3"
   groups: readonly RollGroupOutcome[];
   modifier: number;              // net signed constant terms
@@ -109,11 +116,13 @@ type DieOutcome = {
   kept: boolean;
   die?: string;    // custom die name
   label?: string;  // how the face reads, when it differs from the value
+  source?: "reroll" | "explosion"; // why this die is here beyond the count asked for
+  rerolled?: boolean;              // a reroll threw this result away; never kept
 };
 
 type CoinFlipResult = {
   kind: "coin-flip";
-  schemaVersion: 1;
+  schemaVersion: 2;
   outcome: "heads" | "tails";
   provenance: RandomProvenance;
 };
@@ -121,7 +130,7 @@ type CoinFlipResult = {
 type InteractionEvent = RollResult | CoinFlipResult;
 ```
 
-Dropped dice stay in the record (`kept: false`) so presenters can animate every die while totals remain authoritative.
+Dropped dice stay in the record (`kept: false`) so presenters can animate every die while totals remain authoritative. Dice added by `!` or `r` are ordinary entries in rolled order, marked with `source`; a roll a reroll discarded keeps its place with `rerolled: true` (ADR-0016), so a roll reads back exactly as it happened. `group.dice.length` is therefore the number of dice **rolled**, not the number asked for — that is the group's `notation`.
 
 ## Randomness
 

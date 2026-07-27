@@ -92,6 +92,18 @@ function validateGroup(value: unknown, position: number): RollGroupOutcome {
       fail(`${dieLabel}.value ${dieValue} exceeds ${MAX_FACE_VALUE}`);
     }
     if (typeof dieRecord.kept !== "boolean") fail(`${dieLabel}.kept must be a boolean`);
+    const source = dieRecord.source;
+    if (source !== undefined && source !== "reroll" && source !== "explosion") {
+      fail(`${dieLabel}.source must be "reroll" or "explosion"`);
+    }
+    const rerolled = dieRecord.rerolled;
+    if (rerolled !== undefined && typeof rerolled !== "boolean") {
+      fail(`${dieLabel}.rerolled must be a boolean`);
+    }
+    // A discarded roll that still counted would make the subtotal a fiction.
+    if (rerolled === true && dieRecord.kept === true) {
+      fail(`${dieLabel} was rerolled away, so it cannot also be kept`);
+    }
     const faceLabel =
       dieRecord.label === undefined ? undefined : asString(dieRecord.label, `${dieLabel}.label`);
     if (faceLabel !== undefined && faceLabel.length > MAX_FACE_LABEL_LENGTH) {
@@ -103,6 +115,8 @@ function validateGroup(value: unknown, position: number): RollGroupOutcome {
       kept: dieRecord.kept,
       ...(customDie === undefined ? {} : { die: customDie }),
       ...(faceLabel === undefined ? {} : { label: faceLabel }),
+      ...(source === undefined ? {} : { source }),
+      ...(rerolled ? { rerolled: true } : {}),
     };
   });
   const subtotal = asInteger(record.subtotal, `${label}.subtotal`);

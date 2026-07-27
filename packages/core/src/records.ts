@@ -31,6 +31,18 @@ export type DieOutcome = {
   readonly die?: string;
   /** How the face reads, when that differs from the value. */
   readonly label?: string;
+  /**
+   * Why this die is here beyond the count that was asked for: a `r` reroll
+   * replaced an earlier result, or a `!` explosion followed a highest face
+   * (ADR-0016).
+   */
+  readonly source?: "reroll" | "explosion";
+  /**
+   * True when a reroll threw this result away. Such a die is always
+   * `kept: false`; it stays in the record so a roll can be read back exactly
+   * as it happened.
+   */
+  readonly rerolled?: boolean;
 };
 
 /** The outcome of one dice group term such as "2d20kh1". */

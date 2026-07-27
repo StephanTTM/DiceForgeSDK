@@ -4,6 +4,7 @@ import { DiceForgeError, DiceNotationError } from "../errors.js";
 import type {
   DiceExpression,
   DiceGroupNode,
+  DiceReroll,
   DiceSelection,
   ExpressionTerm,
   SelectionMode,
@@ -14,8 +15,17 @@ export const MAX_EXPRESSION_LENGTH = 500;
 export const MAX_TERMS = 20;
 export const MAX_DICE_PER_GROUP = 100;
 export const MAX_MODIFIER = 1_000_000;
+/** How many times one die may explode in a chain (ADR-0016). */
+export const MAX_EXPLOSIONS_PER_DIE = 10;
+/** How many times one die may be rerolled by `r` (ADR-0016). */
+export const MAX_REROLLS_PER_DIE = 10;
+/** Total dice a group's modifiers may add on top of the count that was asked for. */
+export const MAX_EXTRA_DICE_PER_GROUP = 100;
 
 const SELECTION_MODES: readonly string[] = ["kh", "kl", "dh", "dl"];
+
+/** What "d…" resolved to: a face count, and a custom die name when named. */
+type ParsedDie = { readonly sides: number; readonly id?: string };
 
 export type ParseOptions = {
   /**
@@ -32,14 +42,17 @@ export type ParseOptions = {
  *
  *   expression := [sign] term { sign term }
  *   term       := dice | integer
- *   dice       := [count] ("d" | "D") (faces | "%" | "{" name "}") [selection]
+ *   dice       := [count] ("d" | "D") (faces | "%" | "{" name "}") { modifier }
+ *   modifier   := reroll | "!" | selection
+ *   reroll     := "r" ["o"] threshold
  *   selection  := ("kh" | "kl" | "dh" | "dl") [count]
  *
  * Case-insensitive; whitespace is allowed around terms and signs but not
  * inside a dice group. "d%" is shorthand for "d100". A selection without a
  * count defaults to 1 ("2d20kh" means "2d20kh1"). A face count may be any
  * number from 2 to MAX_DIE_FACES, so "d3" and "d30" need no registration;
- * braces name a custom die, "4d{fate}".
+ * braces name a custom die, "4d{fate}". Modifiers may be written in any order
+ * and always apply as reroll, then explode, then keep/drop (ADR-0016).
  *
  * Throws `DiceNotationError` (code "notation", with a zero-based `position`)
  * for syntax errors and limit violations.
@@ -172,19 +185,98 @@ class Parser {
     if (count > MAX_DICE_PER_GROUP) {
       throw new DiceNotationError(`dice count exceeds ${MAX_DICE_PER_GROUP}`, start);
     }
-    const selection = this.readSelection(count);
+
+    // Modifiers may be written in any order — the reading of "4d6kh3r1" is not
+    // in doubt — but each may appear only once, and they always apply in the
+    // order reroll, explode, select (ADR-0016).
+    let reroll: DiceReroll | undefined;
+    let explode = false;
+    let selection: DiceSelection | undefined;
+    while (!this.atEnd()) {
+      const char = this.peek();
+      if (char === "!") {
+        if (explode) throw new DiceNotationError("explode is already set", this.pos);
+        this.assertCanExplode(die, this.pos);
+        this.pos++;
+        explode = true;
+        continue;
+      }
+      if (char === "r" || char === "R") {
+        if (reroll) throw new DiceNotationError("reroll is already set", this.pos);
+        reroll = this.readReroll(die);
+        continue;
+      }
+      if (char !== undefined && isLetter(char)) {
+        if (selection) throw new DiceNotationError("keep/drop is already set", this.pos);
+        selection = this.readSelection(count);
+        continue;
+      }
+      break;
+    }
+
     return {
       type: "dice",
       sign,
       count,
       sides: die.sides,
       ...(die.id === undefined ? {} : { die: die.id }),
+      ...(reroll ? { reroll } : {}),
+      ...(explode ? { explode } : {}),
       ...(selection ? { selection } : {}),
     };
   }
 
+  /** Face values this die can produce, when they are knowable while parsing. */
+  private faceValues(die: ParsedDie): readonly number[] | undefined {
+    if (die.id === undefined) return undefined; // plain numeric: 1..sides
+    const definition = findDie(this.options.dice, die.id);
+    return definition?.faces.map((face) => face.value);
+  }
+
+  /**
+   * A die whose every face is its highest would explode until it hit the cap,
+   * which is a typo rather than an intention worth honoring.
+   */
+  private assertCanExplode(die: ParsedDie, position: number): void {
+    const values = this.faceValues(die);
+    if (!values || values.length === 0) return;
+    const highest = Math.max(...values);
+    if (values.every((value) => value === highest)) {
+      throw new DiceNotationError(
+        "every face of this die is its highest, so it would explode forever",
+        position,
+      );
+    }
+  }
+
+  private readReroll(die: ParsedDie): DiceReroll {
+    const start = this.pos;
+    this.pos++; // consume "r"
+    const next = this.peek();
+    const once = next === "o" || next === "O";
+    if (once) this.pos++;
+    const threshold = this.readInteger("reroll threshold");
+
+    const values = this.faceValues(die);
+    const highest = values ? Math.max(...values) : die.sides;
+    const lowest = values ? Math.min(...values) : 1;
+    if (threshold >= highest) {
+      throw new DiceNotationError(
+        `reroll threshold ${threshold} covers every face of this die, so it would never settle`,
+        start,
+      );
+    }
+    if (threshold < lowest) {
+      throw new DiceNotationError(
+        `reroll threshold ${threshold} is below every face of this die, so it would do nothing`,
+        start,
+      );
+    }
+    return { threshold, once };
+  }
+
   /** The part after "d": a face count, "%", or a braced custom die name. */
-  private readDie(): { sides: number; id?: string } {
+  private readDie(): ParsedDie {
     const char = this.peek();
     if (char === "%") {
       this.pos++;

@@ -3,6 +3,11 @@ import { findDie } from "../dice/definition.js";
 import { DiceForgeError } from "../errors.js";
 import type { DiceExpression, DiceGroupNode, DiceSelection } from "../notation/ast.js";
 import { renderGroupNotation } from "../notation/ast.js";
+import {
+  MAX_EXPLOSIONS_PER_DIE,
+  MAX_EXTRA_DICE_PER_GROUP,
+  MAX_REROLLS_PER_DIE,
+} from "../notation/parser.js";
 import type { DieOutcome, RollGroupOutcome, RollResult } from "../records.js";
 import { deepFreeze, EVENT_SCHEMA_VERSION } from "../records.js";
 import { rollFace } from "../rng/sample.js";
@@ -32,6 +37,15 @@ function selectKeptFlags(values: readonly number[], selection?: DiceSelection): 
   return flags;
 }
 
+/** One roll before selection has had its say. */
+type RolledDie = {
+  value: number;
+  label?: string;
+  source?: "reroll" | "explosion";
+  /** True when a reroll modifier threw this result away. */
+  rerolled?: boolean;
+};
+
 function resolveGroup(
   term: DiceGroupNode,
   random: RandomSource,
@@ -45,24 +59,79 @@ function resolveGroup(
     );
   }
   const sides = definition?.faces.length ?? term.sides;
+  const highestValue = definition ? Math.max(...definition.faces.map((face) => face.value)) : sides;
 
-  // One RNG draw per die, in order, exactly as a plain numeric die: a custom
-  // die changes what a face is worth, never how many numbers are consumed.
-  const rolled: number[] = [];
-  for (let i = 0; i < term.count; i++) {
-    rolled.push(rollFace(random, sides));
+  /**
+   * One RNG draw, in order, exactly as a plain numeric die: neither a custom
+   * die nor a modifier changes how many numbers a die consumes, only what a
+   * face is worth and how many dice there are.
+   */
+  const draw = (): RolledDie => {
+    const index = rollFace(random, sides);
+    const face = definition?.faces[index - 1];
+    const label = face?.label;
+    return { value: face?.value ?? index, ...(label === undefined ? {} : { label }) };
+  };
+
+  // Each die is finished before the next one starts — rerolled and exploded in
+  // sequence, the way it would be at a table — so a seeded stream is easy to
+  // follow and replays identically (ADR-0016).
+  const rolled: RolledDie[] = [];
+  let extras = 0;
+  for (let index = 0; index < term.count; index++) {
+    let current = draw();
+
+    if (term.reroll) {
+      let attempts = 0;
+      while (
+        current.value <= term.reroll.threshold &&
+        attempts < MAX_REROLLS_PER_DIE &&
+        extras < MAX_EXTRA_DICE_PER_GROUP
+      ) {
+        current.rerolled = true;
+        rolled.push(current);
+        extras += 1;
+        current = { ...draw(), source: "reroll" };
+        attempts += 1;
+        if (term.reroll.once) break;
+      }
+    }
+    rolled.push(current);
+
+    if (term.explode) {
+      let chain = 0;
+      let last = current;
+      while (
+        last.value === highestValue &&
+        chain < MAX_EXPLOSIONS_PER_DIE &&
+        extras < MAX_EXTRA_DICE_PER_GROUP
+      ) {
+        last = { ...draw(), source: "explosion" };
+        rolled.push(last);
+        extras += 1;
+        chain += 1;
+      }
+    }
   }
-  const faces = rolled.map((index) => definition?.faces[index - 1]);
-  const values = rolled.map((index, position) => faces[position]?.value ?? index);
-  const keptFlags = selectKeptFlags(values, term.selection);
-  const dice: DieOutcome[] = values.map((value, index) => {
-    const label = faces[index]?.label;
+
+  // A rerolled result is history: it is recorded, but selection never sees it
+  // and it can never count towards the subtotal.
+  const live = rolled.filter((die) => !die.rerolled);
+  const keptFlags = selectKeptFlags(
+    live.map((die) => die.value),
+    term.selection,
+  );
+  let livePosition = 0;
+  const dice: DieOutcome[] = rolled.map((die) => {
+    const kept = die.rerolled ? false : (keptFlags[livePosition++] ?? true);
     return {
       sides,
-      value,
-      kept: keptFlags[index] ?? true,
+      value: die.value,
+      kept,
       ...(definition ? { die: definition.id } : {}),
-      ...(label === undefined ? {} : { label }),
+      ...(die.label === undefined ? {} : { label: die.label }),
+      ...(die.source === undefined ? {} : { source: die.source }),
+      ...(die.rerolled ? { rerolled: true } : {}),
     };
   });
   const subtotal = dice.reduce((sum, die) => (die.kept ? sum + die.value : sum), 0);

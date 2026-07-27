@@ -15,6 +15,7 @@ export { DiceForgeError, DiceNotationError } from "./errors.js";
 export type {
   DiceExpression,
   DiceGroupNode,
+  DiceReroll,
   DiceSelection,
   DieSides,
   ExpressionTerm,
@@ -25,8 +26,11 @@ export { DIE_SIDES, isDieSides, renderGroupNotation } from "./notation/ast.js";
 export type { ParseOptions } from "./notation/parser.js";
 export {
   MAX_DICE_PER_GROUP,
+  MAX_EXPLOSIONS_PER_DIE,
   MAX_EXPRESSION_LENGTH,
+  MAX_EXTRA_DICE_PER_GROUP,
   MAX_MODIFIER,
+  MAX_REROLLS_PER_DIE,
   MAX_TERMS,
   parseDiceNotation,
 } from "./notation/parser.js";

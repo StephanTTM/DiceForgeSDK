@@ -125,6 +125,8 @@
       Notation takes any face count (<code>4d3</code>, <code>1d30</code>) and custom dice defined by
       their faces: this demo registers a Fate die, so <code>4d{fate}</code> rolls faces worth −1, 0
       and +1 that read as symbols. A custom die has no honest 3D model, so it always lands as tiles.
+      Dice can also explode and reroll: <code>4d6!</code> adds a die for every 6, and
+      <code>4d6r1kh3</code> rerolls 1s before keeping the best three.
     </p>
     <pre id="record"></pre>
     <script type="module" src="./main.ts"></script>

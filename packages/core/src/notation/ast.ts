@@ -11,6 +11,14 @@ export type DiceSelection = {
   readonly count: number;
 };
 
+/** Reroll rule: `r2` rerolls while a die reads 2 or less, `ro2` rerolls once. */
+export type DiceReroll = {
+  /** A die is rerolled while its value is at or below this. */
+  readonly threshold: number;
+  /** True for `ro`: each die is rerolled at most once. */
+  readonly once: boolean;
+};
+
 export type DiceGroupNode = {
   readonly type: "dice";
   /** +1 when the group adds to the total, -1 when it subtracts. */
@@ -23,6 +31,10 @@ export type DiceGroupNode = {
   readonly sides: number;
   /** Custom die name, when the group rolls one: `4d{fate}` (ADR-0015). */
   readonly die?: string;
+  /** `r`/`ro`: replace low rolls before anything else happens (ADR-0016). */
+  readonly reroll?: DiceReroll;
+  /** `!`: a die reading its highest face adds another die (ADR-0016). */
+  readonly explode?: boolean;
   readonly selection?: DiceSelection;
 };
 
@@ -48,9 +60,18 @@ export function isDieSides(value: number): value is DieSides {
   return (DIE_SIDES as readonly number[]).includes(value);
 }
 
-/** Canonical unsigned notation for one dice group, e.g. "2d20kh1", "4d{fate}". */
+/**
+ * Canonical unsigned notation for one dice group, e.g. "2d20kh1", "4d{fate}",
+ * "4d6r1!kh3".
+ *
+ * Modifiers are written in the order they are applied — reroll, explode, then
+ * keep/drop — whatever order they were typed in, so two expressions that mean
+ * the same thing normalize to the same string.
+ */
 export function renderGroupNotation(node: DiceGroupNode): string {
-  const selection = node.selection ? `${node.selection.mode}${node.selection.count}` : "";
   const die = node.die ? `{${node.die}}` : String(node.sides);
-  return `${node.count}d${die}${selection}`;
+  const reroll = node.reroll ? `r${node.reroll.once ? "o" : ""}${node.reroll.threshold}` : "";
+  const explode = node.explode ? "!" : "";
+  const selection = node.selection ? `${node.selection.mode}${node.selection.count}` : "";
+  return `${node.count}d${die}${reroll}${explode}${selection}`;
 }

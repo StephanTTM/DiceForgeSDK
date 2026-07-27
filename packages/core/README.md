@@ -15,7 +15,7 @@ roll.provenance; // { source: "seeded", seed: "table-42", algorithm: "xoshiro128
 ```
 
 - **Deterministic**: the same seed produces the same results on every platform and release (a breaking RNG change requires a documented ADR).
-- **Notation v1.1**: `[count]d(faces|%|{name})` for any face count, `kh`/`kl`/`dh`/`dl` keep/drop, `+`/`-` modifiers — advantage is `2d20kh1`, ability scores `4d6dl1`.
+- **Notation v1.2**: `[count]d(faces|%|{name})` for any face count, `kh`/`kl`/`dh`/`dl` keep/drop, `!` exploding, `r`/`ro` rerolls, `+`/`-` modifiers — advantage is `2d20kh1`, ability scores `4d6dl1`, great-weapon fighting `2d6r2`.
 - **Custom dice**: `defineDie({ id, faces })` describes a die by its faces — values that may be negative and labels that read as symbols — and `createDiceEngine({ dice })` makes it rollable as `4d{fate}`.
 - **Trustworthy records**: results are deeply frozen and `serializeEvent`/`deserializeEvent` validate structure and totals, so downstream consumers can rely on them.
 - **Presentation-ready**: pair with [`@diceforge-sdk/renderer-web`](https://www.npmjs.com/package/@diceforge-sdk/renderer-web) for 3D dice, or implement the `InteractionPresenter` contract yourself. A presenter declares what it can do (`capabilities`), and `presentationSupport(capabilities, event)` answers whether it covers a given roll — so applications ask rather than feature-detect.
