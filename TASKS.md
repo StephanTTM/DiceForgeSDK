@@ -46,7 +46,7 @@ Remaining before tagging 0.1.0:
 - [~] Physics-based presenter plugin exploration. The technique is settled and measured — record the trajectory headlessly, then remap the mesh inside the collider by a symmetry so the recorded face lands where the simulation's did (ADR-0018, **proposed**). Every face pair on all six shapes admits such a remap (`symmetry.test.ts`), and the tables cannot supply it. Still open before implementing:
   - [x] Decide the engine and measure a real roll. (`cannon-es`; `npm run physics` — every shape settles every time in ~0.75 s, scatters 123–269 mm at p95, remaps at 0.0000° error, 28–37 kB of trajectory per roll)
   - [x] Measure a bevelled hull from the shipped `.glb`. (`npm run physics -- --hull=glb`: simulates fine, but the remap fails on all 180 poses and it costs up to 500x more — the collider is the idealised solid and the model is cosmetic, which also frees custom art to have holes or missing faces)
-  - [ ] Decide how the camera frames a scatter of ~25 die-widths, and whether the ~0.7 s simulation latency hides behind a throw animation or is simply accepted.
+  - [x] Decide how the camera frames the roll, and what the simulation costs. (`--tray=<mm>`: eight walls cap the scatter so framing is constant and the camera never moves; radius ≈ `die × (4 + 0.8√n)` settles in ~1s at 96–100% seated. There is no pre-roll latency — simulating a whole roll costs 4–44 ms for 1–40 dice; the 0.7–1.5 s is the animation's length)
   - [ ] Decide whether it ships as `@diceforge-sdk/presenter-physics`, and how a themed model declares or derives its symmetry rotations.
 - [ ] Run the visual regression suite in CI, with baselines generated inside the CI container image so they are platform-stable.
 

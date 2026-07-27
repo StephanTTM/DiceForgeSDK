@@ -46,6 +46,32 @@ The bevelled model simulates perfectly well. It fails the remap because it is no
 
 So the collider is the idealised solid and the model is cosmetic, drawn inside an invisible container only the physics sees. Since the physics decides nothing — the core resolved the outcome before any of this began — the two need not match. Art may be bevelled, hollowed, or missing whole faces and still roll correctly, provided its face planes are scaled onto the collider's. Matching bounding radii instead rests a bevelled die 3–9% off the table, which is why the harness scales by face-plane distance.
 
+## The tray, and why the camera needs one
+
+`--tray=<mm>` puts eight static walls around the roll. Without them a roll scatters further the more dice it has, so a camera framing the result shrinks the dice as the roll grows and has to move for every roll:
+
+| Tray | 5 dice | 10 dice | 20 dice |
+| --- | --- | --- | --- |
+| none | 124 mm scatter, 100% seated | 179 mm, 100% | 230 mm, 100% |
+| 120 mm | 112 mm, 100% | 113 mm, 99% | 113 mm, 99% |
+| 100 mm | 88 mm, 98% | 93 mm, 100% | 94 mm, 99% (7/8 settled) |
+| 80 mm | 74 mm, 95% | 73 mm, 91% | 74 mm, 97% |
+| 60 mm | 55 mm, 95% | 56 mm, 89% | 55 mm, 89% (6/8 settled) |
+
+With a tray the scatter is capped whatever the roll does, so the dice appear at a constant size and the camera never moves. A radius of about `die × (4 + 0.8√n)` — 93 mm for five 16 mm dice, 121 mm for twenty — settles every trial in roughly a second at 96–100% seated. Tighter than five die-widths and the roll crowds: settling stretches past four seconds, and around one die in ten ends up leaning on a wall or a neighbour. Such a die still carries an exact recorded face; it is just harder to read.
+
+## What the simulation costs
+
+| Dice | Wall clock | Animation | Trajectory |
+| --- | --- | --- | --- |
+| 1 | 4 ms | 0.64 s | 6 kB |
+| 5 | 8 ms | 0.69 s | 25 kB |
+| 10 | 14 ms | 0.93 s | 77 kB |
+| 20 | 24 ms | 1.14 s | 162 kB |
+| 40 | 44 ms | 1.52 s | 438 kB |
+
+The wall-clock column is the wait before anything can move: under one 60 Hz frame up to about ten dice. The animation column is how long the roll takes to watch, which is not a cost.
+
 ## Known wrinkle in the source geometry
 
 Five of the d10's ten kite faces list their vertices out of cyclic order. Nothing depends on it today — the renderer stopped triangulating these rings when the procedural dice were retired — and the d10 settles fine because cannon rebuilds its own normals. A presenter that hands these rings to a physics engine should normalize them first.

@@ -4,6 +4,7 @@
  *   npm run physics            all shapes, default trials
  *   npm run physics -- --shape=20 --dice=5 --trials=40
  *   npm run physics -- --hull=glb    collide the shipped bevelled models
+ *   npm run physics -- --tray=60     confine the roll to a 60mm-radius tray
  *
  * ADR-0018 proposes simulating a roll headlessly, recording the trajectory,
  * and rotating each die's mesh inside its collider by a symmetry so the
@@ -67,6 +68,10 @@ const DICE = Number(args.get("dice") ?? 5);
 const ONLY = args.get("shape") ? Number(args.get("shape")) : undefined;
 /** "ideal" is the sharp solid; "glb" is the shipped bevelled model. */
 const HULL = args.get("hull") ?? "ideal";
+/** Tray radius in millimetres; 0 is an open table with nothing to stop a die. */
+const TRAY_MM = Number(args.get("tray") ?? 0);
+/** Walls approximating a round tray. Eight reads as round enough at this scale. */
+const TRAY_WALLS = 8;
 
 /** Distance from the centre to the nearest face plane, over the N largest faces. */
 function inradius(data, faceCount) {
@@ -154,6 +159,16 @@ function rotate(normal, q) {
   ];
 }
 
+/**
+ * How squarely a die sits on the table: 1 when a face lies flat against it.
+ * Unlike the up-face measure this works for a d4 too, which rests on a face
+ * with a vertex uppermost. A die leaning on a wall or on another die scores
+ * below 1, and its recorded face is that much harder to read.
+ */
+function seating(normals, quaternion) {
+  return normals.reduce((best, normal) => Math.max(best, -rotate(normal, quaternion)[1]), -1);
+}
+
 /** Which face is uppermost in a resting pose, and how squarely it sits. */
 function topFace(normals, quaternion) {
   let best = -1;
@@ -186,6 +201,20 @@ function simulate(sides, diceCount, random) {
   const floor = new Body({ mass: 0, shape: new Plane(), material: floorMaterial });
   floor.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
   world.addBody(floor);
+
+  // A tray keeps a roll inside the frame. Without it the camera must either
+  // pull back until the dice are specks or crop a die out of the picture.
+  if (TRAY_MM > 0) {
+    const radius = TRAY_MM / 1000;
+    for (let i = 0; i < TRAY_WALLS; i++) {
+      const angle = (i / TRAY_WALLS) * Math.PI * 2;
+      const wall = new Body({ mass: 0, shape: new Plane(), material: floorMaterial });
+      // A cannon Plane faces +Z; turn each one to face the middle of the tray.
+      wall.quaternion.setFromEuler(0, angle + Math.PI, 0);
+      wall.position.set(Math.sin(angle) * radius, 0, Math.cos(angle) * radius);
+      world.addBody(wall);
+    }
+  }
 
   const unit = () => random.nextUint32() / 0x100000000;
   const spread = (magnitude) => (unit() * 2 - 1) * magnitude;
@@ -226,8 +255,10 @@ function simulate(sides, diceCount, random) {
     const top = topFace(normals, body.quaternion);
     return {
       ...top,
+      seated: seating(normals, body.quaternion),
       distance: Math.hypot(body.position.x, body.position.z),
       belowFloor: body.position.y < -DIE_RADIUS,
+      settledPose: settled,
       remap: settled ? remapError(data, normals, body.quaternion, top.face) : null,
     };
   });
@@ -344,7 +375,7 @@ console.log(
   `cannon-es harness — ${TRIALS} trials x ${DICE} dice, ${DIE_RADIUS * 2000}mm dice, ${STEP * 1000}ms steps\n`,
 );
 console.log(
-  "shape   settled   settle s (mean/p95/max)   scatter mm (p95/max)   flatness min   remap err   trajectory   wall/roll",
+  "shape   settled   settle s (mean/p95/max)   scatter mm (p95/max)   seated   remap err   trajectory   wall/roll",
 );
 
 const summary = [];
@@ -359,6 +390,8 @@ for (const sides of ONLY ? [ONLY] : SHAPES) {
   let worstRemap = 0;
   let remapFailures = 0;
   let steps = 0;
+  let seatedCleanly = 0;
+  let diceSeen = 0;
 
   const wallStart = performance.now();
   for (let trial = 0; trial < TRIALS; trial++) {
@@ -371,8 +404,12 @@ for (const sides of ONLY ? [ONLY] : SHAPES) {
       faces.set(rest.face, (faces.get(rest.face) ?? 0) + 1);
       worstFlatness = Math.min(worstFlatness, rest.flatness);
       if (rest.belowFloor) sunk += 1;
-      if (rest.remap === null) remapFailures += 1;
-      else worstRemap = Math.max(worstRemap, rest.remap);
+      diceSeen += 1;
+      if (rest.seated > 0.99) seatedCleanly += 1;
+      // A die that never settled has no resting pose to remap; that is a
+      // settling failure, already counted, and not a failure of ADR-0018.
+      if (rest.remap !== null) worstRemap = Math.max(worstRemap, rest.remap);
+      else if (rest.settledPose) remapFailures += 1;
     }
   }
 
@@ -384,7 +421,7 @@ for (const sides of ONLY ? [ONLY] : SHAPES) {
       26,
     ) +
     `${percentile(distances, 0.95).toFixed(0)} / ${Math.max(...distances).toFixed(0)}`.padEnd(23) +
-    worstFlatness.toFixed(3).padEnd(15) +
+    `${((seatedCleanly / diceSeen) * 100).toFixed(0)}%`.padEnd(9) +
     (remapFailures ? `${remapFailures} FAILED` : `${worstRemap.toFixed(4)}°`).padEnd(12) +
     // Position and quaternion per die per step, as float64.
     `${((steps * DICE * 7 * 8) / 1024).toFixed(0)} kB`.padEnd(13) +
