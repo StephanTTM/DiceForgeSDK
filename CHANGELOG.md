@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `@diceforge-sdk/presenter-physics`: dice that tumble for real and still land on the outcome the engine decided (ADR-0018). `simulateRoll(dice, options)` runs the whole roll headlessly with cannon-es and hands back a recorded trajectory plus, for each die, the rotation to apply to its mesh *inside* its collider so the recorded face occupies the place the simulation's face landed in. A symmetry leaves the collider identical, so the physics never notices and nothing is corrected on screen. Recording the trajectory rather than simulating live keeps playback frame-rate independent, makes reduced motion a jump to the last frame, and means the engine need not be deterministic across runs; a whole roll costs 4–44 ms for 1–40 dice.
+- `@diceforge-sdk/renderer-web` exports the die solids (`dieGeometry`, `PolyhedronData`, `ShapedDieSides`, `DIE_SIZE`) for presenters that need the shape itself rather than a picture of it.
+
 ### Fixed
 
 - Published source maps referenced `../src/*.ts`, which packages ship `dist` and not `src` — so the maps resolved to nothing in a consumer's project, and some bundlers warned about them. They now carry the TypeScript inline (`inlineSources`), so stepping into the SDK works whatever a bundler does with relative paths. Tarballs grow by roughly half: `@diceforge-sdk/core` from 31 kB to 49 kB packed, `renderer-web` from 38 kB to 58 kB.

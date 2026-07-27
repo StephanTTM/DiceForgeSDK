@@ -12,6 +12,10 @@ export {
   resolveRenderMode,
 } from "./capabilities.js";
 export { FORGE_COIN_ROTATIONS, FORGE_FACE_ROTATIONS } from "./forge-rotations.js";
+// The die solids, for presenters that need the shape itself rather than a
+// picture of it — a physics collider, for one (ADR-0018).
+export type { PolyhedronData, ShapedDieSides, Vec3 } from "./math/geometry.js";
+export { DIE_SIZE, dieGeometry } from "./math/geometry.js";
 export type { DicePresenter, DicePresenterOptions } from "./presenter.js";
 export { createDicePresenter } from "./presenter.js";
 export type {

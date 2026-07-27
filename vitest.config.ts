@@ -15,6 +15,9 @@ export default defineConfig({
       "@diceforge-sdk/testing": fileURLToPath(
         new URL("packages/testing/src/index.ts", import.meta.url),
       ),
+      "@diceforge-sdk/presenter-physics": fileURLToPath(
+        new URL("packages/presenter-physics/src/index.ts", import.meta.url),
+      ),
     },
   },
   test: {

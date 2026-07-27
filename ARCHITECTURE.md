@@ -50,6 +50,7 @@ packages/
   plugin-contracts/     optional extension interfaces              [presenter contract + capabilities live in core — ADR-0008, ADR-0014]
   renderer-web/         web rendering integration                  [implemented — also serves as the browser adapter, ADR-0007]
   assets-forge/         the first-party die set, art only          [implemented — optional, no code depends on it, ADR-0013]
+  presenter-physics/    simulated motion for a resolved roll       [implemented — optional, cannon-es, ADR-0018]
   adapter-unity/        Unity-facing integration                   [future]
   adapter-godot/        Godot-facing integration                   [future]
   testing/              plugin conformance suite                   [implemented — ADR-0014]

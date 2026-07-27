@@ -47,7 +47,8 @@ Remaining before tagging 0.1.0:
   - [x] Decide the engine and measure a real roll. (`cannon-es`; `npm run physics` — every shape settles every time in ~0.75 s, scatters 123–269 mm at p95, remaps at 0.0000° error, 28–37 kB of trajectory per roll)
   - [x] Measure a bevelled hull from the shipped `.glb`. (`npm run physics -- --hull=glb`: simulates fine, but the remap fails on all 180 poses and it costs up to 500x more — the collider is the idealised solid and the model is cosmetic, which also frees custom art to have holes or missing faces)
   - [x] Decide how the camera frames the roll, and what the simulation costs. (`--tray=<mm>`: eight walls cap the scatter so framing is constant and the camera never moves; radius ≈ `die × (4 + 0.8√n)` settles in ~1s at 96–100% seated. There is no pre-roll latency — simulating a whole roll costs 4–44 ms for 1–40 dice; the 0.7–1.5 s is the animation's length)
-  - [ ] Decide whether it ships as `@diceforge-sdk/presenter-physics`, and how a themed model declares or derives its symmetry rotations.
+  - [x] Ship it as `@diceforge-sdk/presenter-physics`. (`simulateRoll` + the symmetry remap, cannon-es, tray-framed, 10 tests; the collider is the idealised solid and the model is cosmetic, so a theme needs no symmetry data of its own)
+  - [ ] Play the trajectory: a renderer that applies each die's remap and animates its frames, turning the motion into an `InteractionPresenter`. Coin flips stay with `renderer-web`.
 - [ ] Run the visual regression suite in CI, with baselines generated inside the CI container image so they are platform-stable.
 
 ## Backlog
