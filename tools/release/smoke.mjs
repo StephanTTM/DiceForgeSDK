@@ -13,7 +13,7 @@
  */
 
 import { execSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -126,7 +126,13 @@ const TSCONFIG = {
  * instead — every argument is ours, and any containing whitespace is quoted.
  */
 const run = (command, args, cwd) => {
-  const line = args.map((arg) => (/[\s"]/.test(arg) ? JSON.stringify(arg) : arg)).join(" ");
+  // Quote anything that is not plainly safe in both cmd and sh. The first CI
+  // run of this script proved why an allowlist beats a denylist: an argument
+  // with parentheses and no whitespace went to /bin/sh unquoted, and Windows
+  // had never minded.
+  const line = args
+    .map((arg) => (/^[\w./\\:@=-]+$/.test(arg) ? arg : JSON.stringify(arg)))
+    .join(" ");
   return execSync(`${command} ${line}`, { cwd, encoding: "utf8" });
 };
 
@@ -138,10 +144,8 @@ try {
   run("npm", ["pack", "--workspaces", "--silent", "--pack-destination", work], REPO);
 
   const tarballs = PACKAGES.map((name) => {
-    const version = JSON.parse(
-      run("node", ["-p", `JSON.stringify(require('./packages/${name}/package.json'))`], REPO),
-    ).version;
-    return join(work, `diceforge-sdk-${name}-${version}.tgz`);
+    const manifest = JSON.parse(readFileSync(join(REPO, "packages", name, "package.json"), "utf8"));
+    return join(work, `diceforge-sdk-${name}-${manifest.version}.tgz`);
   });
 
   writeFileSync(
