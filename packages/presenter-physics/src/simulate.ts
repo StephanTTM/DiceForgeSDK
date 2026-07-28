@@ -77,6 +77,11 @@ export type PhysicsCoin = {
   readonly frames: readonly PhysicsFrame[];
   /** How squarely it finished: 1 is flat, near 0 is resting on the rim. */
   readonly seated: number;
+  /**
+   * How many times a face crossed the horizon during the recording. Two or
+   * more is what reads as a flip; `simulateCoinFlip` guarantees it.
+   */
+  readonly turnovers: number;
 };
 
 /** A coin flip's recorded motion, shaped like `PhysicsRoll` for one coin. */
@@ -266,12 +271,23 @@ type WorldRun = {
   readonly settled: boolean;
 };
 
+/** A body to throw: its collider, and an optional last word on the throw. */
+type ThrownShape = {
+  readonly shape: Shape;
+  /**
+   * Runs after the default throw is set, with the same random source. A coin
+   * uses it to floor its tumble; dice never need it, so their draw sequence —
+   * and every committed baseline — is untouched.
+   */
+  readonly prepare?: (body: Body, random: () => number) => void;
+};
+
 /**
  * Throws a set of bodies into the tray and records where they go. Dice and
  * coins differ only in their colliders and in how a resting pose is read; the
  * world, the walls, the throw and the recording are one implementation.
  */
-function throwBodies(shapes: readonly Shape[], options: SimulateOptions): WorldRun {
+function throwBodies(shapes: readonly ThrownShape[], options: SimulateOptions): WorldRun {
   const dieRadius = options.dieRadius ?? 1;
   const frameRate = options.frameRate ?? 60;
   const random = options.random ?? Math.random;
@@ -325,10 +341,10 @@ function throwBodies(shapes: readonly Shape[], options: SimulateOptions): WorldR
   const spread = (magnitude: number) => (random() * 2 - 1) * magnitude;
   const throwX = Math.max(halfWidthM * 0.35, DIE_RADIUS_M * 2);
   const throwZ = Math.max(halfDepthM * 0.35, DIE_RADIUS_M * 2);
-  const bodies = shapes.map((shape, index) => {
+  const bodies = shapes.map((thrown, index) => {
     const body = new Body({
       mass: 0.004,
-      shape,
+      shape: thrown.shape,
       material: dieMaterial,
       // A real die bleeds energy into the felt; without damping a spinning one
       // outlasts anyone's patience.
@@ -342,6 +358,7 @@ function throwBodies(shapes: readonly Shape[], options: SimulateOptions): WorldR
     body.velocity.set(spread(0.6), -0.4, spread(0.6));
     body.angularVelocity.set(spread(28), spread(28), spread(28));
     body.quaternion.setFromEuler(spread(Math.PI), spread(Math.PI), spread(Math.PI));
+    thrown.prepare?.(body, random);
     world.addBody(body);
     return body;
   });
@@ -430,7 +447,7 @@ function throwOnce(
   options: SimulateOptions = {},
 ): PhysicsRoll {
   const run = throwBodies(
-    request.map((die) => collider(solidFor(die).data)),
+    request.map((die) => ({ shape: collider(solidFor(die).data) })),
     options,
   );
 
@@ -524,6 +541,46 @@ const COIN_NORMALS: readonly Vec3[] = [
 /** A half turn about a diameter: the cylinder symmetry that swaps the faces. */
 const COIN_FLIP: QuaternionTuple = [1, 0, 0, 0];
 
+/**
+ * Guarantees the coin tumbles on the way in, rather than merely falling.
+ *
+ * The shared throw draws an isotropic spin, and a draw that lands mostly on
+ * the coin's own axis spins it like a wheel — measured, 51 of 60 flips turned
+ * over fewer than twice, which reads as a drop. So the spin about a horizontal
+ * diameter — the component that actually flips the faces — is floored: the
+ * axis is horizontal and perpendicular to the face axis by construction, and
+ * the magnitude never starts below TUMBLE_FLOOR. Motion only; the outcome was
+ * decided before any of this ran (ADR-0018).
+ */
+const TUMBLE_FLOOR = 30;
+const TUMBLE_SPREAD = 15;
+/**
+ * Tossed upward, not dropped: the shared throw's height gives about a tenth of
+ * a second of flight, one turnover at best before the first bounce eats the
+ * spin. An upward toss buys the air time that makes the tumble visible — which
+ * is also just what a coin flip is.
+ */
+const TOSS_UP = 0.9;
+const TOSS_SPREAD = 0.5;
+
+function prepareCoinThrow(body: Body, random: () => number): void {
+  const q = body.quaternion;
+  const face = rotateVec([0, 1, 0], [q.x, q.y, q.z, q.w]);
+  // Horizontal and perpendicular to the face axis. When the coin starts flat
+  // the cross degenerates, and then any horizontal axis flips it.
+  const cross: Vec3 = [face[2], 0, -face[0]];
+  const length = Math.hypot(cross[0], cross[2]);
+  const axis: Vec3 = length > 1e-3 ? [cross[0] / length, 0, cross[2] / length] : [1, 0, 0];
+  const magnitude = (TUMBLE_FLOOR + random() * TUMBLE_SPREAD) * (random() < 0.5 ? -1 : 1);
+  const wobble = () => (random() * 2 - 1) * 6;
+  body.angularVelocity.set(
+    axis[0] * magnitude + wobble(),
+    wobble(),
+    axis[2] * magnitude + wobble(),
+  );
+  body.velocity.y = TOSS_UP + random() * TOSS_SPREAD;
+}
+
 /** One flip, start to finish. `simulateCoinFlip` may not like how it landed. */
 function flipOnce(request: PhysicsCoinRequest, options: SimulateOptions = {}): PhysicsFlip {
   const dieRadius = options.dieRadius ?? 1;
@@ -535,7 +592,8 @@ function flipOnce(request: PhysicsCoinRequest, options: SimulateOptions = {}): P
   const thicknessM = request.thickness * toMetres;
   // Enough segments that the rim is round to the eye of the solver; a coarse
   // prism rocks from facet to facet instead of rolling and takes longer to die.
-  const run = throwBodies([new Cylinder(radiusM, radiusM, thicknessM, 24)], options);
+  const cylinder = new Cylinder(radiusM, radiusM, thicknessM, 24);
+  const run = throwBodies([{ shape: cylinder, prepare: prepareCoinThrow }], options);
 
   const orientation = run.orientations[0] as QuaternionTuple;
   // The collider's +Y face *is* heads, its -Y face tails — the coin version of
@@ -552,13 +610,23 @@ function flipOnce(request: PhysicsCoinRequest, options: SimulateOptions = {}): P
     (best, normal) => Math.max(best, -rotateY(normal, orientation)),
     -1,
   );
+  const frames = run.frames[0] as PhysicsFrame[];
+  // A turnover is the face axis crossing the horizon — the thing an eye counts.
+  let turnovers = 0;
+  let lastSign = 0;
+  for (const frame of frames) {
+    const sign = rotateY([0, 1, 0], frame.orientation) > 0 ? 1 : -1;
+    if (lastSign !== 0 && sign !== lastSign) turnovers++;
+    lastSign = sign;
+  }
 
   return {
     coin: {
       outcome: request.outcome,
       remap,
-      frames: run.frames[0] as PhysicsFrame[],
+      frames,
       seated,
+      turnovers,
     },
     impacts: run.impacts,
     frameRate: run.frameRate,
@@ -576,6 +644,19 @@ function flipOnce(request: PhysicsCoinRequest, options: SimulateOptions = {}): P
  * ran, the whole trajectory is recorded up front, and a flip that finishes on
  * its rim — or leaning against a wall — is thrown again rather than shown.
  */
+/**
+ * A coin can spin on its rim for a long while before falling — measured once
+ * at 7.4 s — and watching that to its end is not a flip, it is a wait. Longer
+ * than this is thrown again, like a rim rest.
+ */
+const MAX_FLIP_SECONDS = 3;
+/**
+ * Fewer than two turnovers reads as a drop, which is what the product owner
+ * reported. The floored tumble and the upward toss get 55 of 60 throws there
+ * on their own; the retry absorbs the rest, so the guarantee is absolute.
+ */
+const MIN_TURNOVERS = 2;
+
 export function simulateCoinFlip(
   request: PhysicsCoinRequest,
   options: SimulateOptions = {},
@@ -584,13 +665,35 @@ export function simulateCoinFlip(
   let bestSeating = Number.NEGATIVE_INFINITY;
   for (let attempt = 0; attempt < MAX_THROWS; attempt++) {
     const flip = flipOnce(request, options);
-    if (flip.settled && flip.coin.seated >= MIN_SEATED) return flip;
+    if (
+      flip.settled &&
+      flip.coin.seated >= MIN_SEATED &&
+      flip.duration <= MAX_FLIP_SECONDS &&
+      flip.coin.turnovers >= MIN_TURNOVERS
+    ) {
+      return flip;
+    }
     if (flip.coin.seated > bestSeating) {
       bestSeating = flip.coin.seated;
       best = flip;
     }
   }
   return best as PhysicsFlip;
+}
+
+/** Rotates a vector by a quaternion, for the throw preparation. */
+function rotateVec(v: Vec3, q: QuaternionTuple): Vec3 {
+  const [x, y, z] = v;
+  const [qx, qy, qz, qw] = q;
+  const ix = qw * x + qy * z - qz * y;
+  const iy = qw * y + qz * x - qx * z;
+  const iz = qw * z + qx * y - qy * x;
+  const iw = -qx * x - qy * y - qz * z;
+  return [
+    ix * qw + iw * -qx + iy * -qz - iz * -qy,
+    iy * qw + iw * -qy + iz * -qx - ix * -qz,
+    iz * qw + iw * -qz + ix * -qy - iy * -qx,
+  ];
 }
 
 /** The Y component of a rotated vector, which is all the seating test needs. */

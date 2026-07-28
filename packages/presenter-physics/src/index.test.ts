@@ -261,6 +261,23 @@ describe("simulateCoinFlip", () => {
     }
   });
 
+  /**
+   * The product owner's report: some flips read as a drop. A flip is at least
+   * two turnovers — the face crossing the horizon — and the simulation now
+   * guarantees it by construction and retry, so it is asserted, not eyeballed.
+   */
+  it("turns over at least twice on the way in, never reading as a drop", () => {
+    for (const outcome of ["heads", "tails"] as const) {
+      for (let trial = 0; trial < 10; trial++) {
+        const result = flip(outcome, `turnover-${outcome}-${trial}`);
+        expect(
+          result.coin.turnovers,
+          `${outcome} trial ${trial} turned over ${result.coin.turnovers}x`,
+        ).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
   it("stays inside the tray", () => {
     const result = flip("heads", "coin-walls");
     for (const frame of result.coin.frames) {

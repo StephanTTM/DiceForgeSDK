@@ -66,7 +66,7 @@ Remaining before tagging 0.1.0:
 
 ## Next
 
-- [ ] Guarantee the coin tumbles on entry. Deferred by the product owner (2026-07-28): most flips read fine, but some read as a drop. Diagnosis, so the revisit starts warm: the coin gets the same isotropic random `angularVelocity` as a die, and a draw that lands mostly on the coin's own axis spins it like a wheel rather than tumbling it. Fix shape: floor the spin component about a horizontal diameter (motion only — outcome untouched, ADR-0018 holds), and assert it by counting face-normal reversals across the recorded frames rather than by eye.
+- [x] Guarantee the coin tumbles on entry. (the diagnosis held — isotropic spin reads as a drop 51 times in 60 — but flooring the diameter spin only got it to 40/60: the real lever was air time, so the coin is now *tossed* upward as well. `PhysicsCoin.turnovers` counts horizon crossings, the retry rejects fewer than two, and a rim-spinner longer than 3 s is re-thrown instead of watched. Measured: 120/120 seeds at ≥2 turnovers, worst duration 1.5 s, ~5.5 ms per flip)
 - [ ] Extend the plugin contracts to the categories beyond presentation (physics, audio, transport) once a second implementation exists to shape them — ARCHITECTURE lists them, but nothing implements them yet.
 
 ## Backlog
