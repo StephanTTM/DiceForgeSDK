@@ -23,7 +23,12 @@
 
 import { Body, ContactMaterial, ConvexPolyhedron, Material, Plane, Vec3, World } from "cannon-es";
 import { createSeededRandomSource } from "../../packages/core/dist/index.js";
-import { dieGeometry } from "../../packages/renderer-web/dist/math/geometry.js";
+import {
+  faceDirections,
+  faceNormals as solidFaceNormals,
+  solidFromFaceDirections,
+} from "../../packages/presenter-physics/dist/index.js";
+import { FORGE_FACE_ROTATIONS } from "../../packages/renderer-web/dist/index.js";
 import { convexFromMesh, readGlbMesh } from "./glb.mjs";
 
 const SHAPES = [4, 6, 8, 10, 12, 20];
@@ -96,9 +101,19 @@ function inradius(data, faceCount) {
   );
 }
 
+/**
+ * The solid the die *is*, built from the calibrated face table exactly as
+ * production does (ADR-0019). This harness used to build from `dieGeometry`,
+ * whose d10 is not the shipped die — its "seated 0%" column was measuring a
+ * solid nobody rolls.
+ */
+function idealSolid(sides) {
+  return solidFromFaceDirections(faceDirections(FORGE_FACE_ROTATIONS[sides]));
+}
+
 /** The solid, scaled to die size, with faces wound so normals point outward. */
 function collider(sides) {
-  const ideal = dieGeometry(sides);
+  const ideal = idealSolid(sides);
   const data =
     HULL === "glb"
       ? convexFromMesh(
@@ -127,22 +142,12 @@ function collider(sides) {
   return { shape: new ConvexPolyhedron({ vertices, faces }), data };
 }
 
-/** Outward unit normals of the solid's faces, in face order. */
+/**
+ * Outward unit normals via the package's Newell implementation — a centroid
+ * direction is ~17 degrees wrong on the d10's kites (ADR-0019).
+ */
 function faceNormals(data) {
-  return data.faces.map((face) => {
-    const centre = face
-      .reduce(
-        (sum, i) => [
-          sum[0] + data.vertices[i][0],
-          sum[1] + data.vertices[i][1],
-          sum[2] + data.vertices[i][2],
-        ],
-        [0, 0, 0],
-      )
-      .map((v) => v / face.length);
-    const length = Math.hypot(...centre);
-    return [centre[0] / length, centre[1] / length, centre[2] / length];
-  });
+  return solidFaceNormals(data);
 }
 
 function rotate(normal, q) {
