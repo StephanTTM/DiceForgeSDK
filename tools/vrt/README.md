@@ -42,6 +42,14 @@ anti-aliasing rather than regressions, and will not fail the build.
 
 That keeps a bare `npm run vrt` useful for a quick look — a 40% diff is obviously real whatever drew it — without training anyone to ignore a red suite. The authoritative answer comes from CI, or from `vrt:docker` if you have Docker.
 
+### How much actually varies
+
+Measured when the baselines moved into the container: of the 13 scenes, **11 were byte-identical** between Windows and Linux, and 2 differed — `dom-fallback` and `physics-delegates-unmodelled`.
+
+That split is not a coincidence. Those two are the only scenes captured as an element screenshot rather than read back from a canvas, so they are the only ones containing rasterized **text**, and glyph rendering is what genuinely differs between operating systems. Everything drawn through SwiftShader — every die, every shape, every physics roll — comes out bit-exact on both.
+
+So the container buys correctness for the tile scenes specifically. It is still the right place to draw all of them: relying on eleven-of-thirteen staying stable is a property nobody is checking, and one Chromium upgrade could end it.
+
 A small tolerance is applied anyway (`TOLERANCE`, `PIXEL_THRESHOLD` in `run.mjs`) so that a stray anti-aliased pixel does not fail a run.
 
 ## Updating baselines

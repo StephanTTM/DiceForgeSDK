@@ -23,3 +23,28 @@ jobs:
       - run: npm run test:coverage
       - run: npm run build
       - run: node examples/headless/main.mjs
+
+  # Pixels are only comparable against the browser build that drew them, so this
+  # runs in the image the baselines were generated in. The tag must match the
+  # Playwright pinned in package.json; tools/vrt/environment.mjs fails the job
+  # if a version bump leaves it behind.
+  visual:
+    name: visual regression
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.0-noble
+      # Chromium exhausts the default 64 MB of shared memory and crashes.
+      options: --ipc=host
+    env:
+      VRT_IMAGE: mcr.microsoft.com/playwright:v1.62.0-noble
+    steps:
+      - uses: actions/checkout@v5
+      - run: npm ci
+      - run: npm run vrt
+      - name: Upload diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vrt-diffs
+          path: tools/vrt/output/
+          if-no-files-found: ignore
