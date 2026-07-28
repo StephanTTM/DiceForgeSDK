@@ -35,6 +35,18 @@ implementation to shape them rather than being guessed at in advance.
 - Prove the presenter contract holds for an implementation it was not designed around.
 - Put the visual regression suite on a platform-stable footing so it can gate CI.
 
+## Coin and guard-rails — 0.6.0 *(shipped)*
+
+- Flip coins under the same physics as the dice, in the same tray.
+- Tie every die value to the numeral printed on the shipped model, in CI.
+- Make the pre-publish tarball check a repeatable command.
+
+## Sound — 0.7.0
+
+- Impact-driven audio: sounds derived from the recorded trajectory's own collisions, not played on a timer.
+- Synthesized rather than sampled, so no audio assets need sourcing or licensing to start.
+- No audio plugin contract yet — the first implementation shapes it, a later second one justifies it.
+
 ## Engine adapters
 
 - Prototype Unity adapter with documented install path and end-to-end sample.

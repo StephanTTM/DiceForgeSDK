@@ -4,7 +4,17 @@ All notable changes to DiceForge SDK will be documented here. This project inten
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.6.0] - 2026-07-28
+
+Coin flips join the physics simulation, and the release process grows the
+guard-rails this week's bugs earned.
+
+**Upgrading:** nothing breaks. `simulateCoinFlip` is a new export; records,
+notation and the presenter contract are unchanged. One visible behaviour
+change: when a theme ships a coin, the physics presenter now flips it itself
+instead of handing it to the renderer's toss, so physics mode no longer swaps
+canvases mid-session. A theme without a coin model, or a coin that fails to
+load, still falls back to the toss.
 
 ### Added
 

@@ -1,6 +1,6 @@
 {
   "name": "@diceforge-sdk/assets-forge",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "The first-party DiceForge die set: d4-d20 models, a two-faced coin, and texture atlases in five colours, resolved to URLs your bundler emits.",
   "license": "MIT",
   "type": "module",
@@ -47,6 +47,6 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@diceforge-sdk/renderer-web": "^0.5.0"
+    "@diceforge-sdk/renderer-web": "^0.6.0"
   }
 }
