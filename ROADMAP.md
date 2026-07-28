@@ -29,7 +29,13 @@ Still open from this line: contracts for the plugin categories beyond
 presentation — physics, audio, transport — which wait on a second
 implementation to shape them rather than being guessed at in advance.
 
-## Engine adapters — 0.4.0
+## Motion — 0.5.0 *(shipped)*
+
+- Ship physics-driven dice as an optional plugin, without letting a simulation choose an outcome.
+- Prove the presenter contract holds for an implementation it was not designed around.
+- Put the visual regression suite on a platform-stable footing so it can gate CI.
+
+## Engine adapters
 
 - Prototype Unity adapter with documented install path and end-to-end sample.
 - Prototype Godot adapter with documented install path and end-to-end sample.

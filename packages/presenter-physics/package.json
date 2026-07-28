@@ -1,6 +1,6 @@
 {
   "name": "@diceforge-sdk/presenter-physics",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Physics motion for DiceForge dice: simulates a roll, then remaps each die so the already-resolved face lands where the simulation put it.",
   "license": "MIT",
   "type": "module",
@@ -46,14 +46,14 @@
     "cannon-es": "^0.20.0"
   },
   "peerDependencies": {
-    "@diceforge-sdk/core": "^0.4.0",
-    "@diceforge-sdk/renderer-web": "^0.4.0",
+    "@diceforge-sdk/core": "^0.5.0",
+    "@diceforge-sdk/renderer-web": "^0.5.0",
     "three": "^0.182.0"
   },
   "devDependencies": {
-    "@diceforge-sdk/core": "^0.4.0",
-    "@diceforge-sdk/renderer-web": "^0.4.0",
-    "@diceforge-sdk/testing": "^0.4.0",
+    "@diceforge-sdk/core": "^0.5.0",
+    "@diceforge-sdk/renderer-web": "^0.5.0",
+    "@diceforge-sdk/testing": "^0.5.0",
     "@types/three": "^0.182.0"
   }
 }

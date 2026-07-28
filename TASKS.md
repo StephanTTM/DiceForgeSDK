@@ -40,17 +40,20 @@ Remaining before tagging 0.1.0:
 - [x] Plugin-author documentation and a compatibility test kit a third-party renderer can run against. (`@diceforge-sdk/testing`: runner-agnostic conformance checks + the presenter-authoring guide; `renderer-web` runs it against itself — ADR-0014)
 - [x] Decide whether the first-party dice ship as an optional `@diceforge-sdk/assets-forge` package or stay repository-only. (shipped as a package — ADR-0013; `forgeTheme(forgeAssets({ color }))` needs no copying, `baseUrl` still serves custom packs)
 
-## Next
+## Motion — 0.5.0 (released 2026-07-28)
 
-- [ ] Extend the plugin contracts to the categories beyond presentation (physics, audio, transport) once a second implementation exists to shape them — ARCHITECTURE lists them, but nothing implements them yet.
-- [~] Physics-based presenter plugin exploration. The technique is settled and measured — record the trajectory headlessly, then remap the mesh inside the collider by a symmetry so the recorded face lands where the simulation's did (ADR-0018, **proposed**). Every face pair on all six shapes admits such a remap (`symmetry.test.ts`), and the tables cannot supply it. Still open before implementing:
+- [x] Physics-based presenter plugin. Record the trajectory headlessly, then remap the mesh inside the collider by a symmetry so the recorded face lands where the simulation's did (ADR-0018, **accepted**). Every face pair on all six shapes admits such a remap (`symmetry.test.ts`), and the shipped rotation tables cannot supply it.
   - [x] Decide the engine and measure a real roll. (`cannon-es`; `npm run physics` — every shape settles every time in ~0.75 s, scatters 123–269 mm at p95, remaps at 0.0000° error, 28–37 kB of trajectory per roll)
   - [x] Measure a bevelled hull from the shipped `.glb`. (`npm run physics -- --hull=glb`: simulates fine, but the remap fails on all 180 poses and it costs up to 500x more — the collider is the idealised solid and the model is cosmetic, which also frees custom art to have holes or missing faces)
-  - [x] Decide how the camera frames the roll, and what the simulation costs. (`--tray=<mm>`: eight walls cap the scatter so framing is constant and the camera never moves; radius ≈ `die × (4 + 0.8√n)` settles in ~1s at 96–100% seated. There is no pre-roll latency — simulating a whole roll costs 4–44 ms for 1–40 dice; the 0.7–1.5 s is the animation's length)
+  - [x] Decide how the camera frames the roll, and what the simulation costs. (`--tray=<mm>`: walls cap the scatter, and `dieWidth × (5 + 0.8√n)` settles in ~1s at 96–100% seated. There is no pre-roll latency — simulating a whole roll costs 4–44 ms for 1–40 dice; the 0.7–1.5 s is the animation's length. The first measurement claimed a fixed tray meant the camera never moves; superseded by the framing item below.)
   - [x] Ship it as `@diceforge-sdk/presenter-physics`. (`simulateRoll` + the symmetry remap, cannon-es, tray-framed, 10 tests; the collider is the idealised solid and the model is cosmetic, so a theme needs no symmetry data of its own)
   - [x] Play the trajectory. (`createPhysicsPresenter` — three.js playback, remap applied before the first frame, dropped dice revealed on landing; coins, custom dice and no-WebGL delegate to `renderer-web`, and it passes the conformance suite with no skips)
   - [x] Framing polish. (Rectangular tray shaped to the viewport — measured to cost nothing in settling — and the camera frames where the dice came to rest, centred on them, instead of the walls. Shaping the tray alone did not help: it makes the tray bigger, so the camera pulls back by the same amount.)
-- [ ] Run the visual regression suite in CI, with baselines generated inside the CI container image so they are platform-stable.
+- [x] Run the visual regression suite in CI against platform-stable baselines. (a `visual` job inside the pinned `mcr.microsoft.com/playwright` image; `npm run vrt:docker` reproduces it, and a run from anywhere else is advisory rather than red)
+
+## Next
+
+- [ ] Extend the plugin contracts to the categories beyond presentation (physics, audio, transport) once a second implementation exists to shape them — ARCHITECTURE lists them, but nothing implements them yet.
 
 ## Backlog
 
@@ -65,7 +68,6 @@ Remaining before tagging 0.1.0:
 - [x] Give procedural dice beveled edges, or retire them. (retired, along with the KayKit pack — ADR-0012)
 - [ ] Optional multiplayer transport plugin research. (beyond 1.0)
 - [x] Browser-based visual regression testing for the renderer. (`npm run vrt`, 13 scenes including four for the physics presenter, Playwright + committed baselines)
-- [x] Run the visual regression suite in CI against platform-stable baselines. (a `visual` job inside the pinned `mcr.microsoft.com/playwright` image; `npm run vrt:docker` reproduces it, and a run from anywhere else is advisory rather than red)
 
 ## Task maintenance
 

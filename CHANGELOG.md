@@ -4,7 +4,16 @@ All notable changes to DiceForge SDK will be documented here. This project inten
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.5.0] - 2026-07-28
+
+Dice that tumble under real physics and still land on the outcome the engine
+decided, shipped as an optional fifth package.
+
+**Upgrading:** nothing breaks. Records, notation and the presenter contract are
+unchanged from 0.4.0, and `@diceforge-sdk/presenter-physics` is opt-in — install
+it only if you want simulated motion. It declares `@diceforge-sdk/core`,
+`@diceforge-sdk/renderer-web` and `three` as peers, so it uses the copies you
+already have.
 
 ### Added
 
@@ -19,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `@diceforge-sdk/assets-forge`, `@diceforge-sdk/testing` and `@diceforge-sdk/presenter-physics` shipped without a `LICENSE` file despite declaring MIT, so the published tarballs carried no licence text. All five packages now include it.
 - Published source maps referenced `../src/*.ts`, which packages ship `dist` and not `src` — so the maps resolved to nothing in a consumer's project, and some bundlers warned about them. They now carry the TypeScript inline (`inlineSources`), so stepping into the SDK works whatever a bundler does with relative paths. Tarballs grow by roughly half: `@diceforge-sdk/core` from 31 kB to 49 kB packed, `renderer-web` from 38 kB to 58 kB.
 - `createPhysicsPresenter` never followed its container. The scene is built once, on the first roll it draws, so the canvas kept whatever size the container had then — wrong after any reflow, and worse than it sounds: `trayAspect` *is* read from the container on every roll, so a resized page had the camera framing a tray shaped for a viewport that no longer existed. It now resizes and re-frames on `resize`, and stops listening when disposed.
 - The React example resolved `@diceforge-sdk/presenter-physics` from `dist` rather than source, so it showed a stale build — the exact thing the other aliases in its Vite config exist to prevent.
