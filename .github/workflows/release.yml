@@ -46,9 +46,27 @@ jobs:
           for DIR in packages/core packages/renderer-web packages/assets-forge packages/testing packages/presenter-physics; do
             NAME=$(node -p "require('./$DIR/package.json').name")
             VERSION=$(node -p "require('./$DIR/package.json').version")
+            # A fast path, not the authority. `npm view` reads a cached
+            # packument and can lag minutes behind a publish that just
+            # happened, so a miss here does not prove the version is absent —
+            # which is exactly how v0.5.0 failed, having been published by hand
+            # moments before the tag.
             if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
               echo "$NAME@$VERSION already on the registry - skipping"
+              continue
+            fi
+            # The registry is the authority. Refusing to overwrite a version is
+            # it telling us the version is already there, which is the state
+            # this step exists to reach. Every other failure is real.
+            # Redirected rather than piped: a pipeline reports the last
+            # command's status, which would hide npm's.
+            if npm publish --workspace "$NAME" --provenance --access public >publish.log 2>&1; then
+              cat publish.log
+              echo "published $NAME@$VERSION"
+            elif grep -q "cannot publish over the previously published versions" publish.log; then
+              echo "$NAME@$VERSION was already published - nothing to do"
             else
-              npm publish --workspace "$NAME" --provenance --access public
+              cat publish.log >&2
+              exit 1
             fi
           done
