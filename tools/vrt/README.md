@@ -3,8 +3,9 @@
 Renders a fixed set of rolls through the real presenter and compares each frame to a committed PNG.
 
 ```bash
-npm run vrt          # check every scene against its baseline
-npm run vrt:update   # accept the current output as the new baseline
+npm run vrt                  # check every scene against its baseline
+npm run vrt:docker           # the same, in the container CI uses — authoritative
+npm run vrt:docker -- --update   # redraw the baselines
 node tools/vrt/run.mjs --only=coin   # just the scenes whose name matches
 ```
 
@@ -27,11 +28,31 @@ WebGL scenes read the canvas back as a PNG, keeping the alpha channel so a die's
 
 ## Baselines are tied to the browser that drew them
 
-Rendering is deterministic for a given browser and driver, not across them: the same scene drawn by another GPU or another Chromium build will differ in a few pixels of anti-aliasing. Baselines are therefore generated with Playwright's bundled headless Chromium, which draws through SwiftShader in software rather than on the local GPU. On this setup repeated runs differ by **zero** pixels.
+Rendering is deterministic for a given browser and driver, not across them: the same scene drawn by another GPU or another Chromium build will differ in a few pixels of anti-aliasing. Playwright's bundled headless Chromium draws through SwiftShader in software rather than on the local GPU, so repeated runs on one machine differ by **zero** pixels — but two machines still disagree.
 
-That is also why the suite is **not** wired into CI: baselines committed from one platform would fail on a CI runner for reasons that have nothing to do with the renderer. Running it in CI needs baselines generated inside the same container image CI uses — worth doing, and tracked in `TASKS.md`, but a change of its own.
+So a baseline is only meaningful next to the environment that drew it, and that environment is a pinned container: `mcr.microsoft.com/playwright:v<version>-noble`. CI compares inside it, and `npm run vrt:docker` puts you in the same one. The tag is derived from the Playwright pinned in `package.json` — the image ships the browser build that version expects, so the two move together, and `tools/vrt/environment.mjs` fails the job if a version bump leaves the workflow behind.
+
+`baselines/environment.json` records what drew the committed PNGs. A run from anywhere else says so and reports what changed **without failing**, because it genuinely cannot tell a regression from another Chromium's anti-aliasing:
+
+```
+Baselines were drawn in mcr.microsoft.com/playwright:v1.62.0-noble, playwright 1.62.0.
+This run is win32 (no container), playwright 1.62.0, so differences below may be
+anti-aliasing rather than regressions, and will not fail the build.
+```
+
+That keeps a bare `npm run vrt` useful for a quick look — a 40% diff is obviously real whatever drew it — without training anyone to ignore a red suite. The authoritative answer comes from CI, or from `vrt:docker` if you have Docker.
 
 A small tolerance is applied anyway (`TOLERANCE`, `PIXEL_THRESHOLD` in `run.mjs`) so that a stray anti-aliased pixel does not fail a run.
+
+## Updating baselines
+
+A changed baseline is a claim that the new pixels are correct, so nothing regenerates them automatically — a suite that updates its own expectations cannot fail. Redraw them deliberately, in the container:
+
+```bash
+npm run vrt:docker -- --update
+```
+
+Without Docker, run the **VRT baselines** workflow from the Actions tab. It redraws them in the same image and uploads them as an artifact to download and commit; it has no write access to the repository, so the PNGs still go through review like any other change.
 
 ## Adding a scene
 

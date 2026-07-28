@@ -1,0 +1,28 @@
+# Redraws the visual regression baselines in the image CI compares against.
+name: VRT baselines
+
+# Manual only. Baselines are a deliberate statement that the new pixels are
+# correct, so nothing regenerates them automatically — a suite that updates its
+# own expectations cannot fail.
+on:
+  workflow_dispatch:
+
+jobs:
+  baselines:
+    name: redraw baselines
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.0-noble
+      options: --ipc=host
+    env:
+      VRT_IMAGE: mcr.microsoft.com/playwright:v1.62.0-noble
+    steps:
+      - uses: actions/checkout@v5
+      - run: npm ci
+      - run: npm run vrt:update
+      # Uploaded rather than committed: this workflow needs no write access to
+      # the repository, and the PNGs still go through review like any change.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vrt-baselines
+          path: tools/vrt/baselines/

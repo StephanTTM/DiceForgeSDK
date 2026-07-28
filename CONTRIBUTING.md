@@ -30,10 +30,15 @@ npm run build          # compile @diceforge-sdk/core and @diceforge-sdk/renderer
 npm run example        # build, then run the headless example
 npm run demo:web       # build, then serve the browser demo (Vite)
 npm run vrt            # visual regression: renderer output vs committed baselines
+npm run vrt:docker     # the same in the container CI uses (needs Docker)
 npm run physics        # headless physics measurement for ADR-0018 (tools/physics)
 ```
 
-All of these must pass before a pull request; CI runs the same gates on Node 20 and 24 — except `vrt`, whose baselines are specific to the browser that drew them (see [tools/vrt/README.md](tools/vrt/README.md)). Run it locally whenever you touch the renderer or the dice assets, and commit the updated baselines with the change that caused them. Seeded-RNG golden tests lock the reproducibility contract — never update those constants without a superseding ADR (see ADR-0005).
+All of these must pass before a pull request; CI runs the same gates on Node 20 and 24.
+
+`vrt` is the one that needs a word of explanation. Pixels are only comparable against the browser build that drew them, so the baselines live in a pinned Playwright container and CI compares inside it. A bare `npm run vrt` on your own machine is therefore **advisory**: it prints what changed and says so, but does not fail, because it cannot tell a regression from another Chromium's anti-aliasing. Use `npm run vrt:docker` for the authoritative answer, or push and let CI say. Redraw baselines deliberately with `npm run vrt:docker -- --update` — or the **VRT baselines** workflow if you have no Docker — and commit them with the change that caused them. See [tools/vrt/README.md](tools/vrt/README.md).
+
+Seeded-RNG golden tests lock the reproducibility contract — never update those constants without a superseding ADR (see ADR-0005).
 
 Line endings are LF everywhere and `.gitattributes` enforces it, so `core.autocrlf` — which git's Windows installer turns on by default — cannot leave you with a working tree Biome rejects for files you never touched. If you cloned before that file existed, `git add --renormalize .` will settle it once.
 

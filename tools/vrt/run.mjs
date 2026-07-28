@@ -10,9 +10,11 @@
  * whatever the animation happened to be showing.
  *
  * Baselines are tied to the renderer *and* to the browser that drew them, so
- * they are generated with the bundled headless Chromium rather than a system
- * browser. Regenerate them on the same platform when the renderer changes on
- * purpose; a diff you did not intend is a regression.
+ * they are generated inside a pinned Playwright container and the environment
+ * that drew them is recorded alongside. A run from anywhere else is advisory:
+ * it still reports what changed, but it cannot tell a regression from a
+ * different Chromium's anti-aliasing, so it does not fail the build.
+ * `npm run vrt:docker` puts you in the same container CI uses.
  */
 
 import { existsSync } from "node:fs";
@@ -23,12 +25,19 @@ import pixelmatch from "pixelmatch";
 import { chromium } from "playwright";
 import { PNG } from "pngjs";
 import { createServer } from "vite";
+import {
+  assertImage,
+  currentEnvironment,
+  describeEnvironment,
+  sameEnvironment,
+} from "./environment.mjs";
 import { scenes, sceneUrl } from "./scenes.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "..", "..");
 const BASELINES = join(HERE, "baselines");
 const OUTPUT = join(HERE, "output");
+const ENVIRONMENT = join(BASELINES, "environment.json");
 
 /** Fraction of pixels allowed to differ before a scene counts as changed. */
 const TOLERANCE = 0.001;
@@ -37,6 +46,25 @@ const PIXEL_THRESHOLD = 0.12;
 
 const update = process.argv.includes("--update");
 const only = process.argv.find((arg) => arg.startsWith("--only="))?.slice("--only=".length);
+
+assertImage();
+
+const environment = currentEnvironment();
+const recorded = existsSync(ENVIRONMENT)
+  ? JSON.parse(await readFile(ENVIRONMENT, "utf8"))
+  : undefined;
+/**
+ * Whether this run can be trusted to fail the build. Only a run from the same
+ * environment the baselines came from is comparing like with like.
+ */
+const authoritative = update || !recorded || sameEnvironment(recorded, environment);
+
+if (!authoritative) {
+  console.log(`Baselines were drawn in ${describeEnvironment(recorded)}.`);
+  console.log(`This run is ${describeEnvironment(environment)}, so differences below may be`);
+  console.log("anti-aliasing rather than regressions, and will not fail the build.");
+  console.log("Compare in the environment CI uses with: npm run vrt:docker\n");
+}
 
 async function capture(page, scene) {
   await page.goto(`http://localhost:${port}${sceneUrl(scene)}`, { waitUntil: "load" });
@@ -115,8 +143,20 @@ try {
   await server.close();
 }
 
+// Record what drew these, so a later run from somewhere else can say so rather
+// than reporting a browser difference as a regression.
+if (update) {
+  await writeFile(ENVIRONMENT, `${JSON.stringify(environment, null, 2)}\n`);
+  if (!environment.image) {
+    console.log(`\nThese baselines were drawn on ${environment.platform}, not in the container.`);
+    console.log("CI compares in the container and will reject them — regenerate with:");
+    console.log("  npm run vrt:docker -- --update");
+  }
+}
+
 // A baseline with no scene is a leftover from a renamed or deleted scene.
 const known = new Set(scenes.map((scene) => `${scene.name}.png`));
+known.add("environment.json");
 const orphans = (await readdir(BASELINES)).filter((file) => !known.has(file));
 if (orphans.length) console.log(`\nUnused baselines: ${orphans.join(", ")}`);
 
@@ -124,8 +164,13 @@ if (failures.length) {
   console.log(`\n${failures.length} scene(s) changed. Wrote actual and diff images to:`);
   console.log(`  ${OUTPUT}`);
   for (const failure of failures) console.log(`  - ${failure.name}: ${failure.why}`);
-  console.log("\nIf the change is intended, rerun with: npm run vrt:update");
-  process.exit(1);
+  if (authoritative) {
+    console.log("\nIf the change is intended, rerun with: npm run vrt:docker -- --update");
+    process.exit(1);
+  }
+  // Comparing against baselines from a different browser build. Say what was
+  // seen, but do not claim it means anything — see the banner above.
+  console.log("\nNot failing: this run cannot tell a regression from a browser difference.");
 }
 
 console.log(

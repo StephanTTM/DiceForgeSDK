@@ -65,6 +65,7 @@ Remaining before tagging 0.1.0:
 - [x] Give procedural dice beveled edges, or retire them. (retired, along with the KayKit pack — ADR-0012)
 - [ ] Optional multiplayer transport plugin research. (beyond 1.0)
 - [x] Browser-based visual regression testing for the renderer. (`npm run vrt`, 13 scenes including four for the physics presenter, Playwright + committed baselines)
+- [x] Run the visual regression suite in CI against platform-stable baselines. (a `visual` job inside the pinned `mcr.microsoft.com/playwright` image; `npm run vrt:docker` reproduces it, and a run from anywhere else is advisory rather than red)
 
 ## Task maintenance
 
