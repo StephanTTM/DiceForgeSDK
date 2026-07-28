@@ -1,9 +1,17 @@
 import { createDiceEngine, createSeededRandomSource } from "@diceforge-sdk/core";
 import type { ShapedDieSides, Vec3 } from "@diceforge-sdk/renderer-web";
-import { dieGeometry } from "@diceforge-sdk/renderer-web";
+import { FORGE_FACE_ROTATIONS } from "@diceforge-sdk/renderer-web";
 import { describe, expect, it } from "vitest";
 import type { PhysicsDie, QuaternionTuple } from "./index.js";
-import { multiply, rotate, simulateRoll, symmetryTable } from "./index.js";
+import {
+  faceDirections,
+  faceNormals,
+  multiply,
+  rotate,
+  simulateRoll,
+  solidFromFaceDirections,
+  symmetryTable,
+} from "./index.js";
 
 const SHAPES: readonly ShapedDieSides[] = [4, 6, 8, 10, 12, 20];
 
@@ -13,34 +21,40 @@ function seededRandom(seed: string): () => number {
   return () => source.nextUint32() / 0x100000000;
 }
 
-function faceNormalsOf(shape: ShapedDieSides): Vec3[] {
-  const data = dieGeometry(shape);
-  return data.faces.map((ring) => {
-    const centre = ring.reduce<Vec3>(
-      (acc, index) => {
-        const v = data.vertices[index] as Vec3;
-        return [acc[0] + v[0], acc[1] + v[1], acc[2] + v[2]];
-      },
-      [0, 0, 0],
-    );
-    const length = Math.hypot(...centre);
-    return [centre[0] / length, centre[1] / length, centre[2] / length];
+/**
+ * Where each printed numeral sits on the model, taken from the calibrated table
+ * that positions them — `faceRotations[v - 1]` brings numeral `v` to the top, so
+ * its inverse says where that numeral rests.
+ *
+ * This, not the collider's geometry, is what the player reads. An earlier
+ * version of these tests measured `dieGeometry`'s face order instead and passed
+ * while every shipped die showed the wrong number (ADR-0019).
+ */
+function printedFaceDirections(shape: ShapedDieSides): Vec3[] {
+  const table = FORGE_FACE_ROTATIONS[shape];
+  if (!table) throw new Error(`no calibrated rotations for d${shape}`);
+  return table.map((q) => {
+    const inverse: QuaternionTuple = [-q[0], -q[1], -q[2], q[3]];
+    return rotate([0, 1, 0], inverse);
   });
 }
 
-/**
- * Where the recorded face ends up once the die has come to rest and its mesh
- * has been remapped — the whole point of the package, measured the way a
- * renderer would apply it.
- */
-function recordedFaceDirection(die: PhysicsDie): Vec3 {
-  const normals = faceNormalsOf(die.shape);
-  return rotate(normals[die.face - 1] as Vec3, remapped(die));
+/** A request carrying the calibrated table the simulation now requires. */
+function request(shape: ShapedDieSides, face: number) {
+  return { shape, face, faceRotations: FORGE_FACE_ROTATIONS[shape] as readonly QuaternionTuple[] };
 }
 
-/** How high one of a die's faces sits once the remap has been applied. */
-function recordedFaceHeights(die: PhysicsDie, normal: Vec3): number {
-  return rotate(normal, remapped(die))[1];
+/** The numeral actually facing up once the die has landed and been remapped. */
+function shownNumeral(die: PhysicsDie): number {
+  const drawn = remapped(die);
+  const heights = printedFaceDirections(die.shape).map((dir) => rotate(dir, drawn)[1]);
+  return heights.indexOf(Math.max(...heights)) + 1;
+}
+
+/** How square to the camera the shown numeral sits, as its height in [0, 1]. */
+function shownHeight(die: PhysicsDie): number {
+  const drawn = remapped(die);
+  return Math.max(...printedFaceDirections(die.shape).map((dir) => rotate(dir, drawn)[1]));
 }
 
 /** The die's final orientation with its mesh remap folded in. */
@@ -51,54 +65,58 @@ function remapped(die: PhysicsDie) {
 }
 
 describe("simulateRoll", () => {
-  it("finishes with the recorded face uppermost, for every shape", () => {
+  it("shows the recorded numeral, for every face of every shape", () => {
     for (const shape of SHAPES) {
-      for (const face of [1, Math.ceil(shape / 2), shape]) {
-        const roll = simulateRoll([{ shape, face }], { random: seededRandom(`d${shape}-${face}`) });
+      for (let face = 1; face <= shape; face++) {
+        const roll = simulateRoll([request(shape, face)], {
+          random: seededRandom(`d${shape}-${face}`),
+        });
         const die = roll.dice[0] as PhysicsDie;
-        const up = recordedFaceDirection(die)[1];
-
         expect(roll.settled, `d${shape} face ${face} never settled`).toBe(true);
-        // A die resting on a face has that face's opposite pointing straight
-        // up on most solids; a tetrahedron rests with a vertex up, so its
-        // faces sit at about 70 degrees. What matters is that the recorded
-        // face is the highest one, which the next assertion pins exactly.
-        expect(up, `d${shape} face ${face} is not the top face`).toBeGreaterThan(
-          shape === 4 ? 0.3 : 0.9,
-        );
+        expect(shownNumeral(die), `d${shape} recorded ${face}`).toBe(face);
       }
     }
   });
 
-  it("puts the recorded face higher than every other face", () => {
+  /**
+   * The numeral must not merely be the highest — it must be lying flat enough
+   * to read. A model seated crooked on its collider still "wins" the height
+   * comparison while visibly resting on an edge, which is how the shipped d10,
+   * d12 and d20 came to sit up to 41 degrees off (ADR-0019).
+   */
+  it("lays the shown numeral flat, not merely highest", () => {
     for (const shape of SHAPES) {
-      const face = Math.min(3, shape);
-      const roll = simulateRoll([{ shape, face }], { random: seededRandom(`highest-${shape}`) });
-      const die = roll.dice[0] as PhysicsDie;
-      const heights = faceNormalsOf(shape).map((normal) => recordedFaceHeights(die, normal));
-      const highest = heights.indexOf(Math.max(...heights));
-      expect(highest + 1, `d${shape} showed face ${highest + 1} instead of ${face}`).toBe(face);
+      for (let face = 1; face <= shape; face++) {
+        const roll = simulateRoll([request(shape, face)], {
+          random: seededRandom(`flat-d${shape}-${face}`),
+        });
+        const die = roll.dice[0] as PhysicsDie;
+        const tilt = (Math.acos(Math.min(1, shownHeight(die))) * 180) / Math.PI;
+        // A tetrahedron reads off the face resting on the table, so its numeral
+        // sits at the solid's own 70.5 degrees rather than pointing up.
+        const allowed = shape === 4 ? 71.5 : 3;
+        expect(tilt, `d${shape} face ${face} tilted ${tilt.toFixed(1)}deg`).toBeLessThan(allowed);
+      }
     }
   });
 
-  it("rolls every die of a whole roll onto its recorded face", () => {
+  it("rolls every die of a whole roll onto its recorded numeral", () => {
     const engine = createDiceEngine({ random: createSeededRandomSource("table-42") });
     const record = engine.roll("4d6+2d20");
-    const request = record.groups.flatMap((group) =>
-      group.dice.map((die) => ({ shape: die.sides as ShapedDieSides, face: die.value })),
+    const dice = record.groups.flatMap((group) =>
+      group.dice.map((die) => request(die.sides as ShapedDieSides, die.value)),
     );
-    const roll = simulateRoll(request, { random: seededRandom("whole-roll") });
+    const roll = simulateRoll(dice, { random: seededRandom("whole-roll") });
 
     expect(roll.dice).toHaveLength(6);
     roll.dice.forEach((die, index) => {
-      const heights = faceNormalsOf(die.shape).map((normal) => recordedFaceHeights(die, normal));
-      expect(heights.indexOf(Math.max(...heights)) + 1, `die ${index}`).toBe(die.face);
+      expect(shownNumeral(die), `die ${index}`).toBe(die.face);
     });
   });
 
   it("keeps every die inside the tray, so a camera on it never moves", () => {
     const roll = simulateRoll(
-      Array.from({ length: 10 }, () => ({ shape: 20 as ShapedDieSides, face: 7 })),
+      Array.from({ length: 10 }, () => request(20, 7)),
       { random: seededRandom("tray"), dieRadius: 1 },
     );
     for (const die of roll.dice) {
@@ -111,9 +129,9 @@ describe("simulateRoll", () => {
   });
 
   it("scales its output to the caller's units", () => {
-    const request = [{ shape: 20 as ShapedDieSides, face: 1 }];
-    const small = simulateRoll(request, { random: seededRandom("scale"), dieRadius: 1 });
-    const large = simulateRoll(request, { random: seededRandom("scale"), dieRadius: 10 });
+    const spec = [request(20, 1)];
+    const small = simulateRoll(spec, { random: seededRandom("scale"), dieRadius: 1 });
+    const large = simulateRoll(spec, { random: seededRandom("scale"), dieRadius: 10 });
 
     expect(large.tray.halfWidth).toBeCloseTo(small.tray.halfWidth * 10, 6);
     const smallLast = small.dice[0]?.frames.at(-1);
@@ -124,7 +142,7 @@ describe("simulateRoll", () => {
   });
 
   it("records a trajectory that starts in the air and ends at rest", () => {
-    const roll = simulateRoll([{ shape: 6, face: 4 }], { random: seededRandom("arc") });
+    const roll = simulateRoll([request(6, 4)], { random: seededRandom("arc") });
     const die = roll.dice[0] as PhysicsDie;
     const first = die.frames[0];
     const last = die.frames.at(-1);
@@ -135,9 +153,9 @@ describe("simulateRoll", () => {
   });
 
   it("takes the same throw to the same place, so a failure reproduces", () => {
-    const request = [{ shape: 12 as ShapedDieSides, face: 9 }];
-    const a = simulateRoll(request, { random: seededRandom("repeat") });
-    const b = simulateRoll(request, { random: seededRandom("repeat") });
+    const spec = [request(12, 9)];
+    const a = simulateRoll(spec, { random: seededRandom("repeat") });
+    const b = simulateRoll(spec, { random: seededRandom("repeat") });
     expect(b.dice[0]?.frames.at(-1)).toEqual(a.dice[0]?.frames.at(-1));
   });
 
@@ -149,7 +167,7 @@ describe("simulateRoll", () => {
    */
   it("reports how squarely each die came to rest, and mostly lands them flat", () => {
     const seatings = Array.from({ length: 25 }, (_, trial) => {
-      const roll = simulateRoll([{ shape: 20, face: 11 }], {
+      const roll = simulateRoll([request(20, 11)], {
         random: seededRandom(`seated-${trial}`),
       });
       return roll.dice[0]?.seated ?? 0;
@@ -161,17 +179,76 @@ describe("simulateRoll", () => {
   });
 });
 
+describe("the solid a die is", () => {
+  /** The collider, built from the model's numerals the way simulateRoll does. */
+  function solidOf(shape: ShapedDieSides) {
+    const table = FORGE_FACE_ROTATIONS[shape] as readonly QuaternionTuple[];
+    return solidFromFaceDirections(faceDirections(table));
+  }
+
+  it("has one face per numeral, each a real polygon", () => {
+    for (const shape of SHAPES) {
+      const data = solidOf(shape);
+      expect(data.faces, `d${shape}`).toHaveLength(shape);
+      for (const ring of data.faces) expect(ring.length).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  /**
+   * The collider must be the die that is drawn. `dieGeometry(10)` is not: it
+   * builds a trapezohedron whose faces sit at different angles from the shipped
+   * d10, so the simulation used to collide a shape nobody could see (ADR-0019).
+   */
+  it("faces exactly where the model's numerals face", () => {
+    for (const shape of SHAPES) {
+      const data = solidOf(shape);
+      const wanted = faceDirections(FORGE_FACE_ROTATIONS[shape] as readonly QuaternionTuple[]);
+      faceNormals(data).forEach((normal, index) => {
+        const target = wanted[index] as Vec3;
+        const angle =
+          (Math.acos(
+            Math.min(1, normal[0] * target[0] + normal[1] * target[1] + normal[2] * target[2]),
+          ) *
+            180) /
+          Math.PI;
+        expect(angle, `d${shape} face ${index + 1} off by ${angle.toFixed(3)}deg`).toBeLessThan(
+          0.01,
+        );
+      });
+    }
+  });
+
+  it("is fair: every face plane the same distance from the centre", () => {
+    for (const shape of SHAPES) {
+      const data = solidOf(shape);
+      const dirs = faceDirections(FORGE_FACE_ROTATIONS[shape] as readonly QuaternionTuple[]);
+      // Distance to the face *plane*, not to its centroid: a kite's centroid is
+      // not the foot of the perpendicular, so the d10 would fail that reading.
+      const depths = data.faces.map((ring, i) => {
+        const d = dirs[i] as Vec3;
+        const corner = data.vertices[ring[0] as number] as Vec3;
+        return corner[0] * d[0] + corner[1] * d[1] + corner[2] * d[2];
+      });
+      // Corner positions carry the error of a 3x3 solve, so this is exact to
+      // about a part in a million rather than to the bit.
+      expect(Math.max(...depths) - Math.min(...depths), `d${shape}`).toBeLessThan(1e-5);
+    }
+  });
+});
+
 describe("symmetryTable", () => {
   it("carries any face onto any other for every shape", () => {
     for (const shape of SHAPES) {
-      const table = symmetryTable(shape);
-      expect(table).toHaveLength(shape);
-      for (const row of table) expect(row).toHaveLength(shape);
+      const table = FORGE_FACE_ROTATIONS[shape] as readonly QuaternionTuple[];
+      const rotations = symmetryTable(solidFromFaceDirections(faceDirections(table)), `d${shape}`);
+      expect(rotations).toHaveLength(shape);
+      for (const row of rotations) expect(row).toHaveLength(shape);
     }
   });
 
   it("is the identity when a die already shows the recorded face", () => {
-    const table = symmetryTable(6);
+    const faces = FORGE_FACE_ROTATIONS[6] as readonly QuaternionTuple[];
+    const table = symmetryTable(solidFromFaceDirections(faceDirections(faces)), "d6");
     for (let face = 0; face < 6; face++) {
       const row = table[face] as QuaternionTuple[];
       const [x, y, z, w] = row[face] as QuaternionTuple;

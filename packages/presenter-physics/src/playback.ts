@@ -27,8 +27,9 @@ import {
   ShadowMaterial,
   WebGLRenderer,
 } from "three";
-import type { PhysicsBounds, PhysicsDie } from "./simulate.js";
+import type { PhysicsDie, PhysicsTray } from "./simulate.js";
 import { simulateRoll } from "./simulate.js";
+import type { QuaternionTuple } from "./symmetry.js";
 
 export type PhysicsPresenterOptions = {
   readonly container: HTMLElement;
@@ -145,8 +146,8 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
   let diceGroup: Group | undefined;
   let disposed = false;
   let cancelActive: (() => void) | undefined;
-  /** Where the last roll came to rest, so a resize can re-frame the same dice. */
-  let framed: PhysicsBounds | undefined;
+  /** The dice area in view, so a resize can re-fit the same tray. */
+  let framed: PhysicsTray | undefined;
 
   function ensureScene(): { renderer: WebGLRenderer; scene: Scene; camera: PerspectiveCamera } {
     if (renderer && scene && camera) return { renderer, scene, camera };
@@ -205,31 +206,27 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
   view.addEventListener?.("resize", handleResize);
 
   /**
-   * Frames where the dice came to rest, not the whole tray.
+   * Frames the dice area — the tray — and nothing else.
    *
-   * A tray big enough to settle a roll cleanly is much bigger than the dice
-   * need, so fitting the walls leaves them looking distant. The camera does
-   * therefore shift a little between rolls, but the tray bounds how far — and
-   * a minimum keeps a single die from filling the screen. Width and depth are
-   * fitted separately, since depth foreshortens by the camera's elevation.
+   * An earlier version fitted the camera to wherever the dice happened to come
+   * to rest, which made them larger on screen but moved the camera between
+   * rolls: the same die was a different size each throw, and a roll that
+   * scattered wide zoomed out. A tray is a fixed thing on a table. The camera
+   * is set from it once and only changes when the stage does (ADR-0019).
    */
-  function frame(resting: PhysicsBounds): void {
-    framed = resting;
+  function frame(area: PhysicsTray): void {
+    framed = area;
     const active = camera;
     if (!active) return;
     const angle = (CAMERA_ELEVATION * Math.PI) / 180;
     const vertical = (active.fov * Math.PI) / 180;
     const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * active.aspect);
-    const halfWidth = Math.max(resting.halfWidth, DIE_RADIUS * 3);
-    const halfDepth = Math.max(resting.halfDepth, DIE_RADIUS * 2);
-    const forWidth = (halfWidth * 1.15) / Math.tan(horizontal / 2);
-    const forDepth = (halfDepth * 1.15 * Math.sin(angle)) / Math.tan(vertical / 2);
-    const distance = Math.max(forWidth, forDepth, DIE_RADIUS * 4);
-    // Looking at the middle of the dice, not the middle of the table: a lone
-    // die that rolled into a corner should still be in the middle of the shot.
-    const [centreX, centreZ] = resting.center;
-    active.position.set(centreX, distance * Math.sin(angle), centreZ + distance * Math.cos(angle));
-    active.lookAt(centreX, 0, centreZ);
+    // Fit width and depth separately: depth foreshortens by the elevation.
+    const forWidth = (area.halfWidth * 1.06) / Math.tan(horizontal / 2);
+    const forDepth = (area.halfDepth * 1.06 * Math.sin(angle)) / Math.tan(vertical / 2);
+    const distance = Math.max(forWidth, forDepth);
+    active.position.set(0, distance * Math.sin(angle), distance * Math.cos(angle));
+    active.lookAt(0, 0, 0);
   }
 
   function clearDice(): void {
@@ -405,11 +402,18 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
       // A coin is a toss, not a tumble, and a die this cannot model is better
       // drawn than faked.
       const visuals = record.kind === "roll" ? visualDiceForEvent(record) : [];
+      // A die is only rollable here if its model says where its numerals are.
+      // The collider knows the geometry and nothing else, so without the
+      // calibrated table the physics would put a face up without knowing which
+      // number is printed on it (ADR-0019).
       const rollable =
         canRoll &&
         record.kind === "roll" &&
         visuals.length > 0 &&
-        visuals.every((die) => die.shape !== undefined);
+        visuals.every(
+          (die) =>
+            die.shape !== undefined && hasCalibratedModel(models, die.shape as ShapedDieSides),
+        );
       if (!rollable) {
         showPhysics(false);
         await delegate.present(record, signal ? { signal } : {});
@@ -419,7 +423,14 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
 
       if (signal?.aborted) throw abortError();
       const motion = simulateRoll(
-        visuals.map((die) => ({ shape: die.shape as ShapedDieSides, face: die.face })),
+        visuals.map((die) => {
+          const shape = die.shape as ShapedDieSides;
+          return {
+            shape,
+            face: die.face,
+            faceRotations: models?.faceRotations[shape] as readonly QuaternionTuple[],
+          };
+        }),
         {
           dieRadius: DIE_RADIUS,
           // A tray shaped like the stage, so the dice fill it.
@@ -446,7 +457,7 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
         diceGroup?.add(die.object);
         pose(die, 0);
       }
-      frame(motion.resting);
+      frame(motion.tray);
       showPhysics(true);
 
       await play(dice, motion.frameRate, reduced ? "reduce" : "animate", signal);

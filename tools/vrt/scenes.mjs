@@ -63,7 +63,7 @@ export const scenes = [
   },
   {
     name: "physics-handful",
-    why: "framing follows where the dice came to rest, so a scattered roll stays legible",
+    why: "the fixed dice area holds a handful without the camera moving to fit them",
     query: {
       physics: "1",
       theme: "ivory",

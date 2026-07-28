@@ -1,5 +1,4 @@
-import type { ShapedDieSides, Vec3 } from "@diceforge-sdk/renderer-web";
-import { dieGeometry } from "@diceforge-sdk/renderer-web";
+import type { PolyhedronData, ShapedDieSides, Vec3 } from "@diceforge-sdk/renderer-web";
 import type { GSSolver } from "cannon-es";
 import {
   Body,
@@ -10,14 +9,23 @@ import {
   Plane,
   World,
 } from "cannon-es";
+import { faceDirections, solidFromFaceDirections } from "./solid.js";
 import type { QuaternionTuple } from "./symmetry.js";
-import { faceNormals, symmetryTable, upwardFace } from "./symmetry.js";
+import { symmetryTable, upwardFace } from "./symmetry.js";
 
 /** One die to roll: its shape, and the face the engine already resolved. */
 export type PhysicsDieRequest = {
   readonly shape: ShapedDieSides;
   /** The recorded face, 1..shape. This is what must be showing at the end. */
   readonly face: number;
+  /**
+   * The model's calibrated orientation table: `faceRotations[value - 1]` is the
+   * rotation bringing printed face `value` to the top. This is what says where
+   * each numeral actually is — a collider knows its geometry, not its numbering
+   * — so it is required rather than inferred. Themes carry it as
+   * `models.faceRotations[shape]`.
+   */
+  readonly faceRotations: readonly QuaternionTuple[];
 };
 
 /** A die's pose at one instant, in the caller's units. */
@@ -86,8 +94,9 @@ export type SimulateOptions = {
    */
   readonly dieRadius?: number;
   /**
-   * The tray's shorter half-extent, in the caller's units. Defaults to a size
-   * measured to settle reliably for the number of dice: `dieWidth × (5 + 0.8√n)`.
+   * The tray's shorter half-extent, in the caller's units. Fixed, not scaled to
+   * the number of dice — it is the dice area the player sees. Defaults to
+   * `dieWidth × 3.5`.
    */
   readonly trayRadius?: number;
   /**
@@ -124,25 +133,53 @@ const SLEEP_SPEED = 0.02;
 const SLEEP_TIME = 0.15;
 
 /**
- * Measured: a tray of about `dieWidth × (5 + 0.8√n)` settles every trial in
- * roughly a second with 96-100% of dice resting square on a face.
+ * The dice area is a fixed size, and does not grow with the number of dice.
  *
- * The floor of five is what a *single* die needs — the case the harness never
- * tried, since it swept five dice and up. At four die-widths one die rattles
- * between the walls and finishes leaning about a fifth of the time; at seven it
- * has room to bounce for a second before it stops. Five is the sweet spot at
- * every count from one to ten.
+ * It used to, following a measured settling rule of `dieWidth × (5 + 0.8√n)`,
+ * and the camera was fitted to wherever the dice happened to land. Both moved
+ * between rolls, so the dice changed size on screen from one throw to the next.
+ * A tray is a thing on the table: it is the same size every time, and the dice
+ * are bounded by it (ADR-0019).
+ *
+ * Three and a half die-widths, measured. Swept 2.5 to 7 against 1, 5 and 10
+ * dice: everything settles at every size once a bad throw is thrown again, so
+ * the discriminator is how many finish flat. Below 3.5 a crowded tray keeps
+ * producing leaners that even six attempts cannot clear (27/30 at 2.5); 3.5 is
+ * the tightest that gets 30/30 flat at every count.
+ *
+ * Tight matters because the camera frames this: at seven die-widths a d20 spans
+ * a fourteenth of the frame and cannot be read, at 3.5 it spans a seventh.
  */
-function defaultTrayRadius(dieRadius: number, count: number): number {
-  return dieRadius * 2 * (5 + 0.8 * Math.sqrt(count));
+function defaultTrayRadius(dieRadius: number): number {
+  return dieRadius * 2 * 3.5;
 }
 
-function collider(shape: ShapedDieSides): ConvexPolyhedron {
-  const data = dieGeometry(shape);
+/**
+ * The solid a die is, keyed so it is built once. A theme's calibrated table is
+ * the identity of the shape here — two themes with differently-cut dice get
+ * different colliders, which is the point (ADR-0019).
+ */
+const solids = new Map<string, PolyhedronData>();
+
+function solidFor(die: PhysicsDieRequest): { key: string; data: PolyhedronData } {
+  const key = `${die.shape}:${die.faceRotations.map((q) => q.join(",")).join("|")}`;
+  const existing = solids.get(key);
+  if (existing) return { key, data: existing };
+  if (die.faceRotations.length !== die.shape) {
+    throw new Error(
+      `d${die.shape}: expected ${die.shape} calibrated face rotations, got ${die.faceRotations.length}`,
+    );
+  }
+  const data = solidFromFaceDirections(faceDirections(die.faceRotations));
+  solids.set(key, data);
+  return { key, data };
+}
+
+function collider(data: PolyhedronData): ConvexPolyhedron {
   const scale = DIE_RADIUS_M / Math.max(...data.vertices.map((v) => Math.hypot(v[0], v[1], v[2])));
   const vertices = data.vertices.map((v) => new CVec3(v[0] * scale, v[1] * scale, v[2] * scale));
   const faces = data.faces.map((face) => {
-    const [a, b, c] = face as [number, number, number];
+    const [a, b, c] = face as unknown as [number, number, number];
     const normal = (vertices[b] as CVec3)
       .vsub(vertices[a] as CVec3)
       .cross((vertices[c] as CVec3).vsub(vertices[a] as CVec3));
@@ -156,26 +193,15 @@ function collider(shape: ShapedDieSides): ConvexPolyhedron {
   return new ConvexPolyhedron({ vertices, faces });
 }
 
-/**
- * Rolls dice and records where they went — without deciding anything.
- *
- * The outcome arrived already resolved; this only produces motion that ends
- * with each recorded face on top. It simulates ahead of time and hands back the
- * whole trajectory, so playback is ordinary animation: no physics runs while
- * the roll is on screen, nothing is corrected mid-air, and reduced motion is a
- * matter of jumping to the last frame.
- *
- * Cost is a few milliseconds — 4 ms for one die, 44 ms for forty — so this can
- * run inside the frame that starts the roll.
- */
-export function simulateRoll(
+/** One throw, start to finish. `simulateRoll` may not like how it landed. */
+function throwOnce(
   request: readonly PhysicsDieRequest[],
   options: SimulateOptions = {},
 ): PhysicsRoll {
   const dieRadius = options.dieRadius ?? 1;
   const frameRate = options.frameRate ?? 60;
   const random = options.random ?? Math.random;
-  const trayRadius = options.trayRadius ?? defaultTrayRadius(dieRadius, request.length);
+  const trayRadius = options.trayRadius ?? defaultTrayRadius(dieRadius);
   const aspect = options.trayAspect && options.trayAspect > 0 ? options.trayAspect : 1;
   const tray: PhysicsTray = {
     halfWidth: trayRadius * Math.max(aspect, 1),
@@ -226,7 +252,7 @@ export function simulateRoll(
   const bodies = request.map((die, index) => {
     const body = new Body({
       mass: 0.004,
-      shape: collider(die.shape),
+      shape: collider(solidFor(die).data),
       material: dieMaterial,
       // A real die bleeds energy into the felt; without damping a spinning one
       // outlasts anyone's patience.
@@ -273,7 +299,10 @@ export function simulateRoll(
   if (steps % stepsPerFrame !== 0) record();
 
   const dice: PhysicsDie[] = request.map((die, index) => {
-    const normals = faceNormals(dieGeometry(die.shape));
+    const { key, data } = solidFor(die);
+    // A face of this solid *is* a numeral, so no correspondence is needed
+    // between what the physics landed on and what the model shows (ADR-0019).
+    const normals = faceDirections(die.faceRotations);
     const body = bodies[index] as Body;
     const orientation: QuaternionTuple = [
       body.quaternion.x,
@@ -282,7 +311,7 @@ export function simulateRoll(
       body.quaternion.w,
     ];
     const landed = upwardFace(normals, orientation);
-    const table = symmetryTable(die.shape);
+    const table = symmetryTable(data, key);
     // Face values are one-based; the table is not.
     const remap = (table[landed] as QuaternionTuple[])[die.face - 1] as QuaternionTuple;
     const seated = normals.reduce(
@@ -319,6 +348,54 @@ export function simulateRoll(
     },
     settled,
   };
+}
+
+/**
+ * A die resting against a wall or a neighbour is showing its recorded face at
+ * an angle, which reads as "it hasn't finished". Below this it is not good
+ * enough to put on screen: 0.9995 is a tilt of about 1.8 degrees, which is the
+ * point where a face stops looking deliberately flat.
+ */
+const MIN_SEATED = 0.9995;
+/**
+ * A throw costs about 4 ms per die, so throwing again is cheaper than showing
+ * a bad one. Six attempts clears every shape in practice; the best of them is
+ * used if physics is having an unusually bad day.
+ */
+const MAX_THROWS = 6;
+
+/**
+ * Rolls dice and records where they went — without deciding anything.
+ *
+ * The outcome arrived already resolved; this only produces motion that ends
+ * with each recorded face on top. It simulates ahead of time and hands back the
+ * whole trajectory, so playback is ordinary animation: no physics runs while
+ * the roll is on screen, nothing is corrected mid-air, and reduced motion is a
+ * matter of jumping to the last frame.
+ *
+ * A throw that finishes with a die propped up is thrown again rather than
+ * shown. That changes only the motion — the faces were decided before any of
+ * this ran — and it is what stops a roll ending on a die you cannot read.
+ *
+ * Cost is a few milliseconds — 4 ms for one die, 44 ms for forty — so this can
+ * run inside the frame that starts the roll.
+ */
+export function simulateRoll(
+  request: readonly PhysicsDieRequest[],
+  options: SimulateOptions = {},
+): PhysicsRoll {
+  let best: PhysicsRoll | undefined;
+  let bestSeating = Number.NEGATIVE_INFINITY;
+  for (let attempt = 0; attempt < MAX_THROWS; attempt++) {
+    const roll = throwOnce(request, options);
+    const seating = roll.dice.reduce((low, die) => Math.min(low, die.seated), 1);
+    if (roll.settled && seating >= MIN_SEATED) return roll;
+    if (seating > bestSeating) {
+      bestSeating = seating;
+      best = roll;
+    }
+  }
+  return best as PhysicsRoll;
 }
 
 /** The Y component of a rotated vector, which is all the seating test needs. */

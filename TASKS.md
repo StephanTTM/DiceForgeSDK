@@ -53,6 +53,9 @@ Remaining before tagging 0.1.0:
 
 ## Next
 
+- [x] Fix the physics presenter showing the wrong numeral and resting dice cocked. (the collider is built from the model's calibrated face table, so a collider face *is* a number; 0/60 faces wrong and 0.0° tilt, against 57/60 and up to 41° — ADR-0019)
+- [x] Replace the per-roll camera fit with a fixed dice area. (tray is `dieWidth × 3.5`, measured as the tightest that lands 30/30 flat at 1, 5 and 10 dice; the camera frames it and never moves — ADR-0019)
+
 - [ ] Extend the plugin contracts to the categories beyond presentation (physics, audio, transport) once a second implementation exists to shape them — ARCHITECTURE lists them, but nothing implements them yet.
 
 ## Backlog

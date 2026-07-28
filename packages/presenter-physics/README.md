@@ -19,7 +19,15 @@ import { simulateRoll } from "@diceforge-sdk/presenter-physics";
 
 const record = engine.roll("4d6");           // resolved first, as always
 const motion = simulateRoll(
-  record.groups.flatMap((group) => group.dice.map((die) => ({ shape: die.sides, face: die.value }))),
+  record.groups.flatMap((group) =>
+    group.dice.map((die) => ({
+      shape: die.sides,
+      face: die.value,
+      // Where this model's numerals are. The collider is built from it, so a
+      // face of the collider *is* a number (ADR-0019).
+      faceRotations: theme.models.faceRotations[die.sides],
+    })),
+  ),
   { dieRadius: 1.05 },
 );
 
@@ -34,7 +42,7 @@ Each `PhysicsDie` carries the `remap` to apply to its mesh, the recorded `frames
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `dieRadius` | `1` | Circumradius in your units; every distance is scaled to match |
-| `trayRadius` | `dieWidth × (5 + 0.8√n)` | The tray's shorter half-extent; dice cannot leave it |
+| `trayRadius` | `dieWidth × 3.5` | The tray's shorter half-extent; fixed, not scaled to the dice count |
 | `trayAspect` | `1` | Width over depth — shape it like your viewport and the dice spread into frame |
 | `random` | `Math.random` | Pass a seeded source and the same throw reproduces exactly |
 | `frameRate` | `60` | Recording rate |
@@ -52,9 +60,11 @@ It is also cheap enough to do in the frame that starts the roll:
 | 10 | 14 ms | 0.93 s | 77 kB |
 | 40 | 44 ms | 1.52 s | 438 kB |
 
-## The collider is not your model
+## The collider is not your model, but it is built from it
 
 The die you draw and the die that collides are deliberately different objects. The collider is the idealised sharp solid; your model is cosmetic, drawn inside an invisible container only the physics sees.
+
+It is nevertheless **derived** from your model, via the calibrated table that says which rotation brings each numeral to the top. Intersecting the half-spaces those directions define gives a solid whose faces are the numerals, in value order. That is why `faceRotations` is required: a collider knows its geometry and nothing about its numbering, and the first version of this package built the collider from generated geometry instead — so the physics landed a *geometric* face upward and the model showed whichever numeral happened to be printed there. 57 of 60 faces displayed the wrong number (ADR-0019).
 
 That is not only for speed, though it is 500× faster than colliding a bevelled model. The symmetry remap needs a solid whose faces are all equivalent, and a bevelled d20 is not twenty faces but roughly 620 facets — no symmetry carries one bevel sliver onto another in a way that repositions a die face.
 
@@ -81,9 +91,13 @@ Reduced motion jumps to the final pose instead of playing the roll, and `present
 
 ## Framing
 
-The tray is rectangular and shaped to the stage, so the dice have somewhere to spread that the camera can see. The camera then frames **where the dice came to rest**, centred on them, rather than the tray: a tray big enough to settle a roll cleanly is far bigger than the dice need, and fitting the walls leaves a d20 at about a twelfth of the frame. A floor keeps a single die from filling the screen, and dice fly in from outside the shot on the way down, which reads as a throw.
+The dice area is a **fixed** rectangle, shaped to the stage, and the camera frames it and nothing else. It does not grow with the number of dice, so the same die is the same size on every throw and a roll that scatters wide does not zoom out — a tray is a thing on a table.
 
-The camera therefore shifts a little between rolls. The tray is what bounds how much.
+Its size is measured: `dieWidth × 3.5` on the shorter side is the tightest that still lands 30 out of 30 dice flat at one, five and ten dice. Larger is calmer but shrinks the dice; at seven die-widths a d20 spans a fourteenth of the frame and cannot be read. Override it with `trayRadius`.
+
+## A throw that lands badly is thrown again
+
+A die propped against a wall or a neighbour shows its recorded face at an angle, which reads as though the roll has not finished. Simulating costs about 4 ms per die, so a throw that leaves any die tilted more than about 1.8° is discarded and thrown again, up to six times. Nothing is corrected on screen and no outcome changes — the faces were decided before any of this ran. Only the motion differs.
 
 The canvas follows its container: a window resize re-fits the camera and re-frames the dice where they lie, so a responsive layout keeps the roll it was showing. The listener is released by `dispose()`.
 

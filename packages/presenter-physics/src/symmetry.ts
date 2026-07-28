@@ -1,5 +1,4 @@
-import type { PolyhedronData, ShapedDieSides, Vec3 } from "@diceforge-sdk/renderer-web";
-import { dieGeometry } from "@diceforge-sdk/renderer-web";
+import type { PolyhedronData, Vec3 } from "@diceforge-sdk/renderer-web";
 
 /** Quaternion as [x, y, z, w], matching the renderer's convention. */
 export type QuaternionTuple = readonly [number, number, number, number];
@@ -41,9 +40,34 @@ export function multiply(a: QuaternionTuple, b: QuaternionTuple): QuaternionTupl
   ];
 }
 
-/** Outward unit normal of each face, in face order. */
+/**
+ * Outward unit normal of each face, in face order.
+ *
+ * Newell's method rather than the direction of the face's centroid: a centroid
+ * points along the normal only when the face is symmetric about it, which is
+ * true of every Platonic solid and false of the d10's kites. Reading a
+ * trapezohedron's normals off its centroids puts them about 17 degrees out.
+ */
 export function faceNormals(data: PolyhedronData): Vec3[] {
-  return data.faces.map((ring) => norm(faceCentre(data, ring)));
+  return data.faces.map((ring) => faceNormal(data, ring));
+}
+
+function faceNormal(data: PolyhedronData, ring: readonly number[]): Vec3 {
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = data.vertices[ring[i] as number] as Vec3;
+    const b = data.vertices[ring[(i + 1) % ring.length] as number] as Vec3;
+    x += (a[1] - b[1]) * (a[2] + b[2]);
+    y += (a[2] - b[2]) * (a[0] + b[0]);
+    z += (a[0] - b[0]) * (a[1] + b[1]);
+  }
+  const normal = norm([x, y, z]);
+  // Winding decides the sign; the solid is centred, so the centroid says which
+  // way is out.
+  const centre = faceCentre(data, ring);
+  return dot(normal, centre) >= 0 ? normal : [-normal[0], -normal[1], -normal[2]];
 }
 
 function faceCentre(data: PolyhedronData, ring: readonly number[]): Vec3 {
@@ -62,7 +86,7 @@ type FaceFrame = { readonly normal: Vec3; readonly inPlane: Vec3 };
 function frameOf(data: PolyhedronData, faceIndex: number, offset: number): FaceFrame {
   const ring = data.faces[faceIndex] as readonly number[];
   const centre = faceCentre(data, ring);
-  const normal = norm(centre);
+  const normal = faceNormal(data, ring);
   const vertex = data.vertices[ring[offset % ring.length] as number] as Vec3;
   const raw = sub(vertex, centre);
   const along = dot(raw, normal);
@@ -124,7 +148,7 @@ function isSymmetry(data: PolyhedronData, rotation: QuaternionTuple, tolerance =
   });
 }
 
-const cache = new Map<ShapedDieSides, QuaternionTuple[][]>();
+const cache = new Map<string, QuaternionTuple[][]>();
 
 /**
  * For each pair of faces, a rotation of the solid carrying `target` onto the
@@ -135,15 +159,14 @@ const cache = new Map<ShapedDieSides, QuaternionTuple[][]>();
  * collider is unchanged and the physics never knows. Indexed
  * `[actualFace][targetFace]`, both zero-based.
  *
- * These come from the geometry and never from `FORGE_FACE_ROTATIONS`: those
- * bake a yaw that makes numerals read upright, which is a symmetry for a cube's
- * square faces but not for a d10's kites.
+ * The solid is built from the model's own face directions (ADR-0019), so a
+ * face index here is a numeral rather than an artefact of how some generator
+ * happened to order its geometry.
  */
-export function symmetryTable(sides: ShapedDieSides): QuaternionTuple[][] {
-  const cached = cache.get(sides);
+export function symmetryTable(data: PolyhedronData, key: string): QuaternionTuple[][] {
+  const cached = cache.get(key);
   if (cached) return cached;
 
-  const data = dieGeometry(sides);
   const table = data.faces.map((_, actual) =>
     data.faces.map((_, target) => {
       const from = frameOf(data, target, 0);
@@ -152,15 +175,13 @@ export function symmetryTable(sides: ShapedDieSides): QuaternionTuple[][] {
         const candidate = rotationBetween(from, frameOf(data, actual, offset));
         if (isSymmetry(data, candidate)) return candidate;
       }
-      // Proven impossible for every shipped shape by the renderer's
-      // symmetry test; a custom solid could still fail here.
       throw new Error(
-        `d${sides}: no symmetry carries face ${target + 1} onto face ${actual + 1}; ` +
+        `no symmetry carries face ${target + 1} onto face ${actual + 1}; ` +
           "a physics collider must be a solid whose faces are all equivalent",
       );
     }),
   );
-  cache.set(sides, table);
+  cache.set(key, table);
   return table;
 }
 

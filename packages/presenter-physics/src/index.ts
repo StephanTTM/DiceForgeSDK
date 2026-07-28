@@ -31,5 +31,6 @@ export type {
   SimulateOptions,
 } from "./simulate.js";
 export { simulateRoll } from "./simulate.js";
+export { faceDirections, solidFromFaceDirections } from "./solid.js";
 export type { QuaternionTuple } from "./symmetry.js";
-export { multiply, rotate, symmetryTable } from "./symmetry.js";
+export { faceNormals, multiply, rotate, symmetryTable } from "./symmetry.js";

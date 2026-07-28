@@ -4,6 +4,19 @@ All notable changes to DiceForge SDK will be documented here. This project inten
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- **The physics presenter showed the wrong number.** Its collider came from generated geometry, whose face order and orientation were never related to where a model's numerals actually are, so the simulation landed a *geometric* face upward and the die displayed whichever numeral happened to be printed there. Measured across all six shapes, **57 of 60 faces showed the wrong value** — a d6 rolling a 1 displayed a 2. The collider is now built from the model's own calibrated face table, so a face of the collider *is* a number and there is no correspondence left to get wrong (ADR-0019). `PhysicsDieRequest` gains a required `faceRotations`.
+- **Dice came to rest visibly cocked.** For the d10 the generated collider was not merely ordered differently — it was a different solid from the one that ships, so the physics collided a shape nobody could see and dice settled up to 41° off their face. Building the collider from the model removes it; measured tilt is now 0.0° on every face of every shape. `faceNormals` also switched to Newell's method, since a face's centroid points along its normal only for faces symmetric about it — true of every Platonic solid, false of the d10's kites, and wrong there by about 17°.
+- A throw that leaves any die propped against a wall or a neighbour is now thrown again rather than shown, up to six attempts. Simulating costs about 4 ms per die, so rejecting a bad throw is cheaper than displaying one. No outcome changes — the faces were decided before any of this ran.
+- The visual regression suite no longer prints "No visual changes detected" immediately after listing the scenes that changed.
+
+### Changed
+
+- **The dice area is a fixed size and the camera no longer moves between rolls.** It previously fitted itself to wherever the dice came to rest, which made the same die a different size on every throw. The tray is now `dieWidth × 3.5` on its shorter side, shaped to the stage, and the camera frames it and nothing else — measured as the tightest area that still lands 30 of 30 dice flat at one, five and ten dice, and twice the on-screen die size of framing the old tray.
+
 ## [0.5.0] - 2026-07-28
 
 Dice that tumble under real physics and still land on the outcome the engine

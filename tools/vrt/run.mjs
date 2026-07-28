@@ -171,8 +171,8 @@ if (failures.length) {
   // Comparing against baselines from a different browser build. Say what was
   // seen, but do not claim it means anything — see the banner above.
   console.log("\nNot failing: this run cannot tell a regression from a browser difference.");
+} else {
+  console.log(
+    wrote.length ? `\n${wrote.length} baseline(s) written.` : "\nNo visual changes detected.",
+  );
 }
-
-console.log(
-  wrote.length ? `\n${wrote.length} baseline(s) written.` : "\nNo visual changes detected.",
-);
