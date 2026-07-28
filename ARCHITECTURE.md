@@ -24,11 +24,11 @@ Plugins implement optional capabilities behind core-defined contracts. Initial p
 
 ### Adapters
 
-Adapters offer idiomatic installation and lifecycle APIs for a host platform. They configure core plus chosen plugins; they do not create alternate rules engines. Planned adapters:
+Adapters offer idiomatic installation and lifecycle APIs for a host platform. They configure core plus chosen plugins; they do not create *divergent* rules engines. On platforms that cannot run TypeScript, an adapter carries a **native port of the headless core**, held bit-for-bit to conformance vectors exported by the TypeScript core (`packages/testing/vectors/core-vectors.json` — ADR-0021), so "the same seed produces the same rolls" stays true across languages, mechanically rather than by promise.
 
-- Web: TypeScript package(s), initially a browser renderer integration.
-- Unity: a Unity package that maps core event records to C# and Unity presentation.
-- Godot: a Godot package/add-on that maps core event records to GDScript/C# and Godot presentation.
+- Web: TypeScript packages; `renderer-web` doubles as the browser adapter (ADR-0007).
+- Godot: a Godot 4 addon with a GDScript port of the core (`adapters/godot/` — engine implemented and conformance-verified; presentation future).
+- Unity: a C# port against the same vectors (future).
 
 ## Core data flow
 
@@ -51,9 +51,10 @@ packages/
   renderer-web/         web rendering integration                  [implemented — also serves as the browser adapter, ADR-0007]
   assets-forge/         the first-party die set, art only          [implemented — optional, no code depends on it, ADR-0013]
   presenter-physics/    simulated motion for a resolved roll       [implemented — optional, cannon-es, ADR-0018]
-  adapter-unity/        Unity-facing integration                   [future]
-  adapter-godot/        Godot-facing integration                   [future]
-  testing/              plugin conformance suite                   [implemented — ADR-0014]
+  testing/              plugin conformance suite + core vectors    [implemented — ADR-0014, ADR-0021]
+adapters/
+  godot/                Godot 4 addon: GDScript core port          [engine implemented — ADR-0021]
+  unity/                Unity package: C# core port                [future — same vectors]
 examples/               minimal, runnable integration examples     [headless + web demo implemented]
 docs/                   user and contributor documentation         [future]
 ```

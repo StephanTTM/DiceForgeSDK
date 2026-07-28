@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!assets"]
+    "includes": ["**", "!assets", "!packages/testing/vectors", "!adapters/godot"]
   },
   "formatter": {
     "enabled": true,

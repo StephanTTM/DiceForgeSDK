@@ -4,7 +4,9 @@
     // DOM only for the timer functions used to bound a hung presentation;
     // nothing here touches a document, and the kit runs anywhere core does.
     "lib": ["ES2022", "DOM"],
-    "types": [],
+    // Node types for the vectors freshness test, which spawns the exporter;
+    // the published dist is built by tsconfig.build.json, which excludes tests.
+    "types": ["node"],
     "rootDir": "src",
     "outDir": "dist"
   },

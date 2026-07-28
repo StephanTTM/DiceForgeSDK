@@ -12,3 +12,7 @@ __pycache__/
 
 # Visual regression output (baselines are committed, results are not)
 tools/vrt/output/
+
+# Godot editor/import cache for the adapter test project
+adapters/godot/.godot/
+adapters/godot/conformance-report.txt

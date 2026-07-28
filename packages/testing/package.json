@@ -23,7 +23,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "vectors"
   ],
   "sideEffects": false,
   "engines": {

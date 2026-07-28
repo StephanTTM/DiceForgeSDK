@@ -47,11 +47,12 @@ implementation to shape them rather than being guessed at in advance.
 - Synthesized rather than sampled, so no audio assets need sourcing or licensing to start.
 - No audio plugin contract yet — the first implementation shapes it, a later second one justifies it.
 
-## Engine adapters
+## Engine adapters *(in progress — Godot first)*
 
-- Prototype Unity adapter with documented install path and end-to-end sample.
-- Prototype Godot adapter with documented install path and end-to-end sample.
-- Verify that adapters share identical core result semantics.
+- Hold every non-TypeScript port to conformance vectors exported by the core, so identical result semantics are verified mechanically. *(shipped — ADR-0021)*
+- Godot: headless engine as a GDScript addon. *(shipped, 48/48 vectors in Godot 4.7)*
+- Godot: presentation — dice in a scene, themes, an end-to-end sample.
+- Unity: C# port against the same vectors, install path, end-to-end sample.
 
 ## 1.0 readiness
 

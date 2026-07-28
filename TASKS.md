@@ -64,6 +64,15 @@ Remaining before tagging 0.1.0:
 - [x] `sound` option on the physics presenter, default off, and a demo checkbox. (verified in-browser: sound off schedules nothing; a 3d6 roll schedules 7 knocks on one lazily-created context; a coin flip 2)
 - [ ] Tune the knock voices down. First listen (product owner, 2026-07-28): the sound works but reads a bit high pitched. Fix shape: lower the material bandpass centres in `audio.ts` (`MATERIALS` — felt 950 / wall 2100 / die 3100 Hz today), keeping their order so felt stays dullest and die-on-die brightest; a longer decay would also soften the read. Constants are internal (ADR-0020), so retuning is free — but tune *with* the product owner listening, not ahead of them.
 
+## Engine adapters (in progress — Godot first, per the product owner)
+
+- [x] Decide how a non-TypeScript platform gets the core: a native port held to exported conformance vectors, bit for bit. (`tools/conformance/export-vectors.mjs` → `packages/testing/vectors/core-vectors.json`, freshness-tested against the live core every run — ADR-0021)
+- [x] Godot: headless engine as a GDScript addon. (`adapters/godot/addons/diceforge` — RNG, grammar v1.2, resolution, custom dice, coin; 48/48 vectors pass in Godot 4.7.1, and one flipped rotate constant fails 16, so the gate is real)
+- [ ] Godot: presentation — dice in a scene, reusing the forge models, an end-to-end sample.
+- [ ] Godot: distribution — Asset Library packaging once presentation exists.
+- [ ] Run the Godot conformance scene in CI. (needs a Godot binary on the runner; the scene already exits nonzero on mismatch)
+- [ ] Unity: C# port of the core against the same vectors.
+
 ## Next
 
 - [x] Guarantee the coin tumbles on entry. (the diagnosis held — isotropic spin reads as a drop 51 times in 60 — but flooring the diameter spin only got it to 40/60: the real lever was air time, so the coin is now *tossed* upward as well. `PhysicsCoin.turnovers` counts horizon crossings, the retry rejects fewer than two, and a rim-spinner longer than 3 s is re-thrown instead of watched. Measured: 120/120 seeds at ≥2 turnovers, worst duration 1.5 s, ~5.5 ms per flip)
@@ -71,8 +80,6 @@ Remaining before tagging 0.1.0:
 
 ## Backlog
 
-- [ ] Unity adapter exploration and package distribution plan. (engine adapters milestone)
-- [ ] Godot adapter exploration and package distribution plan. (engine adapters milestone)
 - [x] Theme/asset pack policy and licensing checklist. (ADR-0010, `assets/LICENSES.md`, CONTRIBUTING)
 - [x] Add the missing `boardgame_bits_texture.png` so the KayKit D6_A/D6_B pip styles can be offered. (`d6Style: "pips-a" | "pips-b"`)
 - [x] Calibrate d10/d12 models so themes can cover every shape. (superseded: first-party set generated for every shape, tables exact by construction — ADR-0011)

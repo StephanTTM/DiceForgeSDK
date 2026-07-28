@@ -1,0 +1,767 @@
+{
+  "contract": "diceforge-core-conformance",
+  "version": 1,
+  "generator": "tools/conformance/export-vectors.mjs",
+  "rng": [
+    {
+      "seed": "table-42",
+      "uint32": [
+        620594660,
+        8249658,
+        2420746511,
+        2562415255,
+        1748188114,
+        820627445,
+        826280001,
+        2360778102,
+        659462640,
+        274819355,
+        1317017332,
+        2327857307,
+        4199467682,
+        1807321550,
+        821448406,
+        4091332450
+      ]
+    },
+    {
+      "seed": "",
+      "uint32": [
+        3381779455,
+        529609052,
+        3230818881,
+        239705,
+        1333946920,
+        3251089133,
+        4149927557,
+        3180057816,
+        369858161,
+        701581779,
+        2662796387,
+        1959572450,
+        929349091,
+        2280337200,
+        2700453999,
+        1655447086
+      ]
+    },
+    {
+      "seed": "0",
+      "uint32": [
+        2845271867,
+        2374021016,
+        1804161026,
+        634859905,
+        768555191,
+        2939502826,
+        3347588160,
+        875229401,
+        2513461999,
+        2616666531,
+        4178842446,
+        3082690013,
+        2104414897,
+        2253993185,
+        561039651,
+        647134788
+      ]
+    },
+    {
+      "seed": "42",
+      "uint32": [
+        164136637,
+        2507053714,
+        335270064,
+        1804198605,
+        1174834312,
+        2955824659,
+        3431101737,
+        302297811,
+        3303308418,
+        3445159907,
+        195670552,
+        2326047385,
+        587940821,
+        3010888537,
+        619785748,
+        2175198113
+      ]
+    },
+    {
+      "seed": "The quick brown fox",
+      "uint32": [
+        1237160417,
+        1848907406,
+        3780061255,
+        3326197891,
+        3807121967,
+        533379663,
+        3602457526,
+        1427580332,
+        701352126,
+        3532309346,
+        3649452098,
+        4061525943,
+        3396287628,
+        3997432833,
+        1588179173,
+        4219400433
+      ]
+    },
+    {
+      "seed": "unicode-é→🎲",
+      "uint32": [
+        550097826,
+        618020052,
+        2715139893,
+        133879331,
+        1855406058,
+        1692392340,
+        3061824960,
+        1199883393,
+        2809418461,
+        3597645437,
+        3660152611,
+        1467873894,
+        2188516446,
+        1133019257,
+        3786908083,
+        574262062
+      ]
+    }
+  ],
+  "faces": [
+    {
+      "seed": "faces-6",
+      "sides": 6,
+      "values": [
+        2,
+        2,
+        3,
+        2,
+        6,
+        4,
+        3,
+        4,
+        4,
+        3,
+        5,
+        6
+      ]
+    },
+    {
+      "seed": "faces-20",
+      "sides": 20,
+      "values": [
+        17,
+        6,
+        9,
+        11,
+        2,
+        18,
+        18,
+        3,
+        14,
+        5,
+        18,
+        9
+      ]
+    },
+    {
+      "seed": "faces-100",
+      "sides": 100,
+      "values": [
+        39,
+        17,
+        60,
+        4,
+        5,
+        45,
+        63,
+        86,
+        63,
+        19,
+        26,
+        71
+      ]
+    },
+    {
+      "seed": "faces-3",
+      "sides": 3,
+      "values": [
+        1,
+        1,
+        2,
+        1,
+        3,
+        1,
+        3,
+        2,
+        1,
+        3,
+        2,
+        2
+      ]
+    },
+    {
+      "seed": "faces-1000",
+      "sides": 1000,
+      "values": [
+        543,
+        168,
+        218,
+        293,
+        641,
+        479,
+        948,
+        770,
+        744,
+        431,
+        957,
+        277
+      ]
+    }
+  ],
+  "parse": [
+    {
+      "expression": "1d6",
+      "normalized": "1d6"
+    },
+    {
+      "expression": "2d20kh1+3",
+      "normalized": "2d20kh1+3"
+    },
+    {
+      "expression": "4d6dl1",
+      "normalized": "4d6dl1"
+    },
+    {
+      "expression": "d%",
+      "normalized": "1d100"
+    },
+    {
+      "expression": "3d6!",
+      "normalized": "3d6!"
+    },
+    {
+      "expression": "4d6r1kh3",
+      "normalized": "4d6r1kh3"
+    },
+    {
+      "expression": "4d6kh3r1",
+      "normalized": "4d6r1kh3"
+    },
+    {
+      "expression": "2D10Kh",
+      "normalized": "2d10kh1"
+    },
+    {
+      "expression": " 1d6 + 2 ",
+      "normalized": "1d6+2"
+    },
+    {
+      "expression": "d{fate}",
+      "normalized": "1d{fate}"
+    },
+    {
+      "expression": "4d{fate}!",
+      "normalized": "4d{fate}!"
+    },
+    {
+      "expression": "1d6-2+3d4dh2",
+      "normalized": "1d6-2+3d4dh2"
+    },
+    {
+      "expression": "-2d6+10",
+      "normalized": "-2d6+10"
+    },
+    {
+      "expression": "10d10ro3!kh4",
+      "normalized": "10d10ro3!kh4"
+    },
+    {
+      "expression": "1d1000",
+      "normalized": "1d1000"
+    }
+  ],
+  "parseErrors": [
+    {
+      "expression": "",
+      "position": 0
+    },
+    {
+      "expression": "5",
+      "position": 0
+    },
+    {
+      "expression": "d1",
+      "position": 1
+    },
+    {
+      "expression": "0d6",
+      "position": 0
+    },
+    {
+      "expression": "1d6kh1kh1",
+      "position": 6
+    },
+    {
+      "expression": "2d6kh5",
+      "position": 5
+    },
+    {
+      "expression": "d{nope}",
+      "position": 1
+    },
+    {
+      "expression": "d{",
+      "position": 1
+    },
+    {
+      "expression": "1d",
+      "position": 2
+    },
+    {
+      "expression": "!!",
+      "position": 0
+    },
+    {
+      "expression": "1d6r6",
+      "position": 3
+    },
+    {
+      "expression": "1d6xx2",
+      "position": 3
+    },
+    {
+      "expression": "101d6",
+      "position": 0
+    },
+    {
+      "expression": "1d1001",
+      "position": 2
+    }
+  ],
+  "rolls": [
+    {
+      "seed": "table-42",
+      "expression": "2d20kh1+3",
+      "record": {
+        "kind": "roll",
+        "schemaVersion": 2,
+        "expression": "2d20kh1+3",
+        "groups": [
+          {
+            "notation": "2d20kh1",
+            "sign": 1,
+            "sides": 20,
+            "dice": [
+              {
+                "sides": 20,
+                "value": 1,
+                "kept": false
+              },
+              {
+                "sides": 20,
+                "value": 19,
+                "kept": true
+              }
+            ],
+            "subtotal": 19
+          }
+        ],
+        "modifier": 3,
+        "total": 22,
+        "provenance": {
+          "source": "seeded",
+          "seed": "table-42",
+          "algorithm": "xoshiro128**"
+        }
+      }
+    },
+    {
+      "seed": "table-42",
+      "expression": "4d6dl1",
+      "record": {
+        "kind": "roll",
+        "schemaVersion": 2,
+        "expression": "4d6dl1",
+        "groups": [
+          {
+            "notation": "4d6dl1",
+            "sign": 1,
+            "sides": 6,
+            "dice": [
+              {
+                "sides": 6,
+                "value": 3,
+                "kept": true
+              },
+              {
+                "sides": 6,
+                "value": 1,
+                "kept": false
+              },
+              {
+                "sides": 6,
+                "value": 6,
+                "kept": true
+              },
+              {
+                "sides": 6,
+                "value": 2,
+                "kept": true
+              }
+            ],
+            "subtotal": 11
+          }
+        ],
+        "modifier": 0,
+        "total": 11,
+        "provenance": {
+          "source": "seeded",
+          "seed": "table-42",
+          "algorithm": "xoshiro128**"
+        }
+      }
+    },
+    {
+      "seed": "vectors",
+      "expression": "10d10ro3!kh4",
+      "record": {
+        "kind": "roll",
+        "schemaVersion": 2,
+        "expression": "10d10ro3!kh4",
+        "groups": [
+          {
+            "notation": "10d10ro3!kh4",
+            "sign": 1,
+            "sides": 10,
+            "dice": [
+              {
+                "sides": 10,
+                "value": 10,
+                "kept": true
+              },
+              {
+                "sides": 10,
+                "value": 10,
+                "kept": true,
+                "source": "explosion"
+              },
+              {
+                "sides": 10,
+                "value": 7,
+                "kept": false,
+                "source": "explosion"
+              },
+              {
+                "sides": 10,
+                "value": 4,
+                "kept": false
+              },
+              {
+                "sides": 10,
+                "value": 8,
+                "kept": false
+              },
+              {
+                "sides": 10,
+                "value": 5,
+                "kept": false
+              },
+              {
+                "sides": 10,
+                "value": 10,
+                "kept": true
+              },
+              {
+                "sides": 10,
+                "value": 1,
+                "kept": false,
+                "source": "explosion"
+              },
+              {
+                "sides": 10,
+                "value": 2,
+                "kept": false,
+                "rerolled": true
+              },
+              {
+                "sides": 10,
+                "value": 8,
+                "kept": false,
+                "source": "reroll"
+              },
+              {
+                "sides": 10,
+                "value": 9,
+                "kept": true
+              },
+              {
+                "sides": 10,
+                "value": 8,
+                "kept": false
+              },
+              {
+                "sides": 10,
+                "value": 9,
+                "kept": false
+              },
+              {
+                "sides": 10,
+                "value": 6,
+                "kept": false
+              }
+            ],
+            "subtotal": 39
+          }
+        ],
+        "modifier": 0,
+        "total": 39,
+        "provenance": {
+          "source": "seeded",
+          "seed": "vectors",
+          "algorithm": "xoshiro128**"
+        }
+      }
+    },
+    {
+      "seed": "zz",
+      "expression": "3d6!+2d20-5",
+      "record": {
+        "kind": "roll",
+        "schemaVersion": 2,
+        "expression": "3d6!+2d20-5",
+        "groups": [
+          {
+            "notation": "3d6!",
+            "sign": 1,
+            "sides": 6,
+            "dice": [
+              {
+                "sides": 6,
+                "value": 6,
+                "kept": true
+              },
+              {
+                "sides": 6,
+                "value": 3,
+                "kept": true,
+                "source": "explosion"
+              },
+              {
+                "sides": 6,
+                "value": 5,
+                "kept": true
+              },
+              {
+                "sides": 6,
+                "value": 6,
+                "kept": true
+              },
+              {
+                "sides": 6,
+                "value": 2,
+                "kept": true,
+                "source": "explosion"
+              }
+            ],
+            "subtotal": 22
+          },
+          {
+            "notation": "2d20",
+            "sign": 1,
+            "sides": 20,
+            "dice": [
+              {
+                "sides": 20,
+                "value": 17,
+                "kept": true
+              },
+              {
+                "sides": 20,
+                "value": 8,
+                "kept": true
+              }
+            ],
+            "subtotal": 25
+          }
+        ],
+        "modifier": -5,
+        "total": 42,
+        "provenance": {
+          "source": "seeded",
+          "seed": "zz",
+          "algorithm": "xoshiro128**"
+        }
+      }
+    },
+    {
+      "seed": "fate-seed",
+      "expression": "4d{fate}",
+      "dice": [
+        {
+          "id": "fate",
+          "faces": [
+            {
+              "value": -1,
+              "label": "-"
+            },
+            {
+              "value": -1,
+              "label": "-"
+            },
+            {
+              "value": 0,
+              "label": " "
+            },
+            {
+              "value": 0,
+              "label": " "
+            },
+            {
+              "value": 1,
+              "label": "+"
+            },
+            {
+              "value": 1,
+              "label": "+"
+            }
+          ]
+        }
+      ],
+      "record": {
+        "kind": "roll",
+        "schemaVersion": 2,
+        "expression": "4d{fate}",
+        "groups": [
+          {
+            "notation": "4d{fate}",
+            "sign": 1,
+            "sides": 6,
+            "die": "fate",
+            "dice": [
+              {
+                "sides": 6,
+                "value": 0,
+                "kept": true,
+                "die": "fate",
+                "label": " "
+              },
+              {
+                "sides": 6,
+                "value": -1,
+                "kept": true,
+                "die": "fate",
+                "label": "-"
+              },
+              {
+                "sides": 6,
+                "value": -1,
+                "kept": true,
+                "die": "fate",
+                "label": "-"
+              },
+              {
+                "sides": 6,
+                "value": 1,
+                "kept": true,
+                "die": "fate",
+                "label": "+"
+              }
+            ],
+            "subtotal": -1
+          }
+        ],
+        "modifier": 0,
+        "total": -1,
+        "provenance": {
+          "source": "seeded",
+          "seed": "fate-seed",
+          "algorithm": "xoshiro128**"
+        }
+      }
+    },
+    {
+      "seed": "percentile",
+      "expression": "d%+1d4",
+      "record": {
+        "kind": "roll",
+        "schemaVersion": 2,
+        "expression": "1d100+1d4",
+        "groups": [
+          {
+            "notation": "1d100",
+            "sign": 1,
+            "sides": 100,
+            "dice": [
+              {
+                "sides": 100,
+                "value": 5,
+                "kept": true
+              }
+            ],
+            "subtotal": 5
+          },
+          {
+            "notation": "1d4",
+            "sign": 1,
+            "sides": 4,
+            "dice": [
+              {
+                "sides": 4,
+                "value": 1,
+                "kept": true
+              }
+            ],
+            "subtotal": 1
+          }
+        ],
+        "modifier": 0,
+        "total": 6,
+        "provenance": {
+          "source": "seeded",
+          "seed": "percentile",
+          "algorithm": "xoshiro128**"
+        }
+      }
+    }
+  ],
+  "coins": [
+    {
+      "seed": "coin-seed",
+      "outcomes": [
+        "heads",
+        "heads",
+        "tails",
+        "tails",
+        "tails",
+        "tails",
+        "heads",
+        "tails",
+        "heads",
+        "heads",
+        "heads",
+        "tails"
+      ]
+    },
+    {
+      "seed": "table-42",
+      "outcomes": [
+        "heads",
+        "heads",
+        "tails",
+        "tails",
+        "heads",
+        "tails",
+        "tails",
+        "heads",
+        "heads",
+        "tails",
+        "heads",
+        "tails"
+      ]
+    }
+  ]
+}
