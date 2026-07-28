@@ -93,6 +93,19 @@ export const scenes = [
     query: { physics: "1", theme: "blue", notation: "3d3", seed: "q7", w: 520, h: 340 },
   },
   {
+    name: "physics-coin",
+    why: "a physics coin lands flat on the recorded outcome, in the same tray as the dice",
+    query: {
+      physics: "1",
+      theme: "yellow",
+      flip: "1",
+      seed: "table-42",
+      throw: "coin",
+      w: 520,
+      h: 340,
+    },
+  },
+  {
     name: "dom-fallback",
     why: "the no-theme path: labelled tiles, including a dropped die",
     query: { notation: "4d6dl1", seed: "table-42", render: "dom", w: 520, h: 240 },

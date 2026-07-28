@@ -1,17 +1,18 @@
 import type { PolyhedronData, ShapedDieSides, Vec3 } from "@diceforge-sdk/renderer-web";
-import type { GSSolver } from "cannon-es";
+import type { GSSolver, Shape } from "cannon-es";
 import {
   Body,
   ContactMaterial,
   ConvexPolyhedron,
   Vec3 as CVec3,
+  Cylinder,
   Material,
   Plane,
   World,
 } from "cannon-es";
 import { faceDirections, solidFromFaceDirections } from "./solid.js";
 import type { QuaternionTuple } from "./symmetry.js";
-import { symmetryTable, upwardFace } from "./symmetry.js";
+import { multiply, symmetryTable, upwardFace } from "./symmetry.js";
 
 /** One die to roll: its shape, and the face the engine already resolved. */
 export type PhysicsDieRequest = {
@@ -49,6 +50,43 @@ export type PhysicsDie = {
    * rest leaning on a wall or a neighbour, where the face is harder to read.
    */
   readonly seated: number;
+};
+
+/** One coin to flip: the outcome the engine already resolved, and the model. */
+export type PhysicsCoinRequest = {
+  /** The recorded outcome. This is what must be showing at the end. */
+  readonly outcome: "heads" | "tails";
+  /**
+   * The model's calibrated pair — heads first, then tails — each the rotation
+   * bringing that face to the top. The same role `faceRotations` plays for a
+   * die (ADR-0019): the collider knows it is a cylinder and nothing else, so
+   * the model must say which way its faces point. Themes carry it as
+   * `coin.rotations`.
+   */
+  readonly rotations: readonly [QuaternionTuple, QuaternionTuple];
+  /** The coin's radius, in the caller's units. Measure the model rather than assume. */
+  readonly radius: number;
+  /** The coin's thickness, in the caller's units. */
+  readonly thickness: number;
+};
+
+export type PhysicsCoin = {
+  readonly outcome: "heads" | "tails";
+  /** Rotation for the mesh inside its collider, as `PhysicsDie.remap`. */
+  readonly remap: QuaternionTuple;
+  readonly frames: readonly PhysicsFrame[];
+  /** How squarely it finished: 1 is flat, near 0 is resting on the rim. */
+  readonly seated: number;
+};
+
+/** A coin flip's recorded motion, shaped like `PhysicsRoll` for one coin. */
+export type PhysicsFlip = {
+  readonly coin: PhysicsCoin;
+  readonly frameRate: number;
+  readonly duration: number;
+  readonly tray: PhysicsTray;
+  readonly resting: PhysicsBounds;
+  readonly settled: boolean;
 };
 
 /** A rectangle on the table: where it sits, and how far it reaches. */
@@ -193,11 +231,23 @@ function collider(data: PolyhedronData): ConvexPolyhedron {
   return new ConvexPolyhedron({ vertices, faces });
 }
 
-/** One throw, start to finish. `simulateRoll` may not like how it landed. */
-function throwOnce(
-  request: readonly PhysicsDieRequest[],
-  options: SimulateOptions = {},
-): PhysicsRoll {
+/** What the shared world run hands back, in the caller's units. */
+type WorldRun = {
+  readonly frames: PhysicsFrame[][];
+  readonly orientations: QuaternionTuple[];
+  readonly frameRate: number;
+  readonly duration: number;
+  readonly tray: PhysicsTray;
+  readonly resting: PhysicsBounds;
+  readonly settled: boolean;
+};
+
+/**
+ * Throws a set of bodies into the tray and records where they go. Dice and
+ * coins differ only in their colliders and in how a resting pose is read; the
+ * world, the walls, the throw and the recording are one implementation.
+ */
+function throwBodies(shapes: readonly Shape[], options: SimulateOptions): WorldRun {
   const dieRadius = options.dieRadius ?? 1;
   const frameRate = options.frameRate ?? 60;
   const random = options.random ?? Math.random;
@@ -249,10 +299,10 @@ function throwOnce(
   const spread = (magnitude: number) => (random() * 2 - 1) * magnitude;
   const throwX = Math.max(halfWidthM * 0.35, DIE_RADIUS_M * 2);
   const throwZ = Math.max(halfDepthM * 0.35, DIE_RADIUS_M * 2);
-  const bodies = request.map((die, index) => {
+  const bodies = shapes.map((shape, index) => {
     const body = new Body({
       mass: 0.004,
-      shape: collider(solidFor(die).data),
+      shape,
       material: dieMaterial,
       // A real die bleeds energy into the felt; without damping a spinning one
       // outlasts anyone's patience.
@@ -270,7 +320,7 @@ function throwOnce(
     return body;
   });
 
-  const frames: PhysicsFrame[][] = request.map(() => []);
+  const frames: PhysicsFrame[][] = shapes.map(() => []);
   const record = () => {
     bodies.forEach((body, index) => {
       (frames[index] as PhysicsFrame[]).push({
@@ -298,18 +348,53 @@ function throwOnce(
   }
   if (steps % stepsPerFrame !== 0) record();
 
+  const orientations: QuaternionTuple[] = bodies.map((body) => [
+    body.quaternion.x,
+    body.quaternion.y,
+    body.quaternion.z,
+    body.quaternion.w,
+  ]);
+
+  const span = (axis: 0 | 2): { centre: number; half: number } => {
+    const values = frames.map((body) => body[body.length - 1]?.position[axis] ?? 0);
+    const low = Math.min(...values);
+    const high = Math.max(...values);
+    return { centre: (low + high) / 2, half: (high - low) / 2 + dieRadius };
+  };
+  const x = span(0);
+  const z = span(2);
+
+  return {
+    frames,
+    orientations,
+    frameRate,
+    duration: steps * STEP,
+    tray,
+    resting: {
+      center: [x.centre, z.centre],
+      halfWidth: x.half,
+      halfDepth: z.half,
+    },
+    settled,
+  };
+}
+
+/** One throw, start to finish. `simulateRoll` may not like how it landed. */
+function throwOnce(
+  request: readonly PhysicsDieRequest[],
+  options: SimulateOptions = {},
+): PhysicsRoll {
+  const run = throwBodies(
+    request.map((die) => collider(solidFor(die).data)),
+    options,
+  );
+
   const dice: PhysicsDie[] = request.map((die, index) => {
     const { key, data } = solidFor(die);
     // A face of this solid *is* a numeral, so no correspondence is needed
     // between what the physics landed on and what the model shows (ADR-0019).
     const normals = faceDirections(die.faceRotations);
-    const body = bodies[index] as Body;
-    const orientation: QuaternionTuple = [
-      body.quaternion.x,
-      body.quaternion.y,
-      body.quaternion.z,
-      body.quaternion.w,
-    ];
+    const orientation = run.orientations[index] as QuaternionTuple;
     const landed = upwardFace(normals, orientation);
     const table = symmetryTable(data, key);
     // Face values are one-based; the table is not.
@@ -322,31 +407,18 @@ function throwOnce(
       shape: die.shape,
       face: die.face,
       remap,
-      frames: frames[index] as PhysicsFrame[],
+      frames: run.frames[index] as PhysicsFrame[],
       seated,
     };
   });
 
-  const span = (axis: 0 | 2): { centre: number; half: number } => {
-    const values = dice.map((die) => die.frames[die.frames.length - 1]?.position[axis] ?? 0);
-    const low = Math.min(...values);
-    const high = Math.max(...values);
-    return { centre: (low + high) / 2, half: (high - low) / 2 + dieRadius };
-  };
-  const x = span(0);
-  const z = span(2);
-
   return {
     dice,
-    frameRate,
-    duration: steps * STEP,
-    tray,
-    resting: {
-      center: [x.centre, z.centre],
-      halfWidth: x.half,
-      halfDepth: z.half,
-    },
-    settled,
+    frameRate: run.frameRate,
+    duration: run.duration,
+    tray: run.tray,
+    resting: run.resting,
+    settled: run.settled,
   };
 }
 
@@ -396,6 +468,82 @@ export function simulateRoll(
     }
   }
   return best as PhysicsRoll;
+}
+
+/** The coin's two face directions in its collider frame: heads up, tails down. */
+const COIN_NORMALS: readonly Vec3[] = [
+  [0, 1, 0],
+  [0, -1, 0],
+];
+/** A half turn about a diameter: the cylinder symmetry that swaps the faces. */
+const COIN_FLIP: QuaternionTuple = [1, 0, 0, 0];
+
+/** One flip, start to finish. `simulateCoinFlip` may not like how it landed. */
+function flipOnce(request: PhysicsCoinRequest, options: SimulateOptions = {}): PhysicsFlip {
+  const dieRadius = options.dieRadius ?? 1;
+  // The world is scaled so a die's circumradius is DIE_RADIUS_M; the coin's
+  // measured dimensions ride the same conversion, so coin and dice share one
+  // tray at consistent sizes.
+  const toMetres = DIE_RADIUS_M / dieRadius;
+  const radiusM = request.radius * toMetres;
+  const thicknessM = request.thickness * toMetres;
+  // Enough segments that the rim is round to the eye of the solver; a coarse
+  // prism rocks from facet to facet instead of rolling and takes longer to die.
+  const run = throwBodies([new Cylinder(radiusM, radiusM, thicknessM, 24)], options);
+
+  const orientation = run.orientations[0] as QuaternionTuple;
+  // The collider's +Y face *is* heads, its -Y face tails — the coin version of
+  // "a collider face is a numeral" (ADR-0019).
+  const landed = upwardFace(COIN_NORMALS, orientation);
+  const target = request.outcome === "heads" ? 0 : 1;
+  // Seat the model in the collider first: the calibrated pair's heads rotation
+  // brings heads to +Y, which is exactly the collider's heads face. When the
+  // simulation landed the other face up, follow with the half turn — a
+  // symmetry of the cylinder, so the physics never notices (ADR-0018).
+  const align = request.rotations[0];
+  const remap = landed === target ? align : multiply(COIN_FLIP, align);
+  const seated = COIN_NORMALS.reduce(
+    (best, normal) => Math.max(best, -rotateY(normal, orientation)),
+    -1,
+  );
+
+  return {
+    coin: {
+      outcome: request.outcome,
+      remap,
+      frames: run.frames[0] as PhysicsFrame[],
+      seated,
+    },
+    frameRate: run.frameRate,
+    duration: run.duration,
+    tray: run.tray,
+    resting: run.resting,
+    settled: run.settled,
+  };
+}
+
+/**
+ * Flips a coin with real physics and lands it on the recorded outcome.
+ *
+ * The same contract as `simulateRoll`: the outcome was resolved before this
+ * ran, the whole trajectory is recorded up front, and a flip that finishes on
+ * its rim — or leaning against a wall — is thrown again rather than shown.
+ */
+export function simulateCoinFlip(
+  request: PhysicsCoinRequest,
+  options: SimulateOptions = {},
+): PhysicsFlip {
+  let best: PhysicsFlip | undefined;
+  let bestSeating = Number.NEGATIVE_INFINITY;
+  for (let attempt = 0; attempt < MAX_THROWS; attempt++) {
+    const flip = flipOnce(request, options);
+    if (flip.settled && flip.coin.seated >= MIN_SEATED) return flip;
+    if (flip.coin.seated > bestSeating) {
+      bestSeating = flip.coin.seated;
+      best = flip;
+    }
+  }
+  return best as PhysicsFlip;
 }
 
 /** The Y component of a rotated vector, which is all the seating test needs. */

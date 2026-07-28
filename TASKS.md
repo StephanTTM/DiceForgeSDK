@@ -55,18 +55,7 @@ Remaining before tagging 0.1.0:
 
 - [x] Tie each die value to the numeral printed on the model, in CI. (`forge-models.test.ts` walks rotation → face → UV → atlas tile, and checks every tile is inked and distinct; proved by a generator-style fault that no other test caught)
 - [x] Make the pre-publish tarball check repeatable. (`npm run smoke` — packs, installs and uses all five packages, ~20 s)
-- [ ] Physics coin flips. Coins delegate to the renderer's toss today, so physics mode visibly swaps canvases mid-session. What was established before starting:
-  - The half-space construction in `solid.ts` **cannot** build a coin — two opposing face directions define an infinite slab, not a solid. It needs `cannon-es`'s `Cylinder`, whose axis is **Y** (measured: a `Cylinder(1, 1, 0.2, 16)` spans 2.0 in x and z, 0.2 in y).
-  - The shipped `coin.glb` is thin along **Z**: bounds ±1.0346 in x/y, ±0.1155 in z, so radius ≈ 1.035 and thickness ≈ 0.231 in model units. `FORGE_COIN_ROTATIONS[0]` is +90° about X, which puts heads at −Z and tails at +Z. Seating the model in the collider therefore needs a quarter turn about X, and `DiceTheme.coin` carries no dimensions — either measure the loaded model or take radius/thickness as options.
-  - `faceDirections` already works for a coin: it returns the two ±Z normals from the rotation pair.
-  - The remap is a half turn about any diameter, which is a symmetry of a cylinder, so ADR-0018's technique holds unchanged.
-  - A coin can settle on its rim. `seated` computed from the two face directions goes to ~0 there, so the existing retry loop rejects it — but the rate and the threshold want measuring, the way die seating was.
-  - **Open question for the product owner, before building:** a coin currently gets a dedicated toss animation. A disc clattering into a dice tray may read *worse* than that; the win is consistency, not fidelity. Worth deciding before the work rather than after.
-
-- [x] Fix the physics presenter showing the wrong numeral and resting dice cocked. (the collider is built from the model's calibrated face table, so a collider face *is* a number; 0/60 faces wrong and 0.0° tilt, against 57/60 and up to 41° — ADR-0019)
-- [x] Replace the per-roll camera fit with a fixed dice area. (tray is `dieWidth × 3.5`, measured as the tightest that lands 30/30 flat at 1, 5 and 10 dice; the camera frames it and never moves — ADR-0019)
-
-- [ ] Extend the plugin contracts to the categories beyond presentation (physics, audio, transport) once a second implementation exists to shape them — ARCHITECTURE lists them, but nothing implements them yet.
+- [x] Physics coin flips. (`simulateCoinFlip` — cylinder collider whose faces *are* the outcomes, thrown into the shared tray; the model's calibrated pair seats it and a half-turn symmetry lands the recorded face; radius and thickness measured from the loaded model; rim landings re-thrown. 60/60 seeded flips flat on the recorded outcome at ~5 ms each; the presenter no longer swaps canvases for a coin)
 
 ## Backlog
 

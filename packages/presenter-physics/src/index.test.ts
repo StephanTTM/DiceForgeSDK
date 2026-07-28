@@ -1,6 +1,6 @@
 import { createDiceEngine, createSeededRandomSource } from "@diceforge-sdk/core";
 import type { ShapedDieSides, Vec3 } from "@diceforge-sdk/renderer-web";
-import { FORGE_FACE_ROTATIONS } from "@diceforge-sdk/renderer-web";
+import { FORGE_COIN_ROTATIONS, FORGE_FACE_ROTATIONS } from "@diceforge-sdk/renderer-web";
 import { describe, expect, it } from "vitest";
 import type { PhysicsDie, QuaternionTuple } from "./index.js";
 import {
@@ -8,6 +8,7 @@ import {
   faceNormals,
   multiply,
   rotate,
+  simulateCoinFlip,
   simulateRoll,
   solidFromFaceDirections,
   symmetryTable,
@@ -176,6 +177,78 @@ describe("simulateRoll", () => {
 
     expect(Math.min(...seatings)).toBeGreaterThan(0.7);
     expect(flat / seatings.length).toBeGreaterThan(0.8);
+  });
+});
+
+describe("simulateCoinFlip", () => {
+  /** The shipped coin's proportions, measured from the model (ADR addendum in TASKS). */
+  function flip(outcome: "heads" | "tails", seed: string) {
+    return simulateCoinFlip(
+      { outcome, rotations: FORGE_COIN_ROTATIONS, radius: 1.0346, thickness: 0.231 },
+      { dieRadius: 1.05, random: seededRandom(seed) },
+    );
+  }
+
+  /** Which printed face is up once the recorded pose and the remap compose. */
+  function shownFace(result: ReturnType<typeof flip>): {
+    face: "heads" | "tails";
+    height: number;
+  } {
+    const coin = result.coin;
+    const last = coin.frames[coin.frames.length - 1];
+    if (!last) throw new Error("no frames");
+    const drawn = multiply(last.orientation, coin.remap);
+    const heads = FORGE_COIN_ROTATIONS[0];
+    const tails = FORGE_COIN_ROTATIONS[1];
+    const headsUp = rotate(
+      rotate([0, 1, 0], [-heads[0], -heads[1], -heads[2], heads[3]]),
+      drawn,
+    )[1];
+    const tailsUp = rotate(
+      rotate([0, 1, 0], [-tails[0], -tails[1], -tails[2], tails[3]]),
+      drawn,
+    )[1];
+    return headsUp > tailsUp
+      ? { face: "heads", height: headsUp }
+      : { face: "tails", height: tailsUp };
+  }
+
+  it("lands flat on the recorded outcome, for both outcomes across seeds", () => {
+    for (const outcome of ["heads", "tails"] as const) {
+      for (let trial = 0; trial < 5; trial++) {
+        const result = flip(outcome, `coin-${outcome}-${trial}`);
+        const shown = shownFace(result);
+        expect(result.settled, `${outcome} trial ${trial} never settled`).toBe(true);
+        expect(shown.face, `${outcome} trial ${trial}`).toBe(outcome);
+        // Flat, not merely uppermost: a rim rest would leave the face near 0.
+        expect(shown.height, `${outcome} trial ${trial} tilted`).toBeGreaterThan(0.999);
+      }
+    }
+  });
+
+  it("stays inside the tray", () => {
+    const result = flip("heads", "coin-walls");
+    for (const frame of result.coin.frames) {
+      expect(Math.abs(frame.position[0])).toBeLessThanOrEqual(result.tray.halfWidth + 1.1);
+      expect(Math.abs(frame.position[2])).toBeLessThanOrEqual(result.tray.halfDepth + 1.1);
+    }
+  });
+
+  it("shares the dice tray, so the camera never moves between rolls and flips", () => {
+    const roll = simulateRoll([request(20, 7)], { random: seededRandom("shared-tray") });
+    const result = simulateCoinFlip(
+      { outcome: "tails", rotations: FORGE_COIN_ROTATIONS, radius: 1.0346, thickness: 0.231 },
+      { random: seededRandom("shared-tray") },
+    );
+    expect(result.tray).toEqual(roll.tray);
+  });
+
+  it("takes the same throw to the same place, so a failure reproduces", () => {
+    const a = flip("tails", "coin-repeat");
+    const b = flip("tails", "coin-repeat");
+    expect(b.coin.frames[b.coin.frames.length - 1]).toEqual(
+      a.coin.frames[a.coin.frames.length - 1],
+    );
   });
 });
 

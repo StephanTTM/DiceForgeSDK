@@ -24,13 +24,16 @@
 export type { PhysicsPresenter, PhysicsPresenterOptions } from "./playback.js";
 export { createPhysicsPresenter } from "./playback.js";
 export type {
+  PhysicsCoin,
+  PhysicsCoinRequest,
   PhysicsDie,
   PhysicsDieRequest,
+  PhysicsFlip,
   PhysicsFrame,
   PhysicsRoll,
   SimulateOptions,
 } from "./simulate.js";
-export { simulateRoll } from "./simulate.js";
+export { simulateCoinFlip, simulateRoll } from "./simulate.js";
 export { faceDirections, solidFromFaceDirections } from "./solid.js";
 export type { QuaternionTuple } from "./symmetry.js";
 export { faceNormals, multiply, rotate, symmetryTable } from "./symmetry.js";

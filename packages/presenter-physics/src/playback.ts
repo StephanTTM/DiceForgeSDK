@@ -13,6 +13,7 @@ import {
 } from "@diceforge-sdk/renderer-web";
 import {
   AmbientLight,
+  Box3,
   Color,
   DirectionalLight,
   Group,
@@ -25,10 +26,11 @@ import {
   PlaneGeometry,
   Scene,
   ShadowMaterial,
+  Vector3,
   WebGLRenderer,
 } from "three";
-import type { PhysicsDie, PhysicsTray } from "./simulate.js";
-import { simulateRoll } from "./simulate.js";
+import type { PhysicsDie, PhysicsFlip, PhysicsTray } from "./simulate.js";
+import { simulateCoinFlip, simulateRoll } from "./simulate.js";
 import type { QuaternionTuple } from "./symmetry.js";
 
 export type PhysicsPresenterOptions = {
@@ -87,7 +89,8 @@ function prefersReduced(host: { matchMedia?: (q: string) => { matches: boolean }
 
 type DrawnDie = {
   readonly object: Object3D;
-  readonly motion: PhysicsDie;
+  /** What playback needs: the recording, and the mesh's in-collider rotation. */
+  readonly motion: Pick<PhysicsDie, "frames" | "remap">;
   readonly kept: boolean;
   readonly materials: readonly MeshStandardMaterial[];
   readonly baseColors: readonly Color[];
@@ -96,11 +99,11 @@ type DrawnDie = {
 /**
  * A presenter that rolls dice with physics and lands them on the recorded face.
  *
- * It draws only what it can honestly simulate — a roll whose dice all have
- * models. Coin flips, custom dice, unusual face counts, a missing theme or a
- * browser without WebGL are handed to `@diceforge-sdk/renderer-web`, which
- * already does them well. Delegating rather than reimplementing is why this
- * package is small.
+ * It draws only what it can honestly simulate — rolls whose dice all have
+ * models, and coin flips when the theme ships a coin. Custom dice, unusual
+ * face counts, a missing theme or a browser without WebGL are handed to
+ * `@diceforge-sdk/renderer-web`, which already does them well. Delegating
+ * rather than reimplementing is why this package is small.
  */
 export function createPhysicsPresenter(options: PhysicsPresenterOptions): PhysicsPresenter {
   const { container } = options;
@@ -138,7 +141,9 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
   };
 
   const models = options.theme?.models;
+  const coinModel = options.theme?.coin;
   const canRoll = delegate.mode === "webgl" && models !== undefined;
+  const canFlip = delegate.mode === "webgl" && coinModel !== undefined;
 
   let scene: Scene | undefined;
   let renderer: WebGLRenderer | undefined;
@@ -290,6 +295,63 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
     };
   }
 
+  /**
+   * Builds the coin and simulates its flip in one step: the collider's
+   * dimensions are measured from the loaded model rather than assumed, so a
+   * themed coin of any proportions collides as the coin it is (ADR-0019).
+   */
+  async function buildCoin(
+    outcome: "heads" | "tails",
+  ): Promise<{ drawn: DrawnDie; motion: PhysicsFlip } | null> {
+    if (!coinModel) return null;
+    const model = await loadDieModel(coinModel.url);
+    if (!model) return null;
+    const object = instantiateDieModel(model);
+    object.scale.multiplyScalar(DIE_RADIUS);
+    for (const slot of ["heads", "tails", "rim"] as const) {
+      const url = coinModel.textures?.[slot];
+      if (!url) continue;
+      const texture = await loadThemeTexture(url);
+      // Material names come from the model, e.g. "forge_coin_heads".
+      if (texture) applyTexture(object, texture, (name) => name.endsWith(slot));
+    }
+
+    // The loader normalizes on the largest dimension, so the diameter is the
+    // biggest extent and the thickness the smallest, whichever axis is which.
+    const bounds = new Box3().setFromObject(object);
+    const size = bounds.getSize(new Vector3());
+    const radius = Math.max(size.x, size.y, size.z) / 2;
+    const thickness = Math.min(size.x, size.y, size.z);
+
+    const motion = simulateCoinFlip(
+      { outcome, rotations: coinModel.rotations, radius, thickness },
+      {
+        dieRadius: DIE_RADIUS,
+        trayAspect: (container.clientWidth || 640) / (container.clientHeight || 360),
+        ...(options.random ? { random: options.random } : {}),
+      },
+    );
+
+    const wrapper = new Group();
+    wrapper.add(object);
+    const remap = motion.coin.remap;
+    object.quaternion.set(remap[0], remap[1], remap[2], remap[3]);
+    object.traverse((node) => {
+      if (node instanceof Mesh) node.castShadow = true;
+    });
+    const materials = ownedMaterials(object);
+    return {
+      drawn: {
+        object: wrapper,
+        motion: motion.coin,
+        kept: true,
+        materials,
+        baseColors: materials.map((material) => material.color.clone()),
+      },
+      motion,
+    };
+  }
+
   /** Pushes a dropped die back without making it see-through. */
   function reveal(dice: readonly DrawnDie[], progress: number): void {
     const k = Math.min(Math.max(progress, 0), 1);
@@ -380,7 +442,7 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
     kinds: ["roll", "coin-flip"],
     // Whatever this cannot roll, the delegate can still show.
     dieSides: "any",
-    media: canRoll ? ["3d", "2d"] : delegate.capabilities.media,
+    media: canRoll || canFlip ? ["3d", "2d"] : delegate.capabilities.media,
     cancellable: true,
     announces,
     honorsReducedMotion: true,
@@ -399,8 +461,26 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
         (options.reducedMotion !== "animate" &&
           prefersReduced(view as { matchMedia?: (q: string) => { matches: boolean } }));
 
-      // A coin is a toss, not a tumble, and a die this cannot model is better
-      // drawn than faked.
+      if (record.kind === "coin-flip" && canFlip) {
+        if (signal?.aborted) throw abortError();
+        const built = await buildCoin(record.outcome);
+        if (built) {
+          ensureScene();
+          cancelActive?.();
+          clearDice();
+          diceGroup?.add(built.drawn.object);
+          pose(built.drawn, 0);
+          frame(built.motion.tray);
+          showPhysics(true);
+          await play([built.drawn], built.motion.frameRate, reduced ? "reduce" : "animate", signal);
+          announcer?.announce(formatEventAnnouncement(record));
+          return;
+        }
+        // A coin model that failed to load falls through to the delegate's
+        // toss — a broken asset must never break presentation.
+      }
+
+      // A die this cannot model is better drawn than faked.
       const visuals = record.kind === "roll" ? visualDiceForEvent(record) : [];
       // A die is only rollable here if its model says where its numerals are.
       // The collider knows the geometry and nothing else, so without the
