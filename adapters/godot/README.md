@@ -51,8 +51,34 @@ godot --path adapters/godot
 ```
 
 Grammar v1.2 is supported in full: keep/drop, `d%`, exploding, rerolls, any
-face count 2-1000, and custom dice. Presentation -- 3D dice inside Godot -- is
-future work; this addon is the engine only.
+face count 2-1000, and custom dice.
+
+## Presentation
+
+`presenter_3d.gd` shows a resolved record with the forge models, loaded at
+runtime from an `@diceforge-sdk/assets-forge` directory -- the same doctrine as
+every DiceForge presenter (rule 5): the record is the authority, and each die
+is posed by the calibrated rotation that brings its recorded value to the top,
+from the same manifest that drives the web renderer.
+
+```gdscript
+var presenter := DiceForgePresenter3D.new()
+add_child(presenter)
+presenter.configure("path/to/assets-forge/forge", "red")
+presenter.present(forge.roll("4d6dl1"))   # dropped dice darkened and shrunk
+```
+
+`face_up(sides, pose)` reports which face a pose shows, so a test can prove
+the presentation matches the record rather than eyeballing it -- the demo scene
+(`demo/dice_demo.tscn`) does exactly that, then saves viewport captures:
+
+```bash
+godot --path adapters/godot res://demo/dice_demo.tscn
+```
+
+First slice: settled poses for d4-d20 and the coin. Percentile pairs, custom
+dice tiles, and rolling motion are future work; `present` returns `false` for
+a record it cannot show, so a caller can fall back to text.
 
 ## Licence
 

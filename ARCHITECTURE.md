@@ -53,7 +53,7 @@ packages/
   presenter-physics/    simulated motion for a resolved roll       [implemented — optional, cannon-es, ADR-0018]
   testing/              plugin conformance suite + core vectors    [implemented — ADR-0014, ADR-0021]
 adapters/
-  godot/                Godot 4 addon: GDScript core port          [engine implemented — ADR-0021]
+  godot/                Godot 4 addon: core port + 3D presenter    [engine + posed presentation — ADR-0021]
   unity/                Unity package: C# core port                [future — same vectors]
 examples/               minimal, runnable integration examples     [headless + web demo implemented]
 docs/                   user and contributor documentation         [future]
