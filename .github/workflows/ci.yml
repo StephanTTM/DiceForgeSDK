@@ -24,6 +24,21 @@ jobs:
       - run: npm run build
       - run: node examples/headless/main.mjs
 
+  # The unit tests run against workspace source, which is not what anyone
+  # installs. This packs the tarballs, installs them into a clean project, and
+  # uses them — so a broken exports map or a missing file fails the push that
+  # caused it, not the next release.
+  packaging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run smoke
+
   # Pixels are only comparable against the browser build that drew them, so this
   # runs in the image the baselines were generated in. The tag must match the
   # Playwright pinned in package.json; tools/vrt/environment.mjs fails the job

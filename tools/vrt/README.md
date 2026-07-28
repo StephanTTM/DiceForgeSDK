@@ -60,6 +60,8 @@ A changed baseline is a claim that the new pixels are correct, so nothing regene
 npm run vrt:docker -- --update
 ```
 
+A change that deliberately alters pixels — new motion, new framing — should ride a **branch**: push the branch, run the baselines workflow against it, commit the artifact to the branch, and merge code and baseline together. Pushing the code to `main` first leaves a one-commit window where the visual job is red for a change that was intended.
+
 Without Docker, run the **VRT baselines** workflow from the Actions tab. It redraws them in the same image and uploads them as an artifact to download and commit; it has no write access to the repository, so the PNGs still go through review like any other change.
 
 ## Adding a scene

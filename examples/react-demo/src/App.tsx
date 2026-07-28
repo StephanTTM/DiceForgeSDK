@@ -29,7 +29,10 @@ type Backend = "webgl" | "physics";
  * stop it (ADR-0008). Cancelling explicitly beats relying on `dispose()` to
  * clean up a presentation it was never told about.
  */
-function usePresenter(backend: Backend): {
+function usePresenter(
+  backend: Backend,
+  sound: boolean,
+): {
   containerRef: React.RefObject<HTMLDivElement | null>;
   present: (event: InteractionEvent) => Promise<void>;
   capabilities: PresenterCapabilities | undefined;
@@ -50,7 +53,8 @@ function usePresenter(backend: Backend): {
     // unmodelled dice fall through to the renderer, so the buttons keep working.
     const presenter: InteractionPresenter =
       backend === "physics"
-        ? createPhysicsPresenter({ container, theme })
+        ? // Knocks derived from the recording's own collisions (ADR-0020).
+          createPhysicsPresenter({ container, theme, sound })
         : createDicePresenter({ container, theme });
     const controller = new AbortController();
     presenterRef.current = presenter;
@@ -62,7 +66,7 @@ function usePresenter(backend: Backend): {
       controller.abort();
       presenter.dispose?.();
     };
-  }, [backend]);
+  }, [backend, sound]);
 
   const present = useCallback(async (event: InteractionEvent): Promise<void> => {
     const presenter = presenterRef.current;
@@ -97,9 +101,10 @@ export function App(): React.JSX.Element {
   const [notation, setNotation] = useState("2d20kh1+3");
   const [seed, setSeed] = useState("");
   const [backend, setBackend] = useState<Backend>("webgl");
+  const [sound, setSound] = useState(false);
   const [message, setMessage] = useState("Roll to get started.");
   const [busy, setBusy] = useState(false);
-  const { containerRef, present, capabilities } = usePresenter(backend);
+  const { containerRef, present, capabilities } = usePresenter(backend, sound);
 
   // One engine per seed value: rolls advance the reproducible sequence, and
   // changing the seed restarts it. The engine is headless domain logic —
@@ -160,6 +165,10 @@ export function App(): React.JSX.Element {
             <option value="webgl">webgl</option>
             <option value="physics">physics</option>
           </select>
+        </label>
+        <label style={{ ...FIELD, flexDirection: "row", alignItems: "center" }}>
+          <input type="checkbox" checked={sound} onChange={(e) => setSound(e.target.checked)} />
+          Sound
         </label>
         <button type="button" onClick={() => void handleRoll()} disabled={busy}>
           Roll
