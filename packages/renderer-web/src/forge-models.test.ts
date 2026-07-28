@@ -68,6 +68,7 @@ function readGlb(path: string): { positions: Vec3[]; uvs: Vec2[]; indices: numbe
     offset = start + length;
   }
   if (!json || !bin) throw new Error(`${path}: not a glTF-Binary`);
+  const binary = bin;
 
   const gltf = json as unknown as {
     accessors: {
@@ -89,7 +90,10 @@ function readGlb(path: string): { positions: Vec3[]; uvs: Vec2[]; indices: numbe
     const Ctor = TYPED[accessor.componentType];
     const stride = COMPONENTS[accessor.type];
     const at = (bufferView.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
-    const data = new Ctor(bin.buffer, bin.byteOffset + at, accessor.count * stride);
+    // Buffer types its backing store as ArrayBufferLike, which admits
+    // SharedArrayBuffer; a file read is never shared.
+    const store = binary.buffer as ArrayBuffer;
+    const data = new Ctor(store, binary.byteOffset + at, accessor.count * stride);
     const out: number[][] = [];
     for (let i = 0; i < accessor.count; i++) {
       out.push(Array.from(data.subarray(i * stride, i * stride + stride)));
@@ -162,7 +166,11 @@ function facesOf(shape: ShapedDieSides): Face[] {
       cluster = { sum: [0, 0, 0], area: 0, uv: [0, 0] };
       clusters.push(cluster);
     }
-    for (let k = 0; k < 3; k++) (cluster.sum as number[])[k] += unit[k] * area;
+    cluster.sum = [
+      cluster.sum[0] + unit[0] * area,
+      cluster.sum[1] + unit[1] * area,
+      cluster.sum[2] + unit[2] * area,
+    ];
     cluster.area += area;
     for (const i of [i0, i1, i2]) {
       const uv = uvs[i] as Vec2;
