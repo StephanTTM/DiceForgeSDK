@@ -57,6 +57,13 @@ Remaining before tagging 0.1.0:
 - [x] Make the pre-publish tarball check repeatable. (`npm run smoke` — packs, installs and uses all five packages, ~20 s)
 - [x] Physics coin flips. (`simulateCoinFlip` — cylinder collider whose faces *are* the outcomes, thrown into the shared tray; the model's calibrated pair seats it and a half-turn symmetry lands the recorded face; radius and thickness measured from the loaded model; rim landings re-thrown. 60/60 seeded flips flat on the recorded outcome at ~5 ms each; the presenter no longer swaps canvases for a coin)
 
+## Sound — 0.7.0 (in progress)
+
+- [x] Record impacts in the simulation. (`PhysicsImpact` on `PhysicsRoll`/`PhysicsFlip` from cannon's collide events — time, body, felt/wall/die, closing speed in m/s at real scale; deterministic per seed, asserted)
+- [x] Impact-driven synthesized knocks. (`impactSchedule` — pure, measured thresholds: 0.12 m/s floor, 55 ms per-body merge; Web Audio synthesis from filtered noise, lazy context in the click chain, silent without Web Audio — ADR-0020)
+- [x] `sound` option on the physics presenter, default off, and a demo checkbox. (verified in-browser: sound off schedules nothing; a 3d6 roll schedules 7 knocks on one lazily-created context; a coin flip 2)
+- [ ] Listen and tune. The material voices and thresholds are first-pass, tuned against measured speed ranges but not yet against ears in a room. Product owner's verdict wanted before 0.7.0 tags.
+
 ## Next
 
 - [ ] Guarantee the coin tumbles on entry. Deferred by the product owner (2026-07-28): most flips read fine, but some read as a drop. Diagnosis, so the revisit starts warm: the coin gets the same isotropic random `angularVelocity` as a die, and a draw that lands mostly on the coin's own axis spins it like a wheel rather than tumbling it. Fix shape: floor the spin component about a horizontal diameter (motion only — outcome untouched, ADR-0018 holds), and assert it by counting face-normal reversals across the recorded frames rather than by eye.

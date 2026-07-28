@@ -21,6 +21,8 @@
  * is ordinary animation with no physics running on screen.
  */
 
+export type { Knock, KnockPlayback, KnockPlayer } from "./audio.js";
+export { createKnockPlayer, impactSchedule } from "./audio.js";
 export type { PhysicsPresenter, PhysicsPresenterOptions } from "./playback.js";
 export { createPhysicsPresenter } from "./playback.js";
 export type {
@@ -30,6 +32,7 @@ export type {
   PhysicsDieRequest,
   PhysicsFlip,
   PhysicsFrame,
+  PhysicsImpact,
   PhysicsRoll,
   SimulateOptions,
 } from "./simulate.js";

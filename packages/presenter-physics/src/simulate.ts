@@ -1,5 +1,5 @@
 import type { PolyhedronData, ShapedDieSides, Vec3 } from "@diceforge-sdk/renderer-web";
-import type { GSSolver, Shape } from "cannon-es";
+import type { ContactEquation, GSSolver, Shape } from "cannon-es";
 import {
   Body,
   ContactMaterial,
@@ -82,11 +82,32 @@ export type PhysicsCoin = {
 /** A coin flip's recorded motion, shaped like `PhysicsRoll` for one coin. */
 export type PhysicsFlip = {
   readonly coin: PhysicsCoin;
+  /** Every recorded collision, in time order — the raw material for audio. */
+  readonly impacts: readonly PhysicsImpact[];
   readonly frameRate: number;
   readonly duration: number;
   readonly tray: PhysicsTray;
   readonly resting: PhysicsBounds;
   readonly settled: boolean;
+};
+
+/**
+ * One collision from the recording: what hit what, when, and how hard.
+ *
+ * This is what makes audio derivable rather than guessed: a sound layer can
+ * play a knock exactly when the recording says a die struck the felt, a wall
+ * or a neighbour, scaled by how hard. Speeds are in metres per second at the
+ * simulation's real scale (16 mm dice), so a loudness mapping is independent
+ * of the caller's units.
+ */
+export type PhysicsImpact = {
+  /** Seconds from the start of the recording. */
+  readonly time: number;
+  /** Index of the die (or 0 for a coin) that felt the impact. */
+  readonly body: number;
+  readonly against: "felt" | "wall" | "die";
+  /** Closing speed along the contact normal, m/s. */
+  readonly speed: number;
 };
 
 /** A rectangle on the table: where it sits, and how far it reaches. */
@@ -107,6 +128,8 @@ export type PhysicsTray = {
 
 export type PhysicsRoll = {
   readonly dice: readonly PhysicsDie[];
+  /** Every recorded collision, in time order — the raw material for audio. */
+  readonly impacts: readonly PhysicsImpact[];
   /** Frames per second the trajectory was recorded at. */
   readonly frameRate: number;
   readonly duration: number;
@@ -235,6 +258,7 @@ function collider(data: PolyhedronData): ConvexPolyhedron {
 type WorldRun = {
   readonly frames: PhysicsFrame[][];
   readonly orientations: QuaternionTuple[];
+  readonly impacts: PhysicsImpact[];
   readonly frameRate: number;
   readonly duration: number;
   readonly tray: PhysicsTray;
@@ -281,6 +305,7 @@ function throwBodies(shapes: readonly Shape[], options: SimulateOptions): WorldR
   const floor = new Body({ mass: 0, shape: new Plane(), material: surface });
   floor.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
   world.addBody(floor);
+  const wallBodies = new Set<Body>();
   // Four walls rather than a ring: a rectangular tray can be shaped to the
   // viewport, and a camera framed on it wastes nothing.
   const walls: readonly [number, number, number][] = [
@@ -294,6 +319,7 @@ function throwBodies(shapes: readonly Shape[], options: SimulateOptions): WorldR
     wall.quaternion.setFromEuler(0, yaw, 0);
     wall.position.set(x, 0, z);
     world.addBody(wall);
+    wallBodies.add(wall);
   }
 
   const spread = (magnitude: number) => (random() * 2 - 1) * magnitude;
@@ -320,6 +346,24 @@ function throwBodies(shapes: readonly Shape[], options: SimulateOptions): WorldR
     return body;
   });
 
+  let steps = 0;
+  const impacts: PhysicsImpact[] = [];
+  const indexOf = new Map<Body, number>(bodies.map((body, index) => [body, index]));
+  bodies.forEach((body, index) => {
+    body.addEventListener("collide", (event: { body: Body; contact: ContactEquation }) => {
+      const other = event.body;
+      // A die-on-die contact fires on both bodies; the lower index records it.
+      const otherIndex = indexOf.get(other);
+      if (otherIndex !== undefined && otherIndex < index) return;
+      impacts.push({
+        time: steps * STEP,
+        body: index,
+        against: other === floor ? "felt" : wallBodies.has(other) ? "wall" : "die",
+        speed: Math.abs(event.contact.getImpactVelocityAlongNormal()),
+      });
+    });
+  });
+
   const frames: PhysicsFrame[][] = shapes.map(() => []);
   const record = () => {
     bodies.forEach((body, index) => {
@@ -335,7 +379,7 @@ function throwBodies(shapes: readonly Shape[], options: SimulateOptions): WorldR
   };
 
   record();
-  let steps = 0;
+  steps = 0;
   let settled = false;
   while (steps < maxSteps) {
     world.step(STEP);
@@ -367,6 +411,7 @@ function throwBodies(shapes: readonly Shape[], options: SimulateOptions): WorldR
   return {
     frames,
     orientations,
+    impacts,
     frameRate,
     duration: steps * STEP,
     tray,
@@ -414,6 +459,7 @@ function throwOnce(
 
   return {
     dice,
+    impacts: run.impacts,
     frameRate: run.frameRate,
     duration: run.duration,
     tray: run.tray,
@@ -514,6 +560,7 @@ function flipOnce(request: PhysicsCoinRequest, options: SimulateOptions = {}): P
       frames: run.frames[0] as PhysicsFrame[],
       seated,
     },
+    impacts: run.impacts,
     frameRate: run.frameRate,
     duration: run.duration,
     tray: run.tray,

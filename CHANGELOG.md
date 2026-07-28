@@ -4,6 +4,12 @@ All notable changes to DiceForge SDK will be documented here. This project inten
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **Impact-driven sound** (ADR-0020): `createPhysicsPresenter({ sound: true })` plays a knock for every collision in the recording — felt, wall, and die-on-die each with their own voice, loudness from the recorded closing speed. Nothing fires on a timer: the same data drives the animation and the audio. Knocks are synthesized from filtered noise with Web Audio, so no audio assets are shipped, sourced, or loaded; the `AudioContext` is created lazily inside the first presented roll, satisfying autoplay policy, and a browser without Web Audio stays silent rather than erroring. Default off, and reduced motion skips sound along with the animation. `PhysicsRoll` and `PhysicsFlip` gain `impacts` — time, body, surface, closing speed, deterministic per seed — and `impactSchedule(impacts)` is exported for applications with their own audio pipeline.
+
 ## [0.6.0] - 2026-07-28
 
 Coin flips join the physics simulation, and the release process grows the

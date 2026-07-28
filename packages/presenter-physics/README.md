@@ -91,6 +91,14 @@ A **coin flip** is simulated for real when the theme ships a coin: a cylinder co
 
 Reduced motion jumps to the final pose instead of playing the roll, and `present(event, { signal })` cancels like any other presenter.
 
+## Sound
+
+Pass `sound: true` and every collision in the recording plays a knock — felt is a dull thump, a wall is sharper, die-on-die is the bright clack — with loudness from how hard the recording says the contact was (ADR-0020). Nothing fires on a timer: the same data drives the animation and the audio, so a bounce sounds when it lands.
+
+Every knock is synthesized from filtered noise at play time, so there are no audio files to ship or load. Default off — sound is your application's choice. The `AudioContext` is created inside the first presented roll, which is inside your click handler, so autoplay policy is satisfied; a browser without Web Audio simply stays silent. Reduced motion skips sound along with the animation it would have accompanied.
+
+`simulateRoll` and `simulateCoinFlip` expose the raw material as `impacts` — time, body, surface, and closing speed — and `impactSchedule(impacts)` turns them into knocks, so an application with its own audio pipeline can consume either.
+
 ## Framing
 
 The dice area is a **fixed** rectangle, shaped to the stage, and the camera frames it and nothing else. It does not grow with the number of dice, so the same die is the same size on every throw and a roll that scatters wide does not zoom out — a tray is a thing on a table.

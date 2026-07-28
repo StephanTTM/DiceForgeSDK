@@ -29,6 +29,8 @@ import {
   Vector3,
   WebGLRenderer,
 } from "three";
+import type { Knock } from "./audio.js";
+import { createKnockPlayer, impactSchedule } from "./audio.js";
 import type { PhysicsDie, PhysicsFlip, PhysicsTray } from "./simulate.js";
 import { simulateCoinFlip, simulateRoll } from "./simulate.js";
 import type { QuaternionTuple } from "./symmetry.js";
@@ -43,6 +45,13 @@ export type PhysicsPresenterOptions = {
   readonly announceResults?: boolean;
   /** Uniform random source for the throw. Seed it and a roll replays exactly. */
   readonly random?: () => number;
+  /**
+   * Play a knock for every collision in the recording, synthesized with Web
+   * Audio — no assets involved (ADR-0020). Default false: sound is something
+   * an application chooses, not something a library springs. Reduced motion
+   * skips it along with the animation it would have accompanied.
+   */
+  readonly sound?: boolean;
 };
 
 export type PhysicsPresenter = {
@@ -126,6 +135,9 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
 
   const announces = options.announceResults !== false;
   const announcer = announces ? createAnnouncer(container, doc) : undefined;
+  // Created eagerly but silent until played; the AudioContext inside is lazy,
+  // so nothing touches audio policy until a roll is actually presented.
+  const knocks = options.sound ? createKnockPlayer(view) : undefined;
 
   /**
    * The delegate draws into the same container, and two canvases in normal
@@ -386,6 +398,7 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
     frameRate: number,
     motion: "animate" | "reduce",
     signal: AbortSignalLike | undefined,
+    schedule: readonly Knock[] = [],
   ): Promise<void> {
     const active = renderer;
     const activeScene = scene;
@@ -400,12 +413,18 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
       return Promise.resolve();
     }
 
+    // Scheduled on the audio clock beside the rAF animation; the two drift by
+    // at most a frame, which no ear ties to a bounce. Cancelling the animation
+    // silences what has not sounded yet.
+    const sounding = knocks?.play(schedule);
+
     return new Promise<void>((resolve, reject) => {
       const start = performance.now();
       let raf = 0;
       let onAbort: (() => void) | undefined;
       const finish = (error?: Error): void => {
         cancelAnimationFrame(raf);
+        if (error) sounding?.stop();
         if (onAbort && signal) signal.removeEventListener("abort", onAbort);
         cancelActive = undefined;
         if (error) reject(error);
@@ -472,7 +491,13 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
           pose(built.drawn, 0);
           frame(built.motion.tray);
           showPhysics(true);
-          await play([built.drawn], built.motion.frameRate, reduced ? "reduce" : "animate", signal);
+          await play(
+            [built.drawn],
+            built.motion.frameRate,
+            reduced ? "reduce" : "animate",
+            signal,
+            impactSchedule(built.motion.impacts),
+          );
           announcer?.announce(formatEventAnnouncement(record));
           return;
         }
@@ -540,7 +565,13 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
       frame(motion.tray);
       showPhysics(true);
 
-      await play(dice, motion.frameRate, reduced ? "reduce" : "animate", signal);
+      await play(
+        dice,
+        motion.frameRate,
+        reduced ? "reduce" : "animate",
+        signal,
+        impactSchedule(motion.impacts),
+      );
       announcer?.announce(formatEventAnnouncement(record));
     },
     dispose() {
@@ -551,6 +582,7 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
       renderer?.dispose();
       renderer?.domElement.remove();
       announcer?.dispose();
+      knocks?.dispose();
       delegate.dispose();
     },
   };

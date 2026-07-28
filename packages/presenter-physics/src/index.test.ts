@@ -180,6 +180,41 @@ describe("simulateRoll", () => {
   });
 });
 
+describe("recorded impacts", () => {
+  it("records when and how hard each die struck what, in time order", () => {
+    const roll = simulateRoll([request(6, 3), request(6, 5)], {
+      random: seededRandom("impacts"),
+    });
+    expect(roll.impacts.length).toBeGreaterThan(0);
+    let previous = 0;
+    for (const hit of roll.impacts) {
+      expect(hit.time).toBeGreaterThanOrEqual(previous);
+      expect(hit.time).toBeLessThanOrEqual(roll.duration + 1 / 60);
+      expect(hit.speed).toBeGreaterThanOrEqual(0);
+      expect([0, 1]).toContain(hit.body);
+      expect(["felt", "wall", "die"]).toContain(hit.against);
+      previous = hit.time;
+    }
+    // A throw that lands has, at minimum, hit the felt.
+    expect(roll.impacts.some((hit) => hit.against === "felt")).toBe(true);
+  });
+
+  it("records the same impacts for the same throw", () => {
+    const a = simulateRoll([request(20, 7)], { random: seededRandom("impact-repeat") });
+    const b = simulateRoll([request(20, 7)], { random: seededRandom("impact-repeat") });
+    expect(b.impacts).toEqual(a.impacts);
+  });
+
+  it("records a coin flip's impacts too", () => {
+    const flip = simulateCoinFlip(
+      { outcome: "heads", rotations: FORGE_COIN_ROTATIONS, radius: 1.0346, thickness: 0.231 },
+      { dieRadius: 1.05, random: seededRandom("coin-impacts") },
+    );
+    expect(flip.impacts.length).toBeGreaterThan(0);
+    expect(flip.impacts.every((hit) => hit.body === 0)).toBe(true);
+  });
+});
+
 describe("simulateCoinFlip", () => {
   /** The shipped coin's proportions, measured from the model (ADR addendum in TASKS). */
   function flip(outcome: "heads" | "tails", seed: string) {

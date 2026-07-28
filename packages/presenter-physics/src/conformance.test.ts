@@ -74,6 +74,17 @@ describe("@diceforge-sdk/presenter-physics conformance", () => {
     expect(container.querySelector('[data-diceforge="dom-presenter"]')).toBeNull();
   });
 
+  it("with sound on, still presents where no AudioContext exists", async () => {
+    // jsdom has no Web Audio; the knock player must go silent, not throw —
+    // sound is presentation, and presentation must never break the roll.
+    const container = document.createElement("div");
+    document.body.append(container);
+    const physics = createPhysicsPresenter({ container, reducedMotion: "reduce", sound: true });
+    const engine = createDiceEngine({ random: createSeededRandomSource("sound") });
+    await physics.present(engine.roll("2d6"));
+    physics.dispose();
+  });
+
   /**
    * The canvas and camera are built once, on the first roll, so they have to
    * follow the container afterwards. jsdom has no WebGL and never builds the

@@ -40,6 +40,7 @@ const replayButton = must<HTMLButtonElement>("#replay");
 const modeSelect = must<HTMLSelectElement>("#mode");
 const motionSelect = must<HTMLSelectElement>("#motion");
 const themeSelect = must<HTMLSelectElement>("#theme");
+const soundInput = must<HTMLInputElement>("#sound");
 const activeMode = must<HTMLElement>("#active-mode");
 const status = must<HTMLElement>("#status");
 const record = must<HTMLElement>("#record");
@@ -102,6 +103,9 @@ function rebuildPresenter(): void {
         createPhysicsPresenter({
           container: stage,
           reducedMotion,
+          // Knocks derived from the recording's own collisions (ADR-0020).
+          // Only physics has impacts to sound; the renderer option ignores it.
+          sound: soundInput.checked,
           ...(theme ? { theme } : {}),
         })
       : createDicePresenter({
@@ -191,6 +195,7 @@ notationInput.addEventListener("keydown", (keyboardEvent) => {
 modeSelect.addEventListener("change", rebuildPresenter);
 motionSelect.addEventListener("change", rebuildPresenter);
 themeSelect.addEventListener("change", rebuildPresenter);
+soundInput.addEventListener("change", rebuildPresenter);
 seedInput.addEventListener("input", () => {
   engineSeed = STALE_SEED;
 });
