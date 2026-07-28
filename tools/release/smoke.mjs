@@ -24,8 +24,8 @@ const PACKAGES = ["core", "renderer-web", "assets-forge", "testing", "presenter-
 /** Runs inside the throwaway project, resolving only the installed packages. */
 const CONSUMER = `
 import { createDiceEngine, createSeededRandomSource, presentationSupport } from "@diceforge-sdk/core";
-import { faceDirections, simulateRoll, multiply, rotate } from "@diceforge-sdk/presenter-physics";
-import { FORGE_FACE_ROTATIONS, formatEventAnnouncement } from "@diceforge-sdk/renderer-web";
+import { faceDirections, simulateCoinFlip, simulateRoll, multiply, rotate } from "@diceforge-sdk/presenter-physics";
+import { FORGE_COIN_ROTATIONS, FORGE_FACE_ROTATIONS, formatEventAnnouncement } from "@diceforge-sdk/renderer-web";
 import { forgeAssets, FORGE_SHAPES } from "@diceforge-sdk/assets-forge";
 import { assertPresenterConformance } from "@diceforge-sdk/testing";
 
@@ -61,6 +61,20 @@ for (const shape of FORGE_SHAPES) {
   }
 }
 ok(\`physics shows the rolled numeral on all \${FORGE_SHAPES.reduce((a, b) => a + b, 0)} faces\`, wrong === 0);
+
+// And the coin: both outcomes, through the installed build.
+let coinWrong = 0;
+for (const outcome of ["heads", "tails"]) {
+  const flip = simulateCoinFlip(
+    { outcome, rotations: FORGE_COIN_ROTATIONS, radius: 1.0346, thickness: 0.231 },
+    { dieRadius: 1.05 },
+  );
+  const drawn = multiply(flip.coin.frames.at(-1).orientation, flip.coin.remap);
+  const q = FORGE_COIN_ROTATIONS[outcome === "heads" ? 0 : 1];
+  const up = rotate(rotate([0, 1, 0], [-q[0], -q[1], -q[2], q[3]]), drawn)[1];
+  if (up < 0.999) coinWrong++;
+}
+ok("physics lands the coin on the recorded outcome", coinWrong === 0);
 
 process.exitCode = failures === 0 ? 0 : 1;
 `;
