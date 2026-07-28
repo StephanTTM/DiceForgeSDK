@@ -27,7 +27,7 @@ import {
   ShadowMaterial,
   WebGLRenderer,
 } from "three";
-import type { PhysicsDie } from "./simulate.js";
+import type { PhysicsBounds, PhysicsDie } from "./simulate.js";
 import { simulateRoll } from "./simulate.js";
 
 export type PhysicsPresenterOptions = {
@@ -145,6 +145,8 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
   let diceGroup: Group | undefined;
   let disposed = false;
   let cancelActive: (() => void) | undefined;
+  /** Where the last roll came to rest, so a resize can re-frame the same dice. */
+  let framed: PhysicsBounds | undefined;
 
   function ensureScene(): { renderer: WebGLRenderer; scene: Scene; camera: PerspectiveCamera } {
     if (renderer && scene && camera) return { renderer, scene, camera };
@@ -181,6 +183,28 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
   }
 
   /**
+   * Keeps the canvas and camera matched to the container.
+   *
+   * The scene is built once, on the first roll it draws, so without this the
+   * canvas stays at whatever size the container was then — wrong on any layout
+   * that reflows. The framing has to be redone rather than just the size:
+   * `frame` fits the dice using the camera's aspect, and `trayAspect` is
+   * already taken from the container on every roll, so leaving the aspect stale
+   * would have the camera framing a tray shaped for a different viewport.
+   */
+  const handleResize = (): void => {
+    if (!renderer || !camera || !scene) return;
+    const width = container.clientWidth || 640;
+    const height = container.clientHeight || 360;
+    renderer.setSize(width, height);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    if (framed) frame(framed);
+    renderer.render(scene, camera);
+  };
+  view.addEventListener?.("resize", handleResize);
+
+  /**
    * Frames where the dice came to rest, not the whole tray.
    *
    * A tray big enough to settle a roll cleanly is much bigger than the dice
@@ -189,11 +213,8 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
    * a minimum keeps a single die from filling the screen. Width and depth are
    * fitted separately, since depth foreshortens by the camera's elevation.
    */
-  function frame(resting: {
-    center: readonly [number, number];
-    halfWidth: number;
-    halfDepth: number;
-  }): void {
+  function frame(resting: PhysicsBounds): void {
+    framed = resting;
     const active = camera;
     if (!active) return;
     const angle = (CAMERA_ELEVATION * Math.PI) / 180;
@@ -433,6 +454,7 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
     },
     dispose() {
       disposed = true;
+      view.removeEventListener?.("resize", handleResize);
       cancelActive?.();
       clearDice();
       renderer?.dispose();

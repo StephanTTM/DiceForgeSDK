@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Published source maps referenced `../src/*.ts`, which packages ship `dist` and not `src` — so the maps resolved to nothing in a consumer's project, and some bundlers warned about them. They now carry the TypeScript inline (`inlineSources`), so stepping into the SDK works whatever a bundler does with relative paths. Tarballs grow by roughly half: `@diceforge-sdk/core` from 31 kB to 49 kB packed, `renderer-web` from 38 kB to 58 kB.
+- `createPhysicsPresenter` never followed its container. The scene is built once, on the first roll it draws, so the canvas kept whatever size the container had then — wrong after any reflow, and worse than it sounds: `trayAspect` *is* read from the container on every roll, so a resized page had the camera framing a tray shaped for a viewport that no longer existed. It now resizes and re-frames on `resize`, and stops listening when disposed.
 - A stray NUL byte sat in the browser demo's seed sentinel, where it read as a space in every editor. It worked, but it made git treat a TypeScript file as binary — no diffs, no line-ending handling. Replaced with a named `STALE_SEED` constant.
 - `.gitattributes` pins LF line endings and marks the models, textures and VRT baselines binary. Without it, a contributor with git's Windows default `core.autocrlf=true` gets a working tree Biome rejects on every checkout, for files they never edited.
 

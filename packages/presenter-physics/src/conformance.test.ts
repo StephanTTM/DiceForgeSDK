@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { createDiceEngine, createSeededRandomSource } from "@diceforge-sdk/core";
 import { assertPresenterConformance, formatConformanceReport } from "@diceforge-sdk/testing";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createPhysicsPresenter } from "./playback.js";
 
 /**
@@ -72,5 +72,37 @@ describe("@diceforge-sdk/presenter-physics conformance", () => {
     expect(container.querySelector('[data-diceforge="physics-presenter"]')).toBeNull();
     expect(container.querySelector('[data-diceforge="physics-announcer"]')).toBeNull();
     expect(container.querySelector('[data-diceforge="dom-presenter"]')).toBeNull();
+  });
+
+  /**
+   * The canvas and camera are built once, on the first roll, so they have to
+   * follow the container afterwards. jsdom has no WebGL and never builds the
+   * scene, so what is checkable here is the listener itself — one that outlived
+   * its presenter would keep a disposed renderer reachable in a single-page app
+   * that swaps presenters, which is exactly what the React example does.
+   */
+  it("stops listening for resize once disposed", () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const added: unknown[] = [];
+    const removed: unknown[] = [];
+    const add = window.addEventListener.bind(window);
+    const remove = window.removeEventListener.bind(window);
+    vi.spyOn(window, "addEventListener").mockImplementation((type, handler, options) => {
+      if (type === "resize") added.push(handler);
+      return add(type, handler, options);
+    });
+    vi.spyOn(window, "removeEventListener").mockImplementation((type, handler, options) => {
+      if (type === "resize") removed.push(handler);
+      return remove(type, handler, options);
+    });
+    try {
+      const physics = createPhysicsPresenter({ container });
+      expect(added).toHaveLength(1);
+      physics.dispose();
+      expect(removed).toEqual(added);
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 });

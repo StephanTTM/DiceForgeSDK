@@ -85,6 +85,8 @@ The tray is rectangular and shaped to the stage, so the dice have somewhere to s
 
 The camera therefore shifts a little between rolls. The tray is what bounds how much.
 
+The canvas follows its container: a window resize re-fits the camera and re-frames the dice where they lie, so a responsive layout keeps the roll it was showing. The listener is released by `dispose()`.
+
 ## Licence
 
 MIT.
