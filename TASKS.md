@@ -62,7 +62,7 @@ Remaining before tagging 0.1.0:
 - [x] Record impacts in the simulation. (`PhysicsImpact` on `PhysicsRoll`/`PhysicsFlip` from cannon's collide events — time, body, felt/wall/die, closing speed in m/s at real scale; deterministic per seed, asserted)
 - [x] Impact-driven synthesized knocks. (`impactSchedule` — pure, measured thresholds: 0.12 m/s floor, 55 ms per-body merge; Web Audio synthesis from filtered noise, lazy context in the click chain, silent without Web Audio — ADR-0020)
 - [x] `sound` option on the physics presenter, default off, and a demo checkbox. (verified in-browser: sound off schedules nothing; a 3d6 roll schedules 7 knocks on one lazily-created context; a coin flip 2)
-- [ ] Listen and tune. The material voices and thresholds are first-pass, tuned against measured speed ranges but not yet against ears in a room. Product owner's verdict wanted before 0.7.0 tags.
+- [ ] Tune the knock voices down. First listen (product owner, 2026-07-28): the sound works but reads a bit high pitched. Fix shape: lower the material bandpass centres in `audio.ts` (`MATERIALS` — felt 950 / wall 2100 / die 3100 Hz today), keeping their order so felt stays dullest and die-on-die brightest; a longer decay would also soften the read. Constants are internal (ADR-0020), so retuning is free — but tune *with* the product owner listening, not ahead of them.
 
 ## Next
 
