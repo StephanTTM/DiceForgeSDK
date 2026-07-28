@@ -27,7 +27,7 @@ Remaining before tagging 0.1.0:
 
 ## Web presentation — 0.2.0 (released 2026-07-26)
 
-- [x] Add one popular-framework example (React) consuming `@diceforge-sdk/renderer-web`. (`examples/react-demo`)
+- [x] Add one popular-framework example (React) consuming `@diceforge-sdk/renderer-web`. (`examples/react-demo`; also swaps in `@diceforge-sdk/presenter-physics` at runtime, showing the presenter contract is what the component depends on)
 - [x] Theme/asset loading as an optional presentation concern. (`DiceTheme` + lazy glTF models with calibrated face tables, KayKit CC0 pack — ADR-0010)
 - [x] Publish 0.1.0 to npm. (`@diceforge-sdk/core` + `@diceforge-sdk/renderer-web` live 2026-07-25; `v0.1.0` tagged; trusted publishing configured; release workflow verified green and idempotent — ADR-0009)
 

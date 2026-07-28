@@ -72,7 +72,7 @@ Full options, fallback behaviour and theming are in the [renderer README](packag
 npm ci
 npm run example      # headless: seeded rolls and serialization, in the terminal
 npm run demo:web     # browser demo: 3D dice, themes, fallbacks
-npm run demo:react   # the same, inside React
+npm run demo:react   # the same, inside React — swap presenters while it runs
 ```
 
 ## Project status
