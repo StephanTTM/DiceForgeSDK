@@ -32,6 +32,7 @@ npm run demo:web       # build, then serve the browser demo (Vite)
 npm run vrt            # visual regression: renderer output vs committed baselines
 npm run vrt:docker     # the same in the container CI uses (needs Docker)
 npm run physics        # headless physics measurement for ADR-0018 (tools/physics)
+npm run smoke          # pack, install and use the tarballs as a consumer would
 ```
 
 All of these must pass before a pull request; CI runs the same gates on Node 20 and 24.

@@ -4,6 +4,14 @@ All notable changes to DiceForge SDK will be documented here. This project inten
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- A test ties each die value to the numeral actually printed on the shipped model: it applies the value's rotation, finds the face that ends up on top, and checks that face's UVs land in the atlas tile the manifest assigns to that value. The existing tests only checked the tables were internally tidy and sent every value to a *distinct* face — all of which is true of a table that is consistently wrong, which is how the physics presenter shipped showing 57 of 60 faces incorrectly. Verified by swapping two d20 rotations in the generated source *and* the manifest together, the way a generator bug would: every other test passed, this one failed.
+- The textures are checked too — every face's atlas tile must carry ink, and no two faces of a die may be painted alike, so a texture build that silently skipped or duplicated a glyph is caught.
+- `npm run smoke` packs what `npm publish` would upload, installs it into a throwaway project, and uses it: resolving a roll, formatting an announcement, resolving asset URLs, running all 60 physics faces, and type-checking a consumer against the published `.d.ts` under `strict`. It catches a broken `exports` map, a file missing from `files`, or a dependency that should have been a peer — none of which the unit tests can see, since they run against workspace source. Takes about 20 seconds.
+
 ## [0.5.0] - 2026-07-28
 
 Dice that tumble under real physics and still land on the outcome the engine

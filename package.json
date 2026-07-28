@@ -25,7 +25,8 @@
     "vrt": "node tools/vrt/run.mjs",
     "vrt:update": "node tools/vrt/run.mjs --update",
     "vrt:docker": "node tools/vrt/docker.mjs",
-    "physics": "node tools/physics/harness.mjs"
+    "physics": "node tools/physics/harness.mjs",
+    "smoke": "npm run build && node tools/release/smoke.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.5",
