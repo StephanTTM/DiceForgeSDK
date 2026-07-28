@@ -120,10 +120,19 @@ try {
     const baselinePath = join(BASELINES, `${scene.name}.png`);
 
     const hadBaseline = existsSync(baselinePath);
-    if (update || !hadBaseline) {
+    if (update) {
       await writeFile(baselinePath, actual);
       wrote.push(scene.name);
       console.log(`  ${hadBaseline ? "updated" : "created"}  ${scene.name}`);
+      continue;
+    }
+    // A missing baseline used to be created on any run, which left two holes:
+    // CI silently passed a scene nobody had drawn yet, and a bare local run
+    // minted a host-drawn PNG that CI would then reject. Creation now requires
+    // --update, so a new scene fails until its baseline is drawn deliberately.
+    if (!hadBaseline) {
+      failures.push({ ...scene, reason: "no baseline" });
+      console.log(`  MISSING   ${scene.name} — no baseline committed`);
       continue;
     }
 
