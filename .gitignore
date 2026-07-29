@@ -19,3 +19,5 @@ adapters/godot/conformance-report.txt
 adapters/godot/screenshots/
 adapters/godot/relocated/
 adapters/godot/relocation-report.txt
+dist-godot/
+diceforge-godot-*.zip

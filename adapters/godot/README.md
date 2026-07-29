@@ -30,8 +30,22 @@ Records are Dictionaries shaped exactly like the core's schema v2 JSON --
 
 ## Install
 
-Copy the `addons/diceforge/` folder into your project — **anywhere you like,
-but exactly once**.
+The easiest path is the **bundle** — addon and dice in one download, so the
+presenter needs no configuring at all. Grab it from the
+[`godot-asset` branch](https://github.com/StephanTTM/DiceForgeSDK/tree/godot-asset)
+(Code → Download ZIP) or build it yourself with `npm run godot:bundle`, unzip
+into your project, and roll:
+
+```gdscript
+presenter.configure()   # no path: finds the bundled dice beside the scripts
+```
+
+Asset Library listing: pending submission — the bundle branch is exactly the
+layout it will serve.
+
+Working from this repository instead, copy the `addons/diceforge/` folder into
+your project — **anywhere you like, but exactly once** — and pass
+`configure()` the path to a forge asset directory.
 
 - *Anywhere*: the scripts reference each other by script-relative `preload`,
   so the folder works at `res://addons/diceforge`, `res://vendor/dice`, or

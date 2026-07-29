@@ -27,7 +27,8 @@
     "vrt:docker": "node tools/vrt/docker.mjs",
     "physics": "node tools/physics/harness.mjs",
     "smoke": "npm run build && node tools/release/smoke.mjs",
-    "vectors": "npm run build && node tools/conformance/export-vectors.mjs"
+    "vectors": "npm run build && node tools/conformance/export-vectors.mjs",
+    "godot:bundle": "node tools/godot-bundle/build.mjs --zip"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.5",

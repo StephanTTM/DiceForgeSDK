@@ -71,7 +71,8 @@ Remaining before tagging 0.1.0:
 - [x] Godot: posed presentation — the forge models in a scene, faces from the calibrated manifest. (`presenter_3d.gd` + `demo/dice_demo.tscn`: runtime-loads models and textures from `packages/assets-forge`, poses every die on its recorded value, darkens dropped dice, shows the coin; `face_up()` mechanically verifies every pose against the record — 4 seeded shots, 0 failures, screenshots reviewed)
 - [x] Godot: rolling motion. (authored tumble per ADR-0007 — drop, bounce, free tumble easing into exactly the calibrated pose; dropped dice dim on landing; seedable motion for reproducible captures. Real physics measured impossible in GDScript: no manual stepping on `PhysicsServer3D` — `tests/capability.gd` asks the engine — so ADR-0018's record-then-replay waits on engine support or a GDExtension)
 - [ ] Godot: camera/theming polish for a real game scene, and percentile-pair + custom-dice presentation.
-- [ ] Godot: distribution — Asset Library packaging once presentation exists.
+- [x] Godot: distribution bundle. (`npm run godot:bundle` composes addon + forge dice into the Asset Library layout with a zero-config presenter default; verified by unzipping into a fresh project and rolling the golden-vector record with no configuration. The `Godot bundle` workflow publishes it as an artifact and force-pushes the orphan `godot-asset` branch)
+- [ ] Godot: Asset Library submission. (needs the human owner: an assetlib account, the listing form pointed at the `godot-asset` branch, an icon, and screenshots — the bundle branch is already the exact layout it serves)
 - [ ] Run the Godot conformance scene in CI. (needs a Godot binary on the runner; the scene already exits nonzero on mismatch)
 - [ ] Unity: C# port of the core against the same vectors.
 

@@ -1,0 +1,35 @@
+# Builds the Godot Asset Library bundle — addon + forge dice in one layout —
+# and publishes it two ways: as a downloadable artifact, and force-pushed to
+# the orphan `godot-asset` branch, which is the URL shape the Asset Library
+# consumes (repo + branch, zipped by the host).
+name: Godot bundle
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: node tools/godot-bundle/build.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: diceforge-godot
+          path: dist-godot/
+      - name: Publish the godot-asset branch
+        run: |
+          set -e
+          VERSION=$(cat dist-godot/VERSION)
+          cd dist-godot
+          git init -b godot-asset
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "DiceForge for Godot $VERSION (built from $GITHUB_SHA)"
+          git push --force "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" godot-asset

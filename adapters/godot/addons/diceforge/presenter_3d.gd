@@ -37,22 +37,40 @@ var _textures: Dictionary = {}
 
 ## Points the presenter at a forge asset directory (the contents of
 ## `@diceforge-sdk/assets-forge`'s `forge/` folder) and a colour variant.
-func configure(assets_dir: String, color: String) -> bool:
+##
+## Both arguments are optional. With no directory, the presenter looks for
+## assets bundled beside its own script (`assets/forge/`, the Asset Library
+## layout) — found relative to the script, so a relocated addon folder still
+## finds its own dice.
+func configure(assets_dir: String = "", color: String = "ivory") -> bool:
+	if assets_dir == "":
+		assets_dir = (get_script() as Script).resource_path.get_base_dir().path_join(
+			"assets/forge"
+		)
 	_assets_dir = assets_dir
 	if color != _color:
 		# Textures are cached per name; a colour change invalidates them all.
 		_textures = {}
 	_color = color
-	var file := FileAccess.open(assets_dir.path_join("face-rotations.json"), FileAccess.READ)
-	if file == null:
+	var text := _read_text(assets_dir.path_join("face-rotations.json"))
+	if text == "":
 		push_error("DiceForge: cannot open %s/face-rotations.json" % assets_dir)
 		return false
-	var parsed = JSON.parse_string(file.get_as_text())
+	var parsed = JSON.parse_string(text)
 	if parsed == null or not parsed is Dictionary:
 		push_error("DiceForge: face-rotations.json did not parse")
 		return false
 	_manifest = parsed
 	return true
+
+
+static func _read_text(path: String) -> String:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return ""
+	var text := file.get_as_text()
+	file.close()
+	return text
 
 
 ## Shows a resolved record. Returns false — with nothing drawn — when the
@@ -294,13 +312,19 @@ func _darken(model: Node3D) -> void:
 
 func _instantiate(name_key: String) -> Node3D:
 	if not _models.has(name_key):
-		var doc := GLTFDocument.new()
-		var state := GLTFState.new()
 		var path := _assets_dir.path_join("%s.glb" % name_key)
-		if doc.append_from_file(path, state) != OK:
-			push_error("DiceForge: cannot load %s" % path)
-			return null
-		_models[name_key] = doc.generate_scene(state)
+		if ResourceLoader.exists(path):
+			# Inside the project the editor has imported the model; loading the
+			# imported resource is what makes exported games work untouched.
+			var packed: PackedScene = load(path)
+			_models[name_key] = packed.instantiate()
+		else:
+			var doc := GLTFDocument.new()
+			var state := GLTFState.new()
+			if doc.append_from_file(path, state) != OK:
+				push_error("DiceForge: cannot load %s" % path)
+				return null
+			_models[name_key] = doc.generate_scene(state)
 	var source: Node3D = _models[name_key]
 	var copy := source.duplicate() as Node3D
 	_recenter(copy)
@@ -322,7 +346,7 @@ func _recenter(model: Node3D) -> void:
 
 
 func _apply_texture(model: Node3D, texture_name: String, material_suffix: String) -> void:
-	var texture := _texture(texture_name)
+	var texture: Texture2D = _texture(texture_name)
 	if texture == null:
 		return
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
@@ -340,15 +364,19 @@ func _apply_texture(model: Node3D, texture_name: String, material_suffix: String
 			mesh.set_surface_override_material(surface, painted)
 
 
-func _texture(texture_name: String) -> ImageTexture:
+func _texture(texture_name: String) -> Texture2D:
 	if _textures.has(texture_name):
 		return _textures[texture_name]
 	var path := _assets_dir.path_join("textures").path_join(_color).path_join("%s.png" % texture_name)
-	var image := Image.load_from_file(path)
-	if image == null:
-		push_error("DiceForge: cannot load %s" % path)
-		return null
-	image.generate_mipmaps()
-	var texture := ImageTexture.create_from_image(image)
+	var texture: Texture2D
+	if ResourceLoader.exists(path):
+		texture = load(path)
+	else:
+		var image := Image.load_from_file(path)
+		if image == null:
+			push_error("DiceForge: cannot load %s" % path)
+			return null
+		image.generate_mipmaps()
+		texture = ImageTexture.create_from_image(image)
 	_textures[texture_name] = texture
 	return texture
