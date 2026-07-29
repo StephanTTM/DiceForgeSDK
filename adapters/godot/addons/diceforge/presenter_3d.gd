@@ -28,11 +28,17 @@ const ROLL_STAGGER := 0.07
 const DROP_HEIGHT := 5.5
 const REVEAL_SECONDS := 0.35
 
+const DROPPED_SCALE := 0.82
+
 var _assets_dir := ""
 var _color := "ivory"
 var _manifest: Dictionary = {}
 var _models: Dictionary = {}
 var _textures: Dictionary = {}
+## Bumped by every presentation; a running animation that no longer matches it
+## has been superseded and stands down without touching freed dice.
+var _run_id := 0
+var _animating_run := -1
 
 
 ## Points the presenter at a forge asset directory (the contents of
@@ -73,9 +79,15 @@ static func _read_text(path: String) -> String:
 	return text
 
 
-## Shows a resolved record. Returns false — with nothing drawn — when the
-## record needs a model this slice does not have.
+## Shows a resolved record, settled. Returns false — with nothing drawn — when
+## the record needs a model this slice does not have. Presenting supersedes any
+## animation still in flight, which simply stands down.
 func present(record: Dictionary) -> bool:
+	return _lay_out(record, true)
+
+
+func _lay_out(record: Dictionary, dim_dropped: bool) -> bool:
+	_run_id += 1
 	if record.has("error"):
 		return false
 	for child in get_children():
@@ -100,9 +112,13 @@ func present(record: Dictionary) -> bool:
 	var rows := ceili(float(dice.size()) / float(columns))
 	for index in dice.size():
 		var die: Dictionary = dice[index]
-		var posed := _pose_die(die["sides"], die["value"], die["kept"])
+		var posed := _build_die(die["sides"], die["value"])
 		if posed == null:
 			return false
+		posed.set_meta("diceforge_kept", die["kept"])
+		if dim_dropped and not die["kept"]:
+			posed.scale = Vector3.ONE * DROPPED_SCALE
+			_darken(posed)
 		var column := index % columns
 		@warning_ignore("integer_division")
 		var row := index / columns
@@ -136,11 +152,8 @@ func _present_coin(record: Dictionary) -> bool:
 ## True while `present_animated` is playing; `animation_finished` fires after.
 signal animation_finished
 
-var _animating := false
-
-
 func is_animating() -> bool:
-	return _animating
+	return _animating_run != -1
 
 
 ## Rolls the record in: dice drop, bounce and tumble, then settle on exactly
@@ -153,16 +166,21 @@ func is_animating() -> bool:
 ## Await it like any coroutine:
 ##     await presenter.present_animated(record)
 func present_animated(record: Dictionary, motion_seed: int = -1) -> bool:
-	if not present(record):
+	# Laid out undimmed: kept-ness is a reveal after landing, and pre-dimmed
+	# dice would fly dark and then dim twice.
+	if not _lay_out(record, false):
 		return false
+	# This animation belongs to this presentation. A new present() bumps the
+	# counter, and a superseded flight stands down at its next frame — which is
+	# what makes "reroll while the dice are still rolling" a supported move
+	# rather than an error against freed nodes.
+	var run := _run_id
 	var rng := RandomNumberGenerator.new()
 	if motion_seed >= 0:
 		rng.seed = motion_seed
 	else:
 		rng.randomize()
 
-	# present() left every die posed on its slot; turn each pose into a flight
-	# plan that ends exactly where it already is.
 	var flights: Array = []
 	var index := 0
 	for wrapper in get_children():
@@ -181,10 +199,8 @@ func present_animated(record: Dictionary, motion_seed: int = -1) -> bool:
 			"rate": rng.randf_range(9.0, 14.0),
 			"lateral": lateral,
 			"delay": index * ROLL_STAGGER,
-			"kept_scale": wrapper.scale,
+			"kept": wrapper.get_meta("diceforge_kept", true),
 		})
-		# Fly from the start, full-size and undimmed; kept-ness is a reveal.
-		wrapper.scale = Vector3.ONE
 		index += 1
 
 	# Airborne before the first frame draws, or the settled dice flash once.
@@ -192,10 +208,12 @@ func present_animated(record: Dictionary, motion_seed: int = -1) -> bool:
 		_fly(flight, 0.0)
 
 	var total := ROLL_SECONDS + ROLL_STAGGER * maxi(flights.size() - 1, 0)
-	_animating = true
+	_animating_run = run
 	var elapsed := 0.0
 	while elapsed < total:
 		await get_tree().process_frame
+		if run != _run_id:
+			return _stand_down(run)
 		elapsed += get_process_delta_time()
 		for flight in flights:
 			_fly(flight, clampf((elapsed - flight["delay"]) / ROLL_SECONDS, 0.0, 1.0))
@@ -206,27 +224,43 @@ func present_animated(record: Dictionary, motion_seed: int = -1) -> bool:
 	# be read, mirroring the web presenter's timing.
 	var dimmed := false
 	for flight in flights:
-		if flight["kept_scale"] != Vector3.ONE:
+		if not flight["kept"]:
 			_darken(flight["wrapper"])
 			dimmed = true
 	if dimmed:
 		elapsed = 0.0
 		while elapsed < REVEAL_SECONDS:
 			await get_tree().process_frame
+			if run != _run_id:
+				return _stand_down(run)
 			elapsed += get_process_delta_time()
 			var k := clampf(elapsed / REVEAL_SECONDS, 0.0, 1.0)
 			for flight in flights:
-				if flight["kept_scale"] != Vector3.ONE:
-					flight["wrapper"].scale = Vector3.ONE.lerp(flight["kept_scale"], k)
-	_animating = false
+				if not flight["kept"]:
+					flight["wrapper"].scale = Vector3.ONE.lerp(Vector3.ONE * DROPPED_SCALE, k)
+		for flight in flights:
+			if not flight["kept"]:
+				flight["wrapper"].scale = Vector3.ONE * DROPPED_SCALE
+	_animating_run = -1
 	animation_finished.emit()
 	return true
+
+
+## A superseded animation exits quietly: newer dice are on stage, and the old
+## flight must not touch them — or the freed nodes it used to own.
+func _stand_down(run: int) -> bool:
+	if _animating_run == run:
+		_animating_run = -1
+	animation_finished.emit()
+	return false
 
 
 ## One die at one instant of its authored flight. At t = 1 the pose IS the
 ## calibrated target — reached by construction, not by snap.
 func _fly(flight: Dictionary, t: float) -> void:
 	var wrapper: Node3D = flight["wrapper"]
+	if not is_instance_valid(wrapper):
+		return
 	var slot: Vector3 = flight["slot"]
 
 	# Height: a fall, a real bounce, and a settle bounce.
@@ -250,20 +284,10 @@ func _fly(flight: Dictionary, t: float) -> void:
 	wrapper.quaternion = free.slerp(flight["target_q"], settle)
 
 
-## The face the record holds, brought to the top by the calibrated rotation —
-## never by choosing a face (rule 5: presentation shows, it does not decide).
-func _pose_die(sides: int, value: int, kept: bool) -> Node3D:
-	var wrapper := _build_die(sides, value)
-	if wrapper == null:
-		return null
-	if not kept:
-		wrapper.scale = Vector3.ONE * 0.82
-		_darken(wrapper)
-	return wrapper
-
-
 ## A die at its calibrated final pose, undimmed — the shared start point for
-## both the posed and the animated presentations.
+## both the posed and the animated presentations. The face the record holds is
+## brought to the top by the calibrated rotation, never by choosing a face
+## (rule 5: presentation shows, it does not decide).
 func _build_die(sides: int, value: int) -> Node3D:
 	var entry: Dictionary = _manifest.get("d%d" % sides, {})
 	var model := _instantiate("d%d" % sides)

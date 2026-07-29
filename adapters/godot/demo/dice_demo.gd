@@ -51,6 +51,9 @@ func _ready() -> void:
 		image.save_png(shots_dir.path_join("%s.png" % shot["name"]))
 		_report.append("SHOT %s: %s" % [shot["name"], _describe(record)])
 
+	await _reroll_interrupt_check(presenter, assets)
+	await _single_dim_check(presenter, assets)
+
 	var summary := "DEMO %s: %d shots, %d failures" % [
 		"PASS" if _failures == 0 else "FAIL", SHOTS.size(), _failures
 	]
@@ -111,6 +114,60 @@ func _animated_shot(shot: Dictionary, presenter: Node3D, record: Dictionary, sho
 	)
 	_check_faces(shot["name"], presenter, record)
 	_report.append("SHOT %s (animated): %s" % [shot["name"], _describe(record)])
+
+
+## The product owner's bug report, as a test: pressing reroll while the dice
+## are still rolling must supersede the flight, not crash it. The first
+## animation must report cancellation, the second must land its own record,
+## and any touch of a freed die would break this run outright.
+func _reroll_interrupt_check(presenter: Node3D, assets: String) -> void:
+	presenter.configure(assets, "green")
+	var first_record = Forge.seeded("interrupt-a").roll("5d6")
+	var second_record = Forge.seeded("interrupt-b").roll("2d20kh1")
+	get_tree().create_timer(0.3).timeout.connect(
+		func() -> void: await presenter.present_animated(second_record, 9)
+	)
+	var first_result = await presenter.present_animated(first_record, 7)
+	if first_result:
+		_fail("reroll-interrupt: superseded roll reported natural completion")
+	while presenter.is_animating():
+		await get_tree().process_frame
+	if presenter.get_children().size() != 2:
+		_fail("reroll-interrupt: %d dice on stage, wanted the reroll's 2" % presenter.get_children().size())
+	else:
+		_check_faces("reroll-interrupt", presenter, second_record)
+	_report.append("CHECK reroll-interrupt: reroll mid-flight supersedes cleanly")
+
+
+## The other report: a dropped die must fly undimmed and end exactly as dim as
+## the posed presentation — dimmed once, not twice.
+func _single_dim_check(presenter: Node3D, assets: String) -> void:
+	presenter.configure(assets, "blue")
+	var record = Forge.seeded("table-42").roll("4d6dl1")
+	await presenter.present_animated(record, 7)
+	var animated := _dropped_appearance(presenter)
+	presenter.present(record)
+	var posed := _dropped_appearance(presenter)
+	if animated.is_empty() or posed.is_empty():
+		_fail("single-dim: no dropped die found to compare")
+		return
+	if animated[0] != posed[0]:
+		_fail("single-dim: scale %.3f animated vs %.3f posed" % [animated[0], posed[0]])
+	if animated[1] != posed[1]:
+		_fail("single-dim: albedo %s animated vs %s posed" % [animated[1], posed[1]])
+	_report.append("CHECK single-dim: animated reveal matches the posed dimming exactly")
+
+
+## Scale and albedo of the first dropped die on stage.
+func _dropped_appearance(presenter: Node3D) -> Array:
+	for wrapper in presenter.get_children():
+		if wrapper.get_meta("diceforge_kept", true):
+			continue
+		for mesh: MeshInstance3D in wrapper.find_children("*", "MeshInstance3D", true, false):
+			var material := mesh.get_active_material(0)
+			if material is BaseMaterial3D:
+				return [wrapper.scale.x, material.albedo_color]
+	return []
 
 
 ## Signal-invoked, so it may await; saves whatever is on screen right now.

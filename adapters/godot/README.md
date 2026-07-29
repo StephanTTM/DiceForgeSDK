@@ -114,6 +114,11 @@ await presenter.present_animated(record)        # rolls in, ~1s
 presenter.present(record)                       # settled instantly (reduced motion)
 ```
 
+Presenting again while a roll is still in flight — a reroll button, say —
+simply supersedes it: the old animation stands down at its next frame and its
+`present_animated` returns `false`, while the new roll takes the stage. No
+guarding needed on the caller's side.
+
 Why not real physics? Measured, not assumed: Godot exposes no manual physics
 stepping to scripts (`tests/capability.gd` asks the engine directly), so the
 record-then-replay technique the web physics presenter uses (ADR-0018) cannot
