@@ -80,6 +80,25 @@ First slice: settled poses for d4-d20 and the coin. Percentile pairs, custom
 dice tiles, and rolling motion are future work; `present` returns `false` for
 a record it cannot show, so a caller can fall back to text.
 
+The smallest complete setup is `demo/minimal.tscn`: a Node3D with the script
+above, a Camera3D, and a DirectionalLight3D — three nodes, eight lines of
+integration. Run it with:
+
+```bash
+godot --path adapters/godot res://demo/minimal.tscn
+```
+
+## Shipping a game with it
+
+Two things to know before exporting. The presenter loads `.glb` and `.png`
+files at runtime, so if you put the forge assets inside `res://`, add
+`*.glb,*.png,*.json` to the export preset's non-resource filters — Godot's
+normal import pipeline converts images and would otherwise strip the raw
+files. And the assets themselves come from `@diceforge-sdk/assets-forge`;
+without npm, copy the `forge/` directory out of this repository or the
+published tarball. Bundling addon and assets into one Asset Library package
+is planned.
+
 ## Licence
 
 MIT, as the rest of DiceForge.
