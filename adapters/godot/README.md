@@ -119,6 +119,16 @@ simply supersedes it: the old animation stands down at its next frame and its
 `present_animated` returns `false`, while the new roll takes the stage. No
 guarding needed on the caller's side.
 
+Two dials worth knowing. `presenter.scatter = true` strews the dice about the
+stage with random headings instead of the tidy reading grid — resting spots
+are sampled collision-free, a heading about the vertical cannot change which
+face is up, and it applies to posed and animated presentations alike. (Flights
+cross and jostle visually; true rigid-body contact between dice waits on the
+engine exposing physics stepping.) And the throw's feel is tuned against real
+gravity — honest gravity at die scale lands in ~90 ms, unreadably fast, so the
+arc runs at roughly 4x slow motion of the real thing; the timing constants sit
+at the top of `presenter_3d.gd` if your game wants it snappier or lazier.
+
 Why not real physics? Measured, not assumed: Godot exposes no manual physics
 stepping to scripts (`tests/capability.gd` asks the engine directly), so the
 record-then-replay technique the web physics presenter uses (ADR-0018) cannot

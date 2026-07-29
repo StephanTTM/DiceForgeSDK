@@ -23,12 +23,29 @@ const DROPPED_DARKEN := 0.45
 ## Authored tumble timings (ADR-0007's approach, not simulated physics: the
 ## engine exposes no manual physics stepping — measured, see TASKS — so motion
 ## is designed to end on the calibrated pose rather than corrected into it).
-const ROLL_SECONDS := 0.85
+##
+## The arc is tuned against real gravity rather than by vibe: honest gravity at
+## forge-die scale would land a die in ~90 ms — unreadably fast — and the first
+## cut fell twenty times slower than real, which read as dice on the moon. This
+## is ~4x slow motion of the real thing: a 220 ms fall, bounces sized by a
+## restitution of about 0.35, and tumble that stays energetic until just
+## before rest.
+const ROLL_SECONDS := 0.8
 const ROLL_STAGGER := 0.07
-const DROP_HEIGHT := 5.5
+const DROP_HEIGHT := 6.5
 const REVEAL_SECONDS := 0.35
 
 const DROPPED_SCALE := 0.82
+## Scatter mode's collision-free spacing between resting dice, in die widths of
+## the resting area's Poisson-style sampling.
+const SCATTER_MIN_DISTANCE := 2.5
+
+## When true, dice come to rest strewn about the stage with random headings,
+## like a real throw, instead of on the tidy reading grid — spots are sampled
+## collision-free, so no two dice overlap at rest. Set it before presenting.
+## Flights cross and jostle visually, but this is authored motion: true
+## rigid-body contact between dice waits on engine physics stepping (TASKS).
+var scatter := false
 
 var _assets_dir := ""
 var _color := "ivory"
@@ -83,10 +100,10 @@ static func _read_text(path: String) -> String:
 ## the record needs a model this slice does not have. Presenting supersedes any
 ## animation still in flight, which simply stands down.
 func present(record: Dictionary) -> bool:
-	return _lay_out(record, true)
+	return _lay_out(record, true, null)
 
 
-func _lay_out(record: Dictionary, dim_dropped: bool) -> bool:
+func _lay_out(record: Dictionary, dim_dropped: bool, rng: RandomNumberGenerator) -> bool:
 	_run_id += 1
 	if record.has("error"):
 		return false
@@ -108,27 +125,65 @@ func _lay_out(record: Dictionary, dim_dropped: bool) -> bool:
 		for die in group["dice"]:
 			dice.append({"sides": int(group["sides"]), "value": int(die["value"]), "kept": die["kept"]})
 
-	var columns := ceili(sqrt(float(dice.size())))
-	var rows := ceili(float(dice.size()) / float(columns))
+	if scatter and rng == null:
+		rng = RandomNumberGenerator.new()
+		rng.randomize()
+	var slots := _slots(dice.size(), rng)
 	for index in dice.size():
 		var die: Dictionary = dice[index]
 		var posed := _build_die(die["sides"], die["value"])
 		if posed == null:
 			return false
 		posed.set_meta("diceforge_kept", die["kept"])
+		if scatter:
+			# A random heading about the vertical is a real throw's rest pose,
+			# and it cannot change which face is up — rotation about the world
+			# up axis preserves every face's height, so face_up() and the
+			# record agree exactly as on the grid.
+			posed.quaternion = Quaternion(Vector3.UP, rng.randf_range(0.0, TAU)) * posed.quaternion
 		if dim_dropped and not die["kept"]:
 			posed.scale = Vector3.ONE * DROPPED_SCALE
 			_darken(posed)
+		posed.position = slots[index]
+		add_child(posed)
+	return true
+
+
+## Resting spots: the tidy reading grid, or — in scatter mode — collision-free
+## random spots in an area sized to the roll, rejection-sampled so no two dice
+## overlap at rest. A spot that cannot be placed after many tries falls back to
+## its grid position rather than stacking.
+func _slots(count: int, rng: RandomNumberGenerator) -> Array:
+	var columns := ceili(sqrt(float(count)))
+	var rows := ceili(float(count) / float(columns))
+	var slots: Array = []
+	for index in count:
 		var column := index % columns
 		@warning_ignore("integer_division")
 		var row := index / columns
-		posed.position = Vector3(
+		slots.append(Vector3(
 			(column - (columns - 1) / 2.0) * DIE_SPACING,
 			0.0,
 			(row - (rows - 1) / 2.0) * DIE_SPACING,
-		)
-		add_child(posed)
-	return true
+		))
+	if not scatter or rng == null:
+		return slots
+	var half := maxf(2.2, 0.62 * DIE_SPACING * sqrt(float(count)))
+	var placed: Array = []
+	for index in count:
+		var spot: Vector3 = slots[index]
+		for attempt in 40:
+			var candidate := Vector3(rng.randf_range(-half, half), 0.0, rng.randf_range(-half, half))
+			var clear := true
+			for other in placed:
+				if candidate.distance_to(other) < SCATTER_MIN_DISTANCE:
+					clear = false
+					break
+			if clear:
+				spot = candidate
+				break
+		placed.append(spot)
+	return placed
 
 
 func _present_coin(record: Dictionary) -> bool:
@@ -166,25 +221,27 @@ func is_animating() -> bool:
 ## Await it like any coroutine:
 ##     await presenter.present_animated(record)
 func present_animated(record: Dictionary, motion_seed: int = -1) -> bool:
+	var rng := RandomNumberGenerator.new()
+	if motion_seed >= 0:
+		rng.seed = motion_seed
+	else:
+		rng.randomize()
 	# Laid out undimmed: kept-ness is a reveal after landing, and pre-dimmed
-	# dice would fly dark and then dim twice.
-	if not _lay_out(record, false):
+	# dice would fly dark and then dim twice. The rng rides along so scatter
+	# spots reproduce under a motion seed.
+	if not _lay_out(record, false, rng):
 		return false
 	# This animation belongs to this presentation. A new present() bumps the
 	# counter, and a superseded flight stands down at its next frame — which is
 	# what makes "reroll while the dice are still rolling" a supported move
 	# rather than an error against freed nodes.
 	var run := _run_id
-	var rng := RandomNumberGenerator.new()
-	if motion_seed >= 0:
-		rng.seed = motion_seed
-	else:
-		rng.randomize()
 
 	var flights: Array = []
 	var index := 0
 	for wrapper in get_children():
-		var lateral := Vector3(rng.randf_range(-1.4, 1.4), 0.0, rng.randf_range(-1.4, 1.4))
+		var direction := rng.randf_range(0.0, TAU)
+		var lateral := Vector3(cos(direction), 0.0, sin(direction)) * rng.randf_range(2.0, 3.2)
 		flights.append({
 			"wrapper": wrapper,
 			"target_q": wrapper.quaternion,
@@ -196,7 +253,7 @@ func present_animated(record: Dictionary, motion_seed: int = -1) -> bool:
 			"axis": Vector3(
 				rng.randf_range(-1, 1), rng.randf_range(-0.3, 0.3), rng.randf_range(-1, 1)
 			).normalized(),
-			"rate": rng.randf_range(9.0, 14.0),
+			"rate": rng.randf_range(11.0, 17.0),
 			"lateral": lateral,
 			"delay": index * ROLL_STAGGER,
 			"kept": wrapper.get_meta("diceforge_kept", true),
@@ -263,24 +320,27 @@ func _fly(flight: Dictionary, t: float) -> void:
 		return
 	var slot: Vector3 = flight["slot"]
 
-	# Height: a fall, a real bounce, and a settle bounce.
+	# Height: a fast fall, a real bounce, and a settle bounce — segment lengths
+	# follow from the restitution, not taste alone.
 	var y := 0.0
-	if t < 0.5:
-		var u := t / 0.5
+	if t < 0.3:
+		var u := t / 0.3
 		y = DROP_HEIGHT * (1.0 - u) * (1.0 - u)
-	elif t < 0.78:
-		var u := (t - 0.5) / 0.28
-		y = 1.1 * 4.0 * u * (1.0 - u)
-	elif t < 0.94:
-		var u := (t - 0.78) / 0.16
-		y = 0.28 * 4.0 * u * (1.0 - u)
+	elif t < 0.48:
+		var u := (t - 0.3) / 0.18
+		y = 0.72 * 4.0 * u * (1.0 - u)
+	elif t < 0.6:
+		var u := (t - 0.48) / 0.12
+		y = 0.16 * 4.0 * u * (1.0 - u)
 
-	var approach: Vector3 = flight["lateral"] * pow(1.0 - t, 1.5)
+	# Thrown in from the side, arriving with speed rather than drifting.
+	var approach: Vector3 = flight["lateral"] * pow(1.0 - t, 2.4)
 	wrapper.position = Vector3(slot.x + approach.x, y, slot.z + approach.z)
 
-	# Free tumble early, eased into the exact calibrated pose by the end.
+	# Free tumble through the bounces, locked to the exact calibrated pose only
+	# just before rest — an early ease is what read as gentle.
 	var free: Quaternion = flight["start_q"] * Quaternion(flight["axis"], flight["rate"] * ROLL_SECONDS * t)
-	var settle := smoothstep(0.42, 1.0, t)
+	var settle := smoothstep(0.5, 0.96, t)
 	wrapper.quaternion = free.slerp(flight["target_q"], settle)
 
 

@@ -15,6 +15,9 @@ const SHOTS := [
 	# The rolling motion, captured mid-air and after settling. Motion is seeded
 	# so these frames reproduce; the outcome never needed the help.
 	{"name": "rolling", "seed": "table-42", "roll": "4d6dl1", "color": "ivory", "animate": true},
+	# Scatter mode: strewn resting spots and random headings, still face-checked
+	# against the record — a heading about the vertical cannot change the face.
+	{"name": "scatter", "seed": "zz", "roll": "5d6", "color": "red", "animate": true, "scatter": true},
 ]
 
 var _report: Array[String] = []
@@ -37,6 +40,7 @@ func _ready() -> void:
 			continue
 		var forge := Forge.seeded(shot["seed"])
 		var record = forge.flip_coin() if shot.get("flip", false) else forge.roll(shot["roll"])
+		presenter.scatter = shot.get("scatter", false)
 		if shot.get("animate", false):
 			await _animated_shot(shot, presenter, record, shots_dir)
 			continue
@@ -113,6 +117,16 @@ func _animated_shot(shot: Dictionary, presenter: Node3D, record: Dictionary, sho
 		shots_dir.path_join("%s-settled.png" % shot["name"])
 	)
 	_check_faces(shot["name"], presenter, record)
+	if shot.get("scatter", false):
+		var wrappers := presenter.get_children()
+		for a in wrappers.size():
+			for b in range(a + 1, wrappers.size()):
+				var gap: float = Vector2(
+					wrappers[a].position.x - wrappers[b].position.x,
+					wrappers[a].position.z - wrappers[b].position.z
+				).length()
+				if gap < 2.1:
+					_fail("%s: dice %d and %d rest %.2f apart — overlapping" % [shot["name"], a, b, gap])
 	_report.append("SHOT %s (animated): %s" % [shot["name"], _describe(record)])
 
 
