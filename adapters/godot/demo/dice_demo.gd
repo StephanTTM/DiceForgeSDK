@@ -12,6 +12,9 @@ const SHOTS := [
 	{"name": "dropped-die", "seed": "table-42", "roll": "4d6dl1", "color": "blue"},
 	{"name": "advantage-pair", "seed": "vectors", "roll": "2d20kh1", "color": "green"},
 	{"name": "coin-heads", "seed": "table-42", "flip": true, "color": "yellow"},
+	# The rolling motion, captured mid-air and after settling. Motion is seeded
+	# so these frames reproduce; the outcome never needed the help.
+	{"name": "rolling", "seed": "table-42", "roll": "4d6dl1", "color": "ivory", "animate": true},
 ]
 
 var _report: Array[String] = []
@@ -34,6 +37,9 @@ func _ready() -> void:
 			continue
 		var forge := Forge.seeded(shot["seed"])
 		var record = forge.flip_coin() if shot.get("flip", false) else forge.roll(shot["roll"])
+		if shot.get("animate", false):
+			await _animated_shot(shot, presenter, record, shots_dir)
+			continue
 		if not presenter.present(record):
 			_fail("%s: presenter declined the record" % shot["name"])
 			continue
@@ -79,6 +85,38 @@ func _check_faces(shot_name: String, presenter: Node3D, record: Dictionary) -> v
 				"%s: die %d shows %d, record says %d"
 				% [shot_name, index, up, expected[index]["value"]]
 			)
+
+
+## Runs the tumble, captures it mid-air and settled, and only checks faces
+## once the animation claims to be done — the settled pose must still equal
+## the record exactly, or the ease-in lied.
+##
+## Godot 4.7 refuses fire-and-forget coroutines, so the mid-flight captures
+## are armed as timer signals — the sanctioned async entry point — before the
+## animation itself is awaited.
+func _animated_shot(shot: Dictionary, presenter: Node3D, record: Dictionary, shots_dir: String) -> void:
+	presenter.present(record)
+	_frame_camera(presenter)
+	get_tree().create_timer(0.22).timeout.connect(
+		_snap.bind(shots_dir.path_join("%s-midair.png" % shot["name"]))
+	)
+	get_tree().create_timer(0.55).timeout.connect(
+		_snap.bind(shots_dir.path_join("%s-bounce.png" % shot["name"]))
+	)
+	await presenter.present_animated(record, 7)
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(
+		shots_dir.path_join("%s-settled.png" % shot["name"])
+	)
+	_check_faces(shot["name"], presenter, record)
+	_report.append("SHOT %s (animated): %s" % [shot["name"], _describe(record)])
+
+
+## Signal-invoked, so it may await; saves whatever is on screen right now.
+func _snap(path: String) -> void:
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(path)
 
 
 func _fail(message: String) -> void:

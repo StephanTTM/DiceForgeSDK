@@ -1,0 +1,5 @@
+PhysicsServer3D.space_step: false
+PhysicsServer3D.step: false
+PhysicsServer3D.simulate: false
+PhysicsServer3D.space_flush_queries: false
+Physics tick rate: 60

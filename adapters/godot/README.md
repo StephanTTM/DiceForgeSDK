@@ -89,9 +89,25 @@ the presentation matches the record rather than eyeballing it -- the demo scene
 godot --path adapters/godot res://demo/dice_demo.tscn
 ```
 
-First slice: settled poses for d4-d20 and the coin. Percentile pairs, custom
-dice tiles, and rolling motion are future work; `present` returns `false` for
-a record it cannot show, so a caller can fall back to text.
+Rolling motion ships as an **authored tumble** (the web renderer's ADR-0007
+approach): dice drop in, bounce, and tumble freely, easing into exactly the
+calibrated pose — the animation is designed to end on the recorded face, so
+nothing is simulated and nothing is corrected. Dropped dice dim once the roll
+has landed. Motion takes an optional seed so tests and screenshots reproduce:
+
+```gdscript
+await presenter.present_animated(record)        # rolls in, ~1s
+presenter.present(record)                       # settled instantly (reduced motion)
+```
+
+Why not real physics? Measured, not assumed: Godot exposes no manual physics
+stepping to scripts (`tests/capability.gd` asks the engine directly), so the
+record-then-replay technique the web physics presenter uses (ADR-0018) cannot
+be implemented in GDScript today. If the engine ever exposes stepping — or a
+GDExtension supplies it — the symmetry-remap approach ports directly.
+
+Still future: percentile pairs and custom dice tiles; `present` returns
+`false` for a record it cannot show, so a caller can fall back to text.
 
 The smallest complete setup is `demo/minimal.tscn`: a Node3D with the script
 above, a Camera3D, and a DirectionalLight3D — three nodes, eight lines of

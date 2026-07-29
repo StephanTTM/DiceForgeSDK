@@ -69,7 +69,8 @@ Remaining before tagging 0.1.0:
 - [x] Decide how a non-TypeScript platform gets the core: a native port held to exported conformance vectors, bit for bit. (`tools/conformance/export-vectors.mjs` → `packages/testing/vectors/core-vectors.json`, freshness-tested against the live core every run — ADR-0021)
 - [x] Godot: headless engine as a GDScript addon. (`adapters/godot/addons/diceforge` — RNG, grammar v1.2, resolution, custom dice, coin; 48/48 vectors pass in Godot 4.7.1, and one flipped rotate constant fails 16, so the gate is real)
 - [x] Godot: posed presentation — the forge models in a scene, faces from the calibrated manifest. (`presenter_3d.gd` + `demo/dice_demo.tscn`: runtime-loads models and textures from `packages/assets-forge`, poses every die on its recorded value, darkens dropped dice, shows the coin; `face_up()` mechanically verifies every pose against the record — 4 seeded shots, 0 failures, screenshots reviewed)
-- [ ] Godot: rolling motion — tumble or physics for the posed dice, and camera/theming polish for a real game scene.
+- [x] Godot: rolling motion. (authored tumble per ADR-0007 — drop, bounce, free tumble easing into exactly the calibrated pose; dropped dice dim on landing; seedable motion for reproducible captures. Real physics measured impossible in GDScript: no manual stepping on `PhysicsServer3D` — `tests/capability.gd` asks the engine — so ADR-0018's record-then-replay waits on engine support or a GDExtension)
+- [ ] Godot: camera/theming polish for a real game scene, and percentile-pair + custom-dice presentation.
 - [ ] Godot: distribution — Asset Library packaging once presentation exists.
 - [ ] Run the Godot conformance scene in CI. (needs a Godot binary on the runner; the scene already exits nonzero on mismatch)
 - [ ] Unity: C# port of the core against the same vectors.

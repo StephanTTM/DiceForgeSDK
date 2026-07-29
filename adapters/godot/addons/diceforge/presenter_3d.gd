@@ -20,6 +20,13 @@ extends Node3D
 
 const DIE_SPACING := 3.2
 const DROPPED_DARKEN := 0.45
+## Authored tumble timings (ADR-0007's approach, not simulated physics: the
+## engine exposes no manual physics stepping — measured, see TASKS — so motion
+## is designed to end on the calibrated pose rather than corrected into it).
+const ROLL_SECONDS := 0.85
+const ROLL_STAGGER := 0.07
+const DROP_HEIGHT := 5.5
+const REVEAL_SECONDS := 0.35
 
 var _assets_dir := ""
 var _color := "ivory"
@@ -108,9 +115,138 @@ func _present_coin(record: Dictionary) -> bool:
 	return true
 
 
+## True while `present_animated` is playing; `animation_finished` fires after.
+signal animation_finished
+
+var _animating := false
+
+
+func is_animating() -> bool:
+	return _animating
+
+
+## Rolls the record in: dice drop, bounce and tumble, then settle on exactly
+## the calibrated pose — an authored animation in ADR-0007's sense, designed to
+## end on the recorded face, so nothing is simulated and nothing is corrected.
+## Dropped dice dim once the roll has landed, the way the web presenter reveals
+## them. `motion_seed` >= 0 makes the motion reproducible (screenshots, tests);
+## the outcome needs no such help, it was decided before this ran.
+##
+## Await it like any coroutine:
+##     await presenter.present_animated(record)
+func present_animated(record: Dictionary, motion_seed: int = -1) -> bool:
+	if not present(record):
+		return false
+	var rng := RandomNumberGenerator.new()
+	if motion_seed >= 0:
+		rng.seed = motion_seed
+	else:
+		rng.randomize()
+
+	# present() left every die posed on its slot; turn each pose into a flight
+	# plan that ends exactly where it already is.
+	var flights: Array = []
+	var index := 0
+	for wrapper in get_children():
+		var lateral := Vector3(rng.randf_range(-1.4, 1.4), 0.0, rng.randf_range(-1.4, 1.4))
+		flights.append({
+			"wrapper": wrapper,
+			"target_q": wrapper.quaternion,
+			"slot": wrapper.position,
+			"start_q": Quaternion(
+				Vector3(rng.randf_range(-1, 1), rng.randf_range(-1, 1), rng.randf_range(-1, 1)).normalized(),
+				rng.randf_range(0.0, TAU)
+			),
+			"axis": Vector3(
+				rng.randf_range(-1, 1), rng.randf_range(-0.3, 0.3), rng.randf_range(-1, 1)
+			).normalized(),
+			"rate": rng.randf_range(9.0, 14.0),
+			"lateral": lateral,
+			"delay": index * ROLL_STAGGER,
+			"kept_scale": wrapper.scale,
+		})
+		# Fly from the start, full-size and undimmed; kept-ness is a reveal.
+		wrapper.scale = Vector3.ONE
+		index += 1
+
+	# Airborne before the first frame draws, or the settled dice flash once.
+	for flight in flights:
+		_fly(flight, 0.0)
+
+	var total := ROLL_SECONDS + ROLL_STAGGER * maxi(flights.size() - 1, 0)
+	_animating = true
+	var elapsed := 0.0
+	while elapsed < total:
+		await get_tree().process_frame
+		elapsed += get_process_delta_time()
+		for flight in flights:
+			_fly(flight, clampf((elapsed - flight["delay"]) / ROLL_SECONDS, 0.0, 1.0))
+	for flight in flights:
+		_fly(flight, 1.0)
+
+	# The reveal: dice that were dropped dim and shrink now that the roll can
+	# be read, mirroring the web presenter's timing.
+	var dimmed := false
+	for flight in flights:
+		if flight["kept_scale"] != Vector3.ONE:
+			_darken(flight["wrapper"])
+			dimmed = true
+	if dimmed:
+		elapsed = 0.0
+		while elapsed < REVEAL_SECONDS:
+			await get_tree().process_frame
+			elapsed += get_process_delta_time()
+			var k := clampf(elapsed / REVEAL_SECONDS, 0.0, 1.0)
+			for flight in flights:
+				if flight["kept_scale"] != Vector3.ONE:
+					flight["wrapper"].scale = Vector3.ONE.lerp(flight["kept_scale"], k)
+	_animating = false
+	animation_finished.emit()
+	return true
+
+
+## One die at one instant of its authored flight. At t = 1 the pose IS the
+## calibrated target — reached by construction, not by snap.
+func _fly(flight: Dictionary, t: float) -> void:
+	var wrapper: Node3D = flight["wrapper"]
+	var slot: Vector3 = flight["slot"]
+
+	# Height: a fall, a real bounce, and a settle bounce.
+	var y := 0.0
+	if t < 0.5:
+		var u := t / 0.5
+		y = DROP_HEIGHT * (1.0 - u) * (1.0 - u)
+	elif t < 0.78:
+		var u := (t - 0.5) / 0.28
+		y = 1.1 * 4.0 * u * (1.0 - u)
+	elif t < 0.94:
+		var u := (t - 0.78) / 0.16
+		y = 0.28 * 4.0 * u * (1.0 - u)
+
+	var approach: Vector3 = flight["lateral"] * pow(1.0 - t, 1.5)
+	wrapper.position = Vector3(slot.x + approach.x, y, slot.z + approach.z)
+
+	# Free tumble early, eased into the exact calibrated pose by the end.
+	var free: Quaternion = flight["start_q"] * Quaternion(flight["axis"], flight["rate"] * ROLL_SECONDS * t)
+	var settle := smoothstep(0.42, 1.0, t)
+	wrapper.quaternion = free.slerp(flight["target_q"], settle)
+
+
 ## The face the record holds, brought to the top by the calibrated rotation —
 ## never by choosing a face (rule 5: presentation shows, it does not decide).
 func _pose_die(sides: int, value: int, kept: bool) -> Node3D:
+	var wrapper := _build_die(sides, value)
+	if wrapper == null:
+		return null
+	if not kept:
+		wrapper.scale = Vector3.ONE * 0.82
+		_darken(wrapper)
+	return wrapper
+
+
+## A die at its calibrated final pose, undimmed — the shared start point for
+## both the posed and the animated presentations.
+func _build_die(sides: int, value: int) -> Node3D:
 	var entry: Dictionary = _manifest.get("d%d" % sides, {})
 	var model := _instantiate("d%d" % sides)
 	if model == null or entry.is_empty():
@@ -120,9 +256,6 @@ func _pose_die(sides: int, value: int, kept: bool) -> Node3D:
 	var wrapper := Node3D.new()
 	wrapper.add_child(model)
 	wrapper.quaternion = Quaternion(q[0], q[1], q[2], q[3])
-	if not kept:
-		wrapper.scale = Vector3.ONE * 0.82
-		_darken(model)
 	return wrapper
 
 
