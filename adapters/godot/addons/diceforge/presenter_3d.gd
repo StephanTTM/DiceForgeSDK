@@ -36,6 +36,14 @@ const DROP_HEIGHT := 6.5
 const REVEAL_SECONDS := 0.35
 
 const DROPPED_SCALE := 0.82
+## Story pacing: how long a rerolled or exploding value is readable before its
+## consequence plays, and how long each consequence takes.
+const STORY_HOLD := 0.4
+const RETOSS_SECONDS := 0.55
+const RETOSS_HEIGHT := 3.4
+const POP_SECONDS := 0.3
+const SPAWN_SECONDS := 0.5
+const SPAWN_HEIGHT := 4.5
 ## Scatter mode's collision-free spacing between resting dice, in die widths of
 ## the resting area's Poisson-style sampling.
 const SCATTER_MIN_DISTANCE := 2.5
@@ -96,6 +104,50 @@ static func _read_text(path: String) -> String:
 	return text
 
 
+## The story a group's dice tell, reconstructed from rolled order (ADR-0016):
+## one lineage per original die — the values it showed and lost to rerolls,
+## then past its kept value, each explosion that replaced it with a successor.
+## `final` is the die left standing at the end of the story; every value along
+## the way still counted exactly as the record says.
+static func roll_lineages(record: Dictionary) -> Array:
+	var lineages: Array = []
+	if record.get("kind", "") != "roll":
+		return lineages
+	for group in record["groups"]:
+		var sides := int(group["sides"])
+		var current: Dictionary = {}
+		for die in group["dice"]:
+			var source: String = die.get("source", "")
+			var gone: bool = die.get("rerolled", false)
+			var entry := {"value": int(die["value"]), "kept": bool(die["kept"])}
+			if source == "explosion":
+				# The die that showed its highest face is destroyed on stage;
+				# this entry is the die it became.
+				current["steps"].append({"value": current["final"]["value"], "action": "explode"})
+				current["final"] = entry
+			elif source == "reroll":
+				if gone:
+					current["steps"].append({"value": entry["value"], "action": "reroll"})
+				else:
+					current["final"] = entry
+			else:
+				if not current.is_empty():
+					lineages.append(current)
+				current = {"sides": sides, "steps": [], "final": entry}
+				if gone:
+					current["steps"].append({"value": entry["value"], "action": "reroll"})
+					current["final"] = {}
+		if not current.is_empty():
+			lineages.append(current)
+	return lineages
+
+
+## Calibrated rotation bringing `value` to the top of a die of `sides`.
+func _rotation_for(sides: int, value: int) -> Quaternion:
+	var q: Array = _manifest["d%d" % sides]["rotations"][value - 1]
+	return Quaternion(q[0], q[1], q[2], q[3])
+
+
 ## Shows a resolved record, settled. Returns false — with nothing drawn — when
 ## the record needs a model this slice does not have. Presenting supersedes any
 ## animation still in flight, which simply stands down.
@@ -118,12 +170,18 @@ func _lay_out(record: Dictionary, dim_dropped: bool, rng: RandomNumberGenerator)
 	if record.get("kind", "") != "roll":
 		return false
 
-	var dice: Array = []
 	for group in record["groups"]:
 		if group.has("die") or not _manifest.has("d%d" % int(group["sides"])):
 			return false  # custom or unmodelled dice: future work
-		for die in group["dice"]:
-			dice.append({"sides": int(group["sides"]), "value": int(die["value"]), "kept": die["kept"]})
+	# One die on stage per lineage: rerolled values and exploded predecessors
+	# are the animated story's business; the settled stage shows what remains.
+	var dice: Array = []
+	for lineage in roll_lineages(record):
+		dice.append({
+			"sides": lineage["sides"],
+			"value": lineage["final"]["value"],
+			"kept": lineage["final"]["kept"],
+		})
 
 	if scatter and rng == null:
 		rng = RandomNumberGenerator.new()
@@ -237,15 +295,41 @@ func present_animated(record: Dictionary, motion_seed: int = -1) -> bool:
 	# rather than an error against freed nodes.
 	var run := _run_id
 
+	# One flight per lineage: the initial throw lands the FIRST value the die
+	# showed, and the segment timeline then plays its story — a rerolled value
+	# holds, re-tosses, and lands its successor; an exploding value holds, pops
+	# out of existence, and its successor drops onto the same spot. Every value
+	# comes from the record; the story only decides when each one is visible.
+	var lineages := roll_lineages(record)
 	var flights: Array = []
-	var index := 0
-	for wrapper in get_children():
+	var children := get_children()
+	var is_coin: bool = record.get("kind", "") == "coin-flip"
+	var total := 0.0
+	for index in children.size():
+		var wrapper: Node3D = children[index]
+		var target: Quaternion = wrapper.quaternion
+		var sides := 0
+		var steps: Array = []
+		if not is_coin and index < lineages.size():
+			sides = int(lineages[index]["sides"])
+			steps = lineages[index]["steps"]
+		# Scatter already turned the wrapper; the heading is everything the
+		# final pose carries beyond the calibrated rotation.
+		var yaw := Quaternion.IDENTITY
+		if not is_coin and sides > 0:
+			yaw = target * _rotation_for(sides, int(lineages[index]["final"]["value"])).inverse()
+
+		var first_target := target
+		if steps.size() > 0:
+			first_target = yaw * _rotation_for(sides, int(steps[0]["value"]))
+
 		var direction := rng.randf_range(0.0, TAU)
-		var lateral := Vector3(cos(direction), 0.0, sin(direction)) * rng.randf_range(2.0, 3.2)
-		flights.append({
+		var flight := {
 			"wrapper": wrapper,
-			"target_q": wrapper.quaternion,
 			"slot": wrapper.position,
+			"kept": wrapper.get_meta("diceforge_kept", true),
+			"delay": index * ROLL_STAGGER,
+			"target_q": first_target,
 			"start_q": Quaternion(
 				Vector3(rng.randf_range(-1, 1), rng.randf_range(-1, 1), rng.randf_range(-1, 1)).normalized(),
 				rng.randf_range(0.0, TAU)
@@ -254,17 +338,63 @@ func present_animated(record: Dictionary, motion_seed: int = -1) -> bool:
 				rng.randf_range(-1, 1), rng.randf_range(-0.3, 0.3), rng.randf_range(-1, 1)
 			).normalized(),
 			"rate": rng.randf_range(11.0, 17.0),
-			"lateral": lateral,
-			"delay": index * ROLL_STAGGER,
-			"kept": wrapper.get_meta("diceforge_kept", true),
-		})
-		index += 1
+			"lateral": Vector3(cos(direction), 0.0, sin(direction)) * rng.randf_range(2.0, 3.2),
+			"segments": [],
+		}
+
+		# The story timeline, in absolute seconds.
+		var cursor: float = flight["delay"] + ROLL_SECONDS
+		for step_index in steps.size():
+			var step: Dictionary = steps[step_index]
+			var shown: Quaternion = yaw * _rotation_for(sides, int(step["value"]))
+			var next_value: int = (
+				int(steps[step_index + 1]["value"]) if step_index + 1 < steps.size()
+				else int(lineages[index]["final"]["value"])
+			)
+			var next_q: Quaternion = yaw * _rotation_for(sides, next_value)
+			flight["segments"].append({
+				"type": "hold", "from": cursor, "to": cursor + STORY_HOLD, "pose": shown,
+			})
+			cursor += STORY_HOLD
+			if step["action"] == "reroll":
+				flight["segments"].append({
+					"type": "retoss", "from": cursor, "to": cursor + RETOSS_SECONDS,
+					"pose": shown, "to_pose": next_q,
+					"axis": Vector3(
+						rng.randf_range(-1, 1), rng.randf_range(-0.3, 0.3), rng.randf_range(-1, 1)
+					).normalized(),
+					"rate": rng.randf_range(10.0, 15.0),
+				})
+				cursor += RETOSS_SECONDS
+			else:
+				flight["segments"].append({
+					"type": "pop", "from": cursor, "to": cursor + POP_SECONDS, "pose": shown,
+				})
+				cursor += POP_SECONDS
+				flight["segments"].append({
+					"type": "spawn", "from": cursor, "to": cursor + SPAWN_SECONDS,
+					"to_pose": next_q,
+					"start_q": Quaternion(
+						Vector3(rng.randf_range(-1, 1), rng.randf_range(-1, 1), rng.randf_range(-1, 1)).normalized(),
+						rng.randf_range(0.0, TAU)
+					),
+					"axis": Vector3(
+						rng.randf_range(-1, 1), rng.randf_range(-0.3, 0.3), rng.randf_range(-1, 1)
+					).normalized(),
+					"rate": rng.randf_range(9.0, 14.0),
+				})
+				cursor += SPAWN_SECONDS
+		flight["final_q"] = (
+			yaw * _rotation_for(sides, int(lineages[index]["final"]["value"])) if sides > 0 else target
+		)
+		flight["done_at"] = cursor
+		total = maxf(total, cursor)
+		flights.append(flight)
 
 	# Airborne before the first frame draws, or the settled dice flash once.
 	for flight in flights:
-		_fly(flight, 0.0)
+		_story_pose(flight, 0.0)
 
-	var total := ROLL_SECONDS + ROLL_STAGGER * maxi(flights.size() - 1, 0)
 	_animating_run = run
 	var elapsed := 0.0
 	while elapsed < total:
@@ -273,9 +403,9 @@ func present_animated(record: Dictionary, motion_seed: int = -1) -> bool:
 			return _stand_down(run)
 		elapsed += get_process_delta_time()
 		for flight in flights:
-			_fly(flight, clampf((elapsed - flight["delay"]) / ROLL_SECONDS, 0.0, 1.0))
+			_story_pose(flight, elapsed)
 	for flight in flights:
-		_fly(flight, 1.0)
+		_story_pose(flight, flight["done_at"] + 1.0)
 
 	# The reveal: dice that were dropped dim and shrink now that the roll can
 	# be read, mirroring the web presenter's timing.
@@ -301,6 +431,60 @@ func present_animated(record: Dictionary, motion_seed: int = -1) -> bool:
 	_animating_run = -1
 	animation_finished.emit()
 	return true
+
+
+## One lineage at one instant: the initial throw, then whatever segment of its
+## story the clock has reached. Past the last segment the die rests on exactly
+## its final calibrated pose — reached by construction, not by snap.
+func _story_pose(flight: Dictionary, t: float) -> void:
+	var wrapper: Node3D = flight["wrapper"]
+	if not is_instance_valid(wrapper):
+		return
+	var local := t - float(flight["delay"])
+	if local <= ROLL_SECONDS:
+		_fly(flight, clampf(local / ROLL_SECONDS, 0.0, 1.0))
+		return
+	var slot: Vector3 = flight["slot"]
+	for segment in flight["segments"]:
+		if t < segment["from"] or t >= segment["to"]:
+			continue
+		var u: float = (t - segment["from"]) / (segment["to"] - segment["from"])
+		match segment["type"]:
+			"hold":
+				wrapper.position = slot
+				wrapper.scale = Vector3.ONE
+				wrapper.quaternion = segment["pose"]
+			"retoss":
+				wrapper.position = Vector3(slot.x, RETOSS_HEIGHT * 4.0 * u * (1.0 - u), slot.z)
+				wrapper.scale = Vector3.ONE
+				var spun: Quaternion = (
+					segment["pose"] * Quaternion(segment["axis"], segment["rate"] * RETOSS_SECONDS * u)
+				)
+				wrapper.quaternion = spun.slerp(segment["to_pose"], smoothstep(0.35, 0.95, u))
+			"pop":
+				wrapper.position = slot
+				# Swell, spin up, and vanish: the die explodes.
+				wrapper.scale = Vector3.ONE * maxf((1.0 + 0.45 * u) * (1.0 - u * u), 0.0001)
+				wrapper.quaternion = segment["pose"] * Quaternion(Vector3.UP, 7.0 * u)
+			"spawn":
+				wrapper.scale = Vector3.ONE
+				wrapper.position = Vector3(slot.x, SPAWN_HEIGHT * (1.0 - u) * (1.0 - u), slot.z)
+				var tumbling: Quaternion = (
+					segment["start_q"] * Quaternion(segment["axis"], segment["rate"] * SPAWN_SECONDS * u)
+				)
+				wrapper.quaternion = tumbling.slerp(segment["to_pose"], smoothstep(0.3, 0.95, u))
+		return
+	# Between segments, or done: rest on whatever the story has reached.
+	wrapper.position = slot
+	wrapper.scale = Vector3.ONE
+	if t >= float(flight["done_at"]):
+		wrapper.quaternion = flight["final_q"]
+		return
+	for segment in flight["segments"]:
+		if t < segment["from"]:
+			wrapper.quaternion = segment.get("pose", flight["final_q"])
+			return
+	wrapper.quaternion = flight["final_q"]
 
 
 ## A superseded animation exits quietly: newer dice are on stage, and the old

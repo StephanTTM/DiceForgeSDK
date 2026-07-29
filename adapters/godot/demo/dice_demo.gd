@@ -18,6 +18,10 @@ const SHOTS := [
 	# Scatter mode: strewn resting spots and random headings, still face-checked
 	# against the record — a heading about the vertical cannot change the face.
 	{"name": "scatter", "seed": "zz", "roll": "5d6", "color": "red", "animate": true, "scatter": true},
+	# Story shots: a die that rerolls re-tosses to its successor; a die that
+	# explodes pops and its successor drops in — seed godot chains two.
+	{"name": "reroll-story", "seed": "reroll-1", "roll": "5d6r2", "color": "green", "animate": true, "story_snap": 1.35},
+	{"name": "explosion", "seed": "godot", "roll": "4d6!", "color": "yellow", "animate": true, "story_snap": 1.45},
 ]
 
 var _report: Array[String] = []
@@ -78,9 +82,8 @@ func _check_faces(shot_name: String, presenter: Node3D, record: Dictionary) -> v
 	if record.get("kind", "") != "roll":
 		return
 	var expected: Array = []
-	for group in record["groups"]:
-		for die in group["dice"]:
-			expected.append({"sides": int(group["sides"]), "value": int(die["value"])})
+	for lineage in Presenter.roll_lineages(record):
+		expected.append({"sides": int(lineage["sides"]), "value": int(lineage["final"]["value"])})
 	var wrappers := presenter.get_children()
 	if wrappers.size() != expected.size():
 		_fail("%s: %d dice posed for %d in the record" % [shot_name, wrappers.size(), expected.size()])
@@ -110,6 +113,10 @@ func _animated_shot(shot: Dictionary, presenter: Node3D, record: Dictionary, sho
 	get_tree().create_timer(0.55).timeout.connect(
 		_snap.bind(shots_dir.path_join("%s-bounce.png" % shot["name"]))
 	)
+	if shot.has("story_snap"):
+		get_tree().create_timer(shot["story_snap"]).timeout.connect(
+			_snap.bind(shots_dir.path_join("%s-story.png" % shot["name"]))
+		)
 	await presenter.present_animated(record, 7)
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
