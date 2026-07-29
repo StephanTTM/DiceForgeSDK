@@ -122,13 +122,13 @@ guarding needed on the caller's side.
 Rerolls and explosions are **played, not just summarized**. The record keeps
 every value in rolled order, so each die's story is reconstructible: a
 rerolled die lands, holds its doomed value for a readable beat, then re-tosses
-and lands its successor; a die that explodes holds its highest face, pops out
-of existence, and its successor drops onto the same spot — chains repeat. The
-settled stage shows one die per lineage (the story's survivors), and the posed
-`present()` shows that same end state. One consequence to design around: when
-dice exploded, the faces left standing do not visually sum to the record's
-total — the destroyed values still counted. `total` in the record is always
-the authority; show it as text beside the dice.
+and lands its successor. A die that explodes keeps its seat and **celebrates**
+— a hop with a full turn about the vertical and a swell, which cannot change
+the face it shows — and the bonus die it earned is born mid-cheer, dropping
+onto its own spot; chains repeat, each new die celebrating in turn. The
+settled stage holds every die that exists at the story's end, so **the faces
+always sum to the record's total**, and the posed `present()` shows that same
+end state.
 
 Two dials worth knowing. `presenter.scatter = true` strews the dice about the
 stage with random headings instead of the tidy reading grid — resting spots

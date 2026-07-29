@@ -21,7 +21,7 @@ const SHOTS := [
 	# Story shots: a die that rerolls re-tosses to its successor; a die that
 	# explodes pops and its successor drops in — seed godot chains two.
 	{"name": "reroll-story", "seed": "reroll-1", "roll": "5d6r2", "color": "green", "animate": true, "story_snap": 1.35},
-	{"name": "explosion", "seed": "godot", "roll": "4d6!", "color": "yellow", "animate": true, "story_snap": 1.45},
+	{"name": "explosion", "seed": "godot", "roll": "4d6!", "color": "yellow", "animate": true, "story_snap": 1.75},
 ]
 
 var _report: Array[String] = []
@@ -82,8 +82,8 @@ func _check_faces(shot_name: String, presenter: Node3D, record: Dictionary) -> v
 	if record.get("kind", "") != "roll":
 		return
 	var expected: Array = []
-	for lineage in Presenter.roll_lineages(record):
-		expected.append({"sides": int(lineage["sides"]), "value": int(lineage["final"]["value"])})
+	for entry in Presenter.roll_stage(record):
+		expected.append({"sides": int(entry["sides"]), "value": int(entry["value"])})
 	var wrappers := presenter.get_children()
 	if wrappers.size() != expected.size():
 		_fail("%s: %d dice posed for %d in the record" % [shot_name, wrappers.size(), expected.size()])
