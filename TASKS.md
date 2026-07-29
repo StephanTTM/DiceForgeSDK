@@ -76,6 +76,8 @@ Remaining before tagging 0.1.0:
 
 ## Next
 
+- [ ] Harden the six-times-rejected fallback pose in `simulateRoll`/`simulateCoinFlip`. Diagnosis from a one-in-~300 CI flake (2026-07-29): when every retry is rejected, the returned best-effort roll can rest nearly edge-on, where the recorded face wins "highest" by less than the symmetry table's ~1e-5 numeric error — an observer measuring argmax can read the neighbour. The record is never wrong, only near-unreadable. Options: prefer settled throws in the fallback ranking, snap the final frame to the nearest exact face pose when seated is below threshold, or raise MAX_THROWS. Reproduce with unseeded soak (`2,400 local rolls hit 0`; it needs the tail).
+
 - [x] Guarantee the coin tumbles on entry. (the diagnosis held — isotropic spin reads as a drop 51 times in 60 — but flooring the diameter spin only got it to 40/60: the real lever was air time, so the coin is now *tossed* upward as well. `PhysicsCoin.turnovers` counts horizon crossings, the retry rejects fewer than two, and a rim-spinner longer than 3 s is re-thrown instead of watched. Measured: 120/120 seeds at ≥2 turnovers, worst duration 1.5 s, ~5.5 ms per flip)
 - [ ] Extend the plugin contracts to the categories beyond presentation (physics, audio, transport) once a second implementation exists to shape them — ARCHITECTURE lists them, but nothing implements them yet.
 
