@@ -17,3 +17,5 @@ tools/vrt/output/
 adapters/godot/.godot/
 adapters/godot/conformance-report.txt
 adapters/godot/screenshots/
+adapters/godot/relocated/
+adapters/godot/relocation-report.txt

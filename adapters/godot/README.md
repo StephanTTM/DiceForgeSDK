@@ -30,10 +30,23 @@ Records are Dictionaries shaped exactly like the core's schema v2 JSON --
 
 ## Install
 
-Copy `addons/diceforge/` into your project. The scripts reference each other by
-`preload`, so they work without an editor import pass; the `class_name`
-declarations additionally register `DiceForge` and friends globally once the
-editor has imported the project.
+Copy the `addons/diceforge/` folder into your project — **anywhere you like,
+but exactly once**.
+
+- *Anywhere*: the scripts reference each other by script-relative `preload`,
+  so the folder works at `res://addons/diceforge`, `res://vendor/dice`, or
+  wherever your project keeps things. Keep the files together.
+- *Exactly once*: the `class_name` declarations register `DiceForge` and
+  friends globally, so a second copy collides — that is the
+  `Class "DiceForge" hides a global script class` error. Move the folder,
+  don't duplicate it; if you genuinely need to vendor a second embedded copy,
+  delete the `class_name` lines from it (`tests/relocation.gd` does exactly
+  this, and proves the scripts still work).
+
+No editor import pass is needed, and no plugin has to be enabled. A
+`plugin.cfg` ships anyway so DiceForge shows up in **Project Settings →
+Plugins** the way addons usually do; enabling it changes nothing, because
+there is nothing editor-side to install.
 
 ## Why a port, and why you can trust it
 

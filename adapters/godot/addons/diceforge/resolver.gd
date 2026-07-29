@@ -7,7 +7,7 @@ extends RefCounted
 ## core (ADR-0016, ADR-0021). Records are Dictionaries shaped exactly like the
 ## core's schema v2 JSON, optional keys omitted rather than null.
 
-const Notation := preload("res://addons/diceforge/notation.gd")
+const Notation := preload("notation.gd")
 
 const EVENT_SCHEMA_VERSION := 2
 const UINT32_RANGE := 0x100000000

@@ -1,7 +1,11 @@
 ; Engine configuration file.
-; Godot 4 test-host project for the DiceForge addon. The addon itself is
-; everything under addons/diceforge; this project exists to run the
-; conformance vectors against it.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
 config_version=5
 
 [application]

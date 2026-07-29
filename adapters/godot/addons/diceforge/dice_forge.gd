@@ -19,9 +19,9 @@ extends RefCounted
 ## `{ "error": { "position": int, "message": String } }` because GDScript has
 ## no exceptions; the position is character-exact with the core's.
 
-const SeededRandom := preload("res://addons/diceforge/seeded_random.gd")
-const Notation := preload("res://addons/diceforge/notation.gd")
-const Resolver := preload("res://addons/diceforge/resolver.gd")
+const SeededRandom := preload("seeded_random.gd")
+const Notation := preload("notation.gd")
+const Resolver := preload("resolver.gd")
 
 var _random
 var _registry: Dictionary = {}

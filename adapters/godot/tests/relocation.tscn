@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/relocation.gd" id="1_reloc"]
+
+[node name="Relocation" type="Node" ]
+script = ExtResource("1_reloc")
