@@ -97,6 +97,18 @@ function describe(capabilities: PresenterCapabilities | undefined): string {
 
 const FIELD = { display: "flex", flexDirection: "column", fontSize: "0.8rem", gap: 4 } as const;
 
+/**
+ * One-click stories: each button rolls a notation that shows something the
+ * presenters do beyond landing numbers — rerolls re-toss the doomed die,
+ * explosions celebrate and birth the die they earned, keep/drop dims.
+ */
+const EXAMPLES = [
+  { notation: "4d6dl1", label: "4d6dl1 · drop" },
+  { notation: "5d6r2", label: "5d6r2 · rerolls" },
+  { notation: "4d6!", label: "4d6! · explosions" },
+  { notation: "1d100", label: "1d100 · percentile" },
+] as const;
+
 export function App(): React.JSX.Element {
   const [notation, setNotation] = useState("2d20kh1+3");
   const [seed, setSeed] = useState("");
@@ -126,9 +138,9 @@ export function App(): React.JSX.Element {
     }
   }
 
-  async function handleRoll(): Promise<void> {
+  async function rollNotation(expression: string): Promise<void> {
     try {
-      await show(engine.roll(notation));
+      await show(engine.roll(expression));
     } catch (error) {
       if (error instanceof DiceForgeError) setMessage(error.message);
       else throw error;
@@ -141,7 +153,9 @@ export function App(): React.JSX.Element {
       <p style={{ fontSize: "0.85rem", opacity: 0.75 }}>
         The core resolves each outcome headlessly; the presenter animates the resolved record inside
         a ref&apos;d container owned by an effect. Switching renderer swaps one presenter for
-        another without the engine noticing.
+        another without the engine noticing. Rolls play as stories: a rerolled die lands, holds its
+        doomed value, and re-tosses; a die that explodes celebrates while the die it earned drops
+        in.
       </p>
       <div
         style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "end", marginBottom: 12 }}
@@ -170,7 +184,7 @@ export function App(): React.JSX.Element {
           <input type="checkbox" checked={sound} onChange={(e) => setSound(e.target.checked)} />
           Sound
         </label>
-        <button type="button" onClick={() => void handleRoll()} disabled={busy}>
+        <button type="button" onClick={() => void rollNotation(notation)} disabled={busy}>
           Roll
         </button>
         <button type="button" onClick={() => void show(engine.flipCoin())} disabled={busy}>
@@ -179,6 +193,22 @@ export function App(): React.JSX.Element {
         <span style={{ fontSize: "0.8rem", opacity: 0.75 }} data-testid="capabilities">
           {describe(capabilities)}
         </span>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        {EXAMPLES.map((example) => (
+          <button
+            key={example.notation}
+            type="button"
+            style={{ fontSize: "0.75rem" }}
+            disabled={busy}
+            onClick={() => {
+              setNotation(example.notation);
+              void rollNotation(example.notation);
+            }}
+          >
+            {example.label}
+          </button>
+        ))}
       </div>
       <div
         ref={containerRef}

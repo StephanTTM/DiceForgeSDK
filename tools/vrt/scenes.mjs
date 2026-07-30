@@ -106,6 +106,30 @@ export const scenes = [
     },
   },
   {
+    name: "reroll-collapses",
+    why: "a rerolled value must not linger on the settled stage as a dropped-looking die",
+    query: { theme: "green", notation: "5d6r2", seed: "reroll-1", w: 640, h: 340 },
+  },
+  {
+    name: "explosion-keeps-seats",
+    why: "explosion-born dice take their own seats, so the settled stage sums to the total",
+    query: { theme: "yellow", notation: "4d6!", seed: "godot", w: 760, h: 340 },
+  },
+  {
+    name: "physics-explosion-stage",
+    why: "the physics stage also ends with every earned die on the table",
+    query: {
+      physics: "1",
+      theme: "yellow",
+      notation: "4d6!",
+      seed: "godot",
+      // Chosen from a seed sweep: every die fully inside the frame.
+      throw: "boom-2",
+      w: 760,
+      h: 340,
+    },
+  },
+  {
     name: "dom-fallback",
     why: "the no-theme path: labelled tiles, including a dropped die",
     query: { notation: "4d6dl1", seed: "table-42", render: "dom", w: 520, h: 240 },

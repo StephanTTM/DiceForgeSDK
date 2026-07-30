@@ -259,7 +259,7 @@ Writing a presenter of your own? [`@diceforge-sdk/testing`](packages/testing/REA
 
 Stability: `PresenterCapabilities` is expected to gain fields as plugin categories arrive; consumers should read the fields they care about rather than pattern-match whole objects. Adding a required field is a breaking change and gets an ADR.
 
-The first implementation is [`@diceforge-sdk/renderer-web`](packages/renderer-web/README.md): Three.js 3D dice with outcome-first animation, a DOM fallback, reduced-motion support, and aria-live announcements (ADR-0007).
+The first implementation is [`@diceforge-sdk/renderer-web`](packages/renderer-web/README.md): Three.js 3D dice with outcome-first animation, a DOM fallback, reduced-motion support, and aria-live announcements (ADR-0007). Presenters show the record's *settled stage* (ADR-0016): values lost to rerolls collapse into the die that replaced them and explosion-born dice take their own seats, so the dice on the table always sum to the record's total — story-capable presenters (the web pair, the Godot addon) additionally play the history as motion.
 
 ### Themes and art (ADR-0010, ADR-0013)
 

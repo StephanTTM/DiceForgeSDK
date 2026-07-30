@@ -64,6 +64,13 @@ Remaining before tagging 0.1.0:
 - [x] `sound` option on the physics presenter, default off, and a demo checkbox. (verified in-browser: sound off schedules nothing; a 3d6 roll schedules 7 knocks on one lazily-created context; a coin flip 2)
 - [ ] Tune the knock voices down. First listen (product owner, 2026-07-28): the sound works but reads a bit high pitched. Fix shape: lower the material bandpass centres in `audio.ts` (`MATERIALS` — felt 950 / wall 2100 / die 3100 Hz today), keeping their order so felt stays dullest and die-on-die brightest; a longer decay would also soften the read. Constants are internal (ADR-0020), so retuning is free — but tune *with* the product owner listening, not ahead of them.
 
+## Story playback — web parity (0.7.0, in progress)
+
+- [x] Reroll and explosion stories in both web presenters, matching Godot. (`visualDiceForEvent` returns the settled stage with `rerolledFaces`/`exploded`/`bornOf`; the WebGL renderer's authored story lives in `webgl/story.ts`, the physics presenter's multi-throw plan in `presenter-physics/src/story.ts` — both pure and headlessly tested; three VRT scenes pin the settled stages; the React demo grew one-click story buttons)
+- [ ] Custom-dice stories: a custom die falls back to tiles, which show only the settled stage — its rerolls and explosions have no motion anywhere yet.
+- [ ] Physics follow-up throws run in their own worlds, so a re-toss or a born die does not collide with resting dice and can settle closer than a real die could (or clip one in flight). Fix shape: seed the follow-up world with the resting dice as static bodies, and re-throw when the landing spot overlaps one.
+- [ ] Product owner's live look at the web stories (throw feel of the physics re-toss pickup, celebration timing) — constants are `STORY` in each story module.
+
 ## Engine adapters (in progress — Godot first, per the product owner)
 
 - [x] Decide how a non-TypeScript platform gets the core: a native port held to exported conformance vectors, bit for bit. (`tools/conformance/export-vectors.mjs` → `packages/testing/vectors/core-vectors.json`, freshness-tested against the live core every run — ADR-0021)
@@ -93,7 +100,7 @@ Remaining before tagging 0.1.0:
 - [x] Even out apparent die sizes. (`modelSilhouetteScale` equalizes each die's on-screen silhouette, measured from the loaded mesh)
 - [x] Give procedural dice beveled edges, or retire them. (retired, along with the KayKit pack — ADR-0012)
 - [ ] Optional multiplayer transport plugin research. (beyond 1.0)
-- [x] Browser-based visual regression testing for the renderer. (`npm run vrt`, 13 scenes including four for the physics presenter, Playwright + committed baselines)
+- [x] Browser-based visual regression testing for the renderer. (`npm run vrt`, 17 scenes including six for the physics presenter, Playwright + committed baselines)
 
 ## Task maintenance
 
