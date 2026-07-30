@@ -91,7 +91,13 @@ A **coin flip** is simulated for real when the theme ships a coin: a cylinder co
 
 Reduced motion jumps to the final pose instead of playing the roll, and `present(event, { signal })` cancels like any other presenter.
 
-## Sound
+## Rerolls and explosions play as stories
+
+The record keeps every value in rolled order (ADR-0016), and the presenter simulates each chapter as its own real throw. A die whose value was rerolled away lands its throw on the doomed value, rests long enough to read, is picked up, and its next recording plays as the re-toss — the lost value never lingers on the table looking dropped. A die that rolled its highest face on an exploding roll celebrates over its rest pose — a hop with a full vertical turn, which cannot change the face that is up — while the bonus die it earned plays its own throw into the tray, born mid-celebration; chains repeat, each earned die celebrating in turn. The settled stage holds every die that exists when the story ends, so the faces always sum to the record's total.
+
+Every chapter is honest physics: the follow-up throws run in the same fixed tray with the same seeded random source, so a seeded roll — stories included — replays exactly. Their collisions join the knock schedule at their place on the story's clock, so sound stays derived rather than timed. Reduced motion jumps straight to the settled stage.
+
+One honest limit: each follow-up throw runs in its own world, so a re-tossed or explosion-born die does not collide with dice already resting — it can land beside one closer than a real die could, or pass through one in flight. The original throw is still one shared world, and every landing is still a flat, verified face.
 
 Pass `sound: true` and every collision in the recording plays a knock — felt is a dull thump, a wall is sharper, die-on-die is the bright clack — with loudness from how hard the recording says the contact was (ADR-0020). Nothing fires on a timer: the same data drives the animation and the audio, so a bounce sounds when it lands.
 

@@ -31,8 +31,10 @@ import {
 } from "three";
 import type { Knock } from "./audio.js";
 import { createKnockPlayer, impactSchedule } from "./audio.js";
-import type { PhysicsDie, PhysicsFlip, PhysicsTray } from "./simulate.js";
+import type { PhysicsFlip, PhysicsImpact, PhysicsTray } from "./simulate.js";
 import { simulateCoinFlip, simulateRoll } from "./simulate.js";
+import type { DieTimeline, Recording } from "./story.js";
+import { offsetImpacts, planStory, storyCast, storyPoseAt } from "./story.js";
 import type { QuaternionTuple } from "./symmetry.js";
 
 export type PhysicsPresenterOptions = {
@@ -97,12 +99,19 @@ function prefersReduced(host: { matchMedia?: (q: string) => { matches: boolean }
 }
 
 type DrawnDie = {
+  /** The wrapper playback poses; the recording's body orientation lives here. */
   readonly object: Object3D;
-  /** What playback needs: the recording, and the mesh's in-collider rotation. */
-  readonly motion: Pick<PhysicsDie, "frames" | "remap">;
+  /** The model inside, wearing the active recording's remap (ADR-0018). */
+  readonly inner: Object3D;
+  /** Every throw this die plays, in story order: re-rolls re-toss (ADR-0016). */
+  readonly recordings: readonly Recording[];
+  /** When each recording plays, and the celebration if one was earned. */
+  readonly timeline: DieTimeline;
   readonly kept: boolean;
   readonly materials: readonly MeshStandardMaterial[];
   readonly baseColors: readonly Color[];
+  /** Which recording's remap the mesh is wearing right now. */
+  activeSim: number;
 };
 
 /**
@@ -274,8 +283,10 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
     return found;
   }
 
-  /** Builds a die's mesh with its remap already applied inside the collider. */
-  async function buildDie(die: VisualDie, motion: PhysicsDie): Promise<DrawnDie | null> {
+  /** Loads a die's model into a wrapper; the caller wires its recordings. */
+  async function buildDie(
+    die: VisualDie,
+  ): Promise<{ wrapper: Group; inner: Object3D; materials: MeshStandardMaterial[] } | null> {
     const shape = die.shape;
     if (shape === undefined || !models || !hasCalibratedModel(models, shape)) return null;
     const url = models.urls[shape];
@@ -289,22 +300,15 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
       const texture = await loadThemeTexture(textureUrl);
       if (texture) applyTexture(object, texture);
     }
-    // The remap lives on a wrapper, so the body's own orientation can be set
-    // from the recording each frame without disturbing it (ADR-0018).
+    // The remap lives on the model inside a wrapper, so the body's own
+    // orientation can be set from the recording each frame without disturbing
+    // it (ADR-0018) — and a re-toss can swap in its own recording's remap.
     const wrapper = new Group();
     wrapper.add(object);
-    object.quaternion.set(motion.remap[0], motion.remap[1], motion.remap[2], motion.remap[3]);
     object.traverse((node) => {
       if (node instanceof Mesh) node.castShadow = true;
     });
-    const materials = ownedMaterials(object);
-    return {
-      object: wrapper,
-      motion,
-      kept: die.kept,
-      materials,
-      baseColors: materials.map((material) => material.color.clone()),
-    };
+    return { wrapper, inner: object, materials: ownedMaterials(object) };
   }
 
   /**
@@ -352,50 +356,70 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
       if (node instanceof Mesh) node.castShadow = true;
     });
     const materials = ownedMaterials(object);
+    // A coin's story is one throw: a single recording, no cues beyond it.
+    const recording: Recording = {
+      frames: motion.coin.frames,
+      frameRate: motion.frameRate,
+      remap,
+    };
     return {
       drawn: {
         object: wrapper,
-        motion: motion.coin,
+        inner: object,
+        recordings: [recording],
+        timeline: {
+          bornAt: 0,
+          cues: [{ kind: "sim", sim: 0, start: 0, end: motion.duration }],
+          settleAt: motion.duration,
+        },
         kept: true,
         materials,
         baseColors: materials.map((material) => material.color.clone()),
+        activeSim: 0,
       },
       motion,
     };
   }
 
-  /** Pushes a dropped die back without making it see-through. */
-  function reveal(dice: readonly DrawnDie[], progress: number): void {
-    const k = Math.min(Math.max(progress, 0), 1);
-    for (const die of dice) {
-      if (die.kept) continue;
-      die.object.scale.setScalar(1 - 0.18 * k);
-      die.materials.forEach((material, index) => {
-        const base = die.baseColors[index];
-        if (base) material.color.copy(base).lerp(new Color(0x2a2e38), 0.72 * k);
-        material.needsUpdate = true;
-      });
-    }
+  /**
+   * A die's size and colour at one instant: the celebration's swell, and —
+   * for a dropped die past the reveal — the push into the background, without
+   * making it see-through.
+   */
+  function applyLook(die: DrawnDie, swell: number, revealProgress: number): void {
+    const k = Math.min(Math.max(revealProgress, 0), 1);
+    die.object.scale.setScalar(swell * (1 - 0.18 * k));
+    if (k <= 0) return;
+    die.materials.forEach((material, index) => {
+      const base = die.baseColors[index];
+      if (base) material.color.copy(base).lerp(new Color(0x2a2e38), 0.72 * k);
+      material.needsUpdate = true;
+    });
   }
 
-  function pose(die: DrawnDie, frameIndex: number): void {
-    const frames = die.motion.frames;
-    const clamped = Math.min(frames.length - 1, Math.max(0, frameIndex));
-    const frame = frames[clamped];
-    if (!frame) return;
-    die.object.position.set(frame.position[0], frame.position[1], frame.position[2]);
+  /** Poses one die at a story instant; returns the celebration swell to draw. */
+  function poseDie(die: DrawnDie, seconds: number): number {
+    const pose = storyPoseAt(die.timeline, die.recordings, seconds, DIE_RADIUS);
+    die.object.visible = pose.visible;
+    die.object.position.set(pose.position[0], pose.position[1], pose.position[2]);
     die.object.quaternion.set(
-      frame.orientation[0],
-      frame.orientation[1],
-      frame.orientation[2],
-      frame.orientation[3],
+      pose.orientation[0],
+      pose.orientation[1],
+      pose.orientation[2],
+      pose.orientation[3],
     );
+    if (pose.sim !== die.activeSim) {
+      die.activeSim = pose.sim;
+      const remap = (die.recordings[pose.sim] as Recording).remap;
+      die.inner.quaternion.set(remap[0], remap[1], remap[2], remap[3]);
+    }
+    return pose.swell;
   }
 
-  /** Plays the recording. No physics runs here — this is an animation. */
+  /** Plays the stories. No physics runs here — this is an animation. */
   function play(
     dice: readonly DrawnDie[],
-    frameRate: number,
+    duration: number,
     motion: "animate" | "reduce",
     signal: AbortSignalLike | undefined,
     schedule: readonly Knock[] = [],
@@ -404,11 +428,12 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
     const activeScene = scene;
     const activeCamera = camera;
     if (!active || !activeScene || !activeCamera) return Promise.resolve();
-    const longest = Math.max(...dice.map((die) => die.motion.frames.length));
 
     if (motion === "reduce") {
-      for (const die of dice) pose(die, longest);
-      reveal(dice, 1);
+      for (const die of dice) {
+        const swell = poseDie(die, duration);
+        applyLook(die, swell, die.kept ? 0 : 1);
+      }
       active.render(activeScene, activeCamera);
       return Promise.resolve();
     }
@@ -417,6 +442,7 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
     // at most a frame, which no ear ties to a bounce. Cancelling the animation
     // silences what has not sounded yet.
     const sounding = knocks?.play(schedule);
+    const landedMs = duration * 1000;
 
     return new Promise<void>((resolve, reject) => {
       const start = performance.now();
@@ -438,15 +464,17 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
 
       const step = (): void => {
         const elapsed = performance.now() - start;
-        const frameIndex = Math.floor((elapsed / 1000) * frameRate);
-        for (const die of dice) pose(die, frameIndex);
-        const landed = elapsed >= ((longest - 1) / frameRate) * 1000;
-        if (landed) {
-          const after = elapsed - ((longest - 1) / frameRate) * 1000;
-          reveal(dice, (after - REVEAL_HOLD_MS) / REVEAL_MS);
+        for (const die of dice) {
+          const swell = poseDie(die, elapsed / 1000);
+          // Dropped dice look exactly like the rest until every story ends.
+          const revealProgress =
+            !die.kept && elapsed > landedMs + REVEAL_HOLD_MS
+              ? (elapsed - landedMs - REVEAL_HOLD_MS) / REVEAL_MS
+              : 0;
+          applyLook(die, swell, revealProgress);
         }
         active.render(activeScene, activeCamera);
-        if (landed && elapsed > ((longest - 1) / frameRate) * 1000 + REVEAL_HOLD_MS + REVEAL_MS) {
+        if (elapsed > landedMs + REVEAL_HOLD_MS + REVEAL_MS) {
           finish();
           return;
         }
@@ -488,12 +516,12 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
           cancelActive?.();
           clearDice();
           diceGroup?.add(built.drawn.object);
-          pose(built.drawn, 0);
+          poseDie(built.drawn, 0);
           frame(built.motion.tray);
           showPhysics(true);
           await play(
             [built.drawn],
-            built.motion.frameRate,
+            built.motion.duration,
             reduced ? "reduce" : "animate",
             signal,
             impactSchedule(built.motion.impacts),
@@ -527,50 +555,127 @@ export function createPhysicsPresenter(options: PhysicsPresenterOptions): Physic
       }
 
       if (signal?.aborted) throw abortError();
+      const cast = storyCast(visuals);
+      const simOptions = {
+        dieRadius: DIE_RADIUS,
+        // A tray shaped like the stage, so the dice fill it.
+        trayAspect: (container.clientWidth || 640) / (container.clientHeight || 360),
+        ...(options.random ? { random: options.random } : {}),
+      };
+      const requestFor = (die: VisualDie, face: number) => {
+        const shape = die.shape as ShapedDieSides;
+        return {
+          shape,
+          face,
+          faceRotations: models?.faceRotations[shape] as readonly QuaternionTuple[],
+        };
+      };
+      // The original throw: every die not born of an explosion, landing the
+      // first face its seat ever showed. One shared world, exactly as before —
+      // a roll without stories simulates identically to how it always has.
+      const thrownIndices = cast.flatMap((role, index) => (role.thrown ? [index] : []));
       const motion = simulateRoll(
-        visuals.map((die) => {
-          const shape = die.shape as ShapedDieSides;
-          return {
-            shape,
-            face: die.face,
-            faceRotations: models?.faceRotations[shape] as readonly QuaternionTuple[],
-          };
-        }),
-        {
-          dieRadius: DIE_RADIUS,
-          // A tray shaped like the stage, so the dice fill it.
-          trayAspect: (container.clientWidth || 640) / (container.clientHeight || 360),
-          ...(options.random ? { random: options.random } : {}),
-        },
+        thrownIndices.map((index) =>
+          requestFor(visuals[index] as VisualDie, cast[index]?.faces[0] as number),
+        ),
+        simOptions,
       );
+      // Follow-up throws: each reroll's re-toss and each explosion-born die's
+      // drop-in, single-die worlds in the same fixed tray, simulated in stage
+      // order so a seeded throw stays reproducible.
+      const recordings: Recording[][] = visuals.map(() => []);
+      const durations: number[][] = visuals.map(() => []);
+      const followUps: { die: number; sim: number; impacts: readonly PhysicsImpact[] }[] = [];
+      thrownIndices.forEach((dieIndex, position) => {
+        const thrown = motion.dice[position];
+        if (!thrown) return;
+        recordings[dieIndex]?.push({
+          frames: thrown.frames,
+          frameRate: motion.frameRate,
+          remap: thrown.remap,
+        });
+        durations[dieIndex]?.push(motion.duration);
+      });
+      cast.forEach((role, dieIndex) => {
+        for (let sim = role.thrown ? 1 : 0; sim < role.faces.length; sim += 1) {
+          const single = simulateRoll(
+            [requestFor(visuals[dieIndex] as VisualDie, role.faces[sim] as number)],
+            simOptions,
+          );
+          const recorded = single.dice[0];
+          if (!recorded) continue;
+          recordings[dieIndex]?.push({
+            frames: recorded.frames,
+            frameRate: single.frameRate,
+            remap: recorded.remap,
+          });
+          durations[dieIndex]?.push(single.duration);
+          followUps.push({ die: dieIndex, sim, impacts: single.impacts });
+        }
+      });
+      const plan = planStory(cast, durations);
+      // Every recording's knocks on the one clock the stories share, each
+      // re-owned by its stage die so the per-die cooldown still means one die.
+      const simStart = (die: number, sim: number): number => {
+        for (const cue of plan.dice[die]?.cues ?? []) {
+          if (cue.kind === "sim" && cue.sim === sim) return cue.start;
+        }
+        return 0;
+      };
+      const impacts = [
+        ...motion.impacts.map((impact) => ({
+          ...impact,
+          body: thrownIndices[impact.body] ?? impact.body,
+        })),
+        ...followUps.flatMap(({ die, sim, impacts: recorded }) =>
+          offsetImpacts(recorded, simStart(die, sim), die),
+        ),
+      ].sort((a, b) => a.time - b.time);
 
       ensureScene();
-      const built = await Promise.all(
-        visuals.map((die, index) => buildDie(die, motion.dice[index] as PhysicsDie)),
-      );
+      const built = await Promise.all(visuals.map((die) => buildDie(die)));
       if (built.some((die) => die === null)) {
         showPhysics(false);
         await delegate.present(record, signal ? { signal } : {});
         announcer?.announce(formatEventAnnouncement(record));
         return;
       }
-      const dice = built as DrawnDie[];
+      const dice: DrawnDie[] = built.map((piece, index) => {
+        const { wrapper, inner, materials } = piece as {
+          wrapper: Group;
+          inner: Object3D;
+          materials: MeshStandardMaterial[];
+        };
+        const own = recordings[index] as Recording[];
+        const remap = (own[0] as Recording).remap;
+        inner.quaternion.set(remap[0], remap[1], remap[2], remap[3]);
+        return {
+          object: wrapper,
+          inner,
+          recordings: own,
+          timeline: plan.dice[index] as DieTimeline,
+          kept: (visuals[index] as VisualDie).kept,
+          materials,
+          baseColors: materials.map((material) => material.color.clone()),
+          activeSim: 0,
+        };
+      });
 
       cancelActive?.();
       clearDice();
       for (const die of dice) {
         diceGroup?.add(die.object);
-        pose(die, 0);
+        poseDie(die, 0);
       }
       frame(motion.tray);
       showPhysics(true);
 
       await play(
         dice,
-        motion.frameRate,
+        plan.duration,
         reduced ? "reduce" : "animate",
         signal,
-        impactSchedule(motion.impacts),
+        impactSchedule(impacts),
       );
       announcer?.announce(formatEventAnnouncement(record));
     },
