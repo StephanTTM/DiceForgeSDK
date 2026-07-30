@@ -15,6 +15,15 @@ describe("formatEventAnnouncement", () => {
     );
   });
 
+  it("says a rerolled value was rerolled, not dropped", () => {
+    const roll = seededEngine("reroll-1").roll("5d6r2");
+    const message = formatEventAnnouncement(roll);
+    // Seed "reroll-1" rerolls a 2 and a 1 — the same record the demos play.
+    expect(message).toContain("2 rerolled");
+    expect(message).toContain("1 rerolled");
+    expect(message).not.toContain("dropped");
+  });
+
   it("omits the modifier sentence when the modifier is zero", () => {
     const roll = seededEngine("table-42").roll("1d6");
     const message = formatEventAnnouncement(roll);

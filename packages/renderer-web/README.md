@@ -108,6 +108,8 @@ A coin is not rolled but tossed: it rests flat, is thrown into the air spinning 
 
 **Dropped dice are revealed only after the roll lands.** Every die looks identical while it is in motion; once all of them have settled, a short pause passes and then dice excluded by a keep/drop selection darken and shrink slightly. They stay on the table, fully opaque, so the whole roll can still be read — nothing disappears, nothing turns see-through, and nothing gives the outcome away early. Under reduced motion there is no animation at all: the final state, dimming included, appears immediately.
 
+**Rerolls and explosions play as stories** (ADR-0016). A die whose value was rerolled away lands showing the doomed value, holds it long enough to read, and re-tosses to its replacement — the lost value never lingers on the table looking dropped. A die that rolled its highest face on an exploding roll celebrates — a hop with a full vertical turn and a slight swell, which cannot change the face that is up — while the bonus die it earned drops in beside it; chains repeat, each earned die celebrating in turn. The settled stage holds every die that exists when the story ends, so the faces on the table always sum to the record's total. `visualDiceForEvent(event)` exposes the reconstruction (`rerolledFaces`, `exploded`, `bornOf` on each `VisualDie`), and it is the same story the Godot presenter plays. Under reduced motion the settled stage appears immediately.
+
 ## Fallback tiers
 
 1. **WebGL** — themed 3D dice; dropped dice render dimmed; d100 appears as the classic percentile pair (tens + units d10, `100` = `00` + `0`).

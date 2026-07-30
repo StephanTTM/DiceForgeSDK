@@ -11,7 +11,10 @@ export function formatEventAnnouncement(event: InteractionEvent): string {
   const groups = event.groups
     .map((group) => {
       const dice = group.dice
-        .map((die) => (die.kept ? `${die.value}` : `${die.value} dropped`))
+        // A rerolled value was replaced, not merely excluded — say which.
+        .map((die) =>
+          die.kept ? `${die.value}` : `${die.value} ${die.rerolled ? "rerolled" : "dropped"}`,
+        )
         .join(", ");
       return `${group.notation}: ${dice}`;
     })

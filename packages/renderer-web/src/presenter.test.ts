@@ -356,3 +356,100 @@ describe("custom dice (ADR-0015)", () => {
     expect(d7?.shape).toBeUndefined();
   });
 });
+
+/**
+ * The settled stage (ADR-0016): rerolled values collapse into the die that
+ * replaced them, explosion-born dice take their own seats, and what remains
+ * always sums to the record's total. The same reconstruction the Godot
+ * presenter performs, so every DiceForge stage tells the same story.
+ */
+describe("visualDiceForEvent stage semantics", () => {
+  type StageDie = Record<string, unknown>;
+  function stageOf(dice: readonly StageDie[], sides = 6) {
+    return visualDiceForEvent({
+      kind: "roll",
+      groups: [{ notation: `${dice.length}d${sides}`, sign: 1, sides, dice, subtotal: 0 }],
+    } as unknown as RollResult);
+  }
+
+  it("collapses a rerolled value into the seat that replaced it", () => {
+    const dice = stageOf([
+      { sides: 6, value: 2, kept: false, rerolled: true },
+      { sides: 6, value: 5, kept: true, source: "reroll" },
+      { sides: 6, value: 3, kept: true },
+    ]);
+    expect(dice.map((die) => die.face)).toEqual([5, 3]);
+    expect(dice[0]?.rerolledFaces).toEqual([2]);
+    expect(dice[1]?.rerolledFaces).toBeUndefined();
+  });
+
+  it("folds a chain of rerolls into one seat, oldest step first", () => {
+    const dice = stageOf([
+      { sides: 6, value: 2, kept: false, rerolled: true },
+      { sides: 6, value: 1, kept: false, rerolled: true, source: "reroll" },
+      { sides: 6, value: 6, kept: true, source: "reroll" },
+    ]);
+    expect(dice).toHaveLength(1);
+    expect(dice[0]?.face).toBe(6);
+    expect(dice[0]?.rerolledFaces).toEqual([2, 1]);
+  });
+
+  it("marks an explosion chain: each earner celebrates, each earned points back", () => {
+    const dice = stageOf([
+      { sides: 6, value: 6, kept: true },
+      { sides: 6, value: 6, kept: true, source: "explosion" },
+      { sides: 6, value: 2, kept: true, source: "explosion" },
+      { sides: 6, value: 3, kept: true },
+    ]);
+    expect(dice.map((die) => die.exploded ?? false)).toEqual([true, true, false, false]);
+    expect(dice.map((die) => die.bornOf ?? -1)).toEqual([-1, 0, 1, -1]);
+  });
+
+  it("maps a percentile seat's reroll steps onto both halves of the pair", () => {
+    const dice = stageOf(
+      [
+        { sides: 100, value: 42, kept: false, rerolled: true },
+        { sides: 100, value: 7, kept: true, source: "reroll" },
+      ],
+      100,
+    );
+    expect(dice).toHaveLength(2);
+    expect(dice[0]?.role).toBe("tens");
+    expect(dice[0]?.rerolledFaces).toEqual([4]);
+    expect(dice[1]?.role).toBe("units");
+    expect(dice[1]?.face).toBe(7);
+    expect(dice[1]?.rerolledFaces).toEqual([2]);
+  });
+
+  it("keeps the reroll stage the Godot demo plays, and its sum", () => {
+    const roll = createDiceEngine({ random: createSeededRandomSource("reroll-1") }).roll("5d6r2");
+    const stage = visualDiceForEvent(roll);
+    expect(stage).toHaveLength(5);
+    expect(stage.reduce((sum, die) => sum + (die.kept ? die.face : 0), 0)).toBe(roll.total);
+    const lost = roll.groups[0]?.dice.filter((die) => die.rerolled).length ?? 0;
+    expect(lost).toBeGreaterThan(0);
+    expect(stage.flatMap((die) => die.rerolledFaces ?? [])).toHaveLength(lost);
+  });
+
+  it("keeps the explosion stage the Godot demo plays, and its sum", () => {
+    const roll = createDiceEngine({ random: createSeededRandomSource("godot") }).roll("4d6!");
+    const stage = visualDiceForEvent(roll);
+    expect(stage).toHaveLength(roll.groups[0]?.dice.length ?? 0);
+    expect(stage.reduce((sum, die) => sum + (die.kept ? die.face : 0), 0)).toBe(roll.total);
+    const born = stage.filter((die) => die.bornOf !== undefined);
+    expect(born.length).toBeGreaterThan(0);
+    for (const die of born) {
+      expect(stage[die.bornOf as number]?.exploded).toBe(true);
+    }
+  });
+
+  it("shows only the settled stage as tiles", async () => {
+    const container = makeContainer();
+    const presenter = createDicePresenter({ container, reducedMotion: "reduce" });
+    const roll = createDiceEngine({ random: createSeededRandomSource("reroll-1") }).roll("5d6r2");
+    await presenter.present(roll);
+    // Five seats — the values lost to rerolls do not linger as dropped-looking tiles.
+    expect(container.querySelectorAll('[data-diceforge="die"]')).toHaveLength(5);
+    presenter.dispose();
+  });
+});

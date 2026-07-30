@@ -27,6 +27,7 @@ import {
   loadThemeTexture,
   modelSilhouetteScale,
 } from "./models.js";
+import { buildFlights, type DieFlight, type FlightRequest, storyPose } from "./story.js";
 
 export type WebglBackendOptions = {
   readonly container: HTMLElement;
@@ -36,9 +37,6 @@ export type WebglBackendOptions = {
   readonly coin?: CoinModel | undefined;
 };
 
-const TUMBLE_PORTION = 0.62;
-const BASE_DURATION_MS = 1000;
-const STAGGER_MS = 80;
 const SETTLE_TAIL_MS = 120;
 /** Dropped dice stay indistinguishable until the whole roll has landed. */
 const REVEAL_HOLD_MS = 220;
@@ -78,24 +76,17 @@ type FlipPlan = {
 type DieEntry = {
   readonly object: Object3D;
   readonly finalOrientation: Quaternion;
+  /** The coin's toss; dice carry a `flight` instead. */
   readonly flip?: FlipPlan;
+  /** The die's whole story: fall, re-tosses, celebration, birth (ADR-0016). */
+  readonly flight?: DieFlight;
   readonly restingPosition: Vector3;
   readonly baseScale: Vector3;
-  readonly startQuaternion: Quaternion;
-  readonly tumbleAxis: Vector3;
-  readonly tumbleSpeed: number;
-  readonly delayMs: number;
   readonly kept: boolean;
   /** Materials this scene owns and may recolor when revealing dropped dice. */
   readonly dimMaterials: readonly MeshStandardMaterial[];
   readonly baseColors: readonly Color[];
-  handoff?: Quaternion;
 };
-
-function randomUnitVector(): Vector3 {
-  const vector = new Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1);
-  return vector.lengthSq() < 1e-6 ? new Vector3(0, 1, 0) : vector.normalize();
-}
 
 function layoutPosition(index: number, total: number): Vector3 {
   const rows = Math.ceil(total / DICE_PER_ROW);
@@ -123,15 +114,16 @@ function ownedMaterials(object: Object3D): MeshStandardMaterial[] {
 }
 
 /**
- * Pushes a dropped die into the background: it darkens and shrinks slightly,
- * staying fully opaque so the roll can still be read. Opacity is deliberately
- * untouched — a see-through die reveals its own back faces and reads as a
- * rendering glitch rather than as "this one does not count".
- * `progress` runs 0 (as rolled) to 1.
+ * A die's size and colour at one instant: the celebration's swell, and — for
+ * a dropped die past the reveal — the push into the background. It darkens
+ * and shrinks slightly, staying fully opaque so the roll can still be read.
+ * Opacity is deliberately untouched — a see-through die reveals its own back
+ * faces and reads as a rendering glitch rather than as "this one does not
+ * count". `reveal` runs 0 (as rolled) to 1.
  */
-function applyDropReveal(entry: DieEntry, progress: number): void {
-  const k = easeOutCubic(clamp01(progress));
-  entry.object.scale.copy(entry.baseScale).multiplyScalar(1 - 0.18 * k);
+function applyLook(entry: DieEntry, swell: number, reveal: number): void {
+  const k = easeOutCubic(clamp01(reveal));
+  entry.object.scale.copy(entry.baseScale).multiplyScalar(swell * (1 - 0.18 * k));
   entry.dimMaterials.forEach((material, index) => {
     const base = entry.baseColors[index];
     if (base) material.color.copy(base).lerp(new Color(0x2a2e38), 0.72 * k);
@@ -232,9 +224,10 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
     cancelActive?.();
     if (context.signal?.aborted) return Promise.reject(abortError());
     const settle = (entry: DieEntry): void => {
+      entry.object.visible = true;
       entry.object.quaternion.copy(entry.finalOrientation);
       entry.object.position.copy(entry.restingPosition);
-      if (!entry.kept) applyDropReveal(entry, 1);
+      applyLook(entry, 1, entry.kept ? 0 : 1);
     };
     if (context.motion === "reduce") {
       for (const entry of entries) settle(entry);
@@ -244,9 +237,11 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
     return new Promise<void>((resolve, reject) => {
       const started = performance.now();
       const tossing = entries.some((entry) => entry.flip);
+      // The story is over when the last flight settles — a reroll's re-toss
+      // or an explosion's birth can outlast the original throw.
       const landedAt = tossing
         ? COIN_REST_MS + COIN_FLIGHT_MS
-        : BASE_DURATION_MS + STAGGER_MS * Math.max(0, entries.length - 1) + SETTLE_TAIL_MS;
+        : Math.max(...entries.map((entry) => entry.flight?.settleAt ?? 0)) + SETTLE_TAIL_MS;
       const hasDropped = entries.some((entry) => !entry.kept);
       const revealAt = landedAt + REVEAL_HOLD_MS;
       const endsAt = hasDropped ? revealAt + REVEAL_MS : landedAt;
@@ -281,24 +276,16 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
             entry.object.quaternion.copy(spin.multiply(entry.flip.heads));
             continue;
           }
-          const local = clamp01((elapsed - entry.delayMs) / BASE_DURATION_MS);
+          if (!entry.flight) continue;
+          const pose = storyPose(entry.flight, elapsed);
+          entry.object.visible = pose.visible;
           entry.object.position.copy(entry.restingPosition);
-          entry.object.position.y = entry.restingPosition.y + 5 * (1 - easeOutCubic(local));
-          if (local < TUMBLE_PORTION) {
-            const spin = new Quaternion().setFromAxisAngle(
-              entry.tumbleAxis,
-              entry.tumbleSpeed * local,
-            );
-            entry.object.quaternion.copy(spin.multiply(entry.startQuaternion));
-          } else {
-            if (!entry.handoff) entry.handoff = entry.object.quaternion.clone();
-            const t = easeOutCubic((local - TUMBLE_PORTION) / (1 - TUMBLE_PORTION));
-            entry.object.quaternion.copy(entry.handoff.clone().slerp(entry.finalOrientation, t));
-          }
+          entry.object.position.y += pose.lift;
+          entry.object.quaternion.copy(pose.orientation);
           // Dropped dice look exactly like the rest until every die has landed.
-          if (hasDropped && !entry.kept && elapsed > revealAt) {
-            applyDropReveal(entry, (elapsed - revealAt) / REVEAL_MS);
-          }
+          const reveal =
+            hasDropped && !entry.kept && elapsed > revealAt ? (elapsed - revealAt) / REVEAL_MS : 0;
+          applyLook(entry, pose.swell, reveal);
         }
         renderer.render(scene, camera);
         if (elapsed >= endsAt) {
@@ -319,7 +306,7 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
     index: number,
     total: number,
     kept: boolean,
-    flip?: FlipPlan,
+    motion: { flip?: FlipPlan; flight?: DieFlight },
   ): DieEntry {
     const restingPosition = layoutPosition(index, total);
     object.position.copy(restingPosition);
@@ -331,16 +318,10 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
     return {
       object,
       finalOrientation,
-      ...(flip ? { flip } : {}),
+      ...(motion.flip ? { flip: motion.flip } : {}),
+      ...(motion.flight ? { flight: motion.flight } : {}),
       restingPosition,
       baseScale: object.scale.clone(),
-      startQuaternion: new Quaternion().setFromAxisAngle(
-        randomUnitVector(),
-        Math.random() * Math.PI * 2,
-      ),
-      tumbleAxis: randomUnitVector(),
-      tumbleSpeed: 9 + Math.random() * 5,
-      delayMs: index * STAGGER_MS,
       kept,
       dimMaterials,
       baseColors: dimMaterials.map((material) => material.color.clone()),
@@ -404,6 +385,24 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
       // presenter falls back wholesale rather than mixing art styles or, worse,
       // leaving a resolved die off the table.
       if (resolved.some((entry) => entry === null)) return false;
+      // The story each die will fly: land on every face its seat lost to a
+      // reroll before re-tossing, celebrate an explosion, and hold a die the
+      // explosion earned until its parent's celebration births it.
+      const requests: FlightRequest[] = dice.map((die, index) => {
+        const final = (resolved[index] as { final: Quaternion }).final;
+        const table = die.shape !== undefined ? (models?.faceRotations[die.shape] ?? []) : [];
+        const steps = (die.rerolledFaces ?? []).flatMap((face) => {
+          const tuple = table[face - 1];
+          return tuple ? [new Quaternion(tuple[0], tuple[1], tuple[2], tuple[3])] : [];
+        });
+        return {
+          final,
+          steps,
+          exploded: die.exploded === true,
+          bornOf: die.bornOf ?? -1,
+        };
+      });
+      const flights = buildFlights(requests);
       clearDice();
       const entries = resolved.map((entry, index) =>
         toEntry(
@@ -412,6 +411,7 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
           index,
           dice.length,
           dice[index]?.kept ?? true,
+          { flight: flights[index] as DieFlight },
         ),
       );
       // A d4 shows its value on the side, so only an all-d4 roll gets the low
@@ -439,7 +439,10 @@ export function createWebglBackend(options: WebglBackendOptions): PresenterBacke
       elevationDeg = TOP_DOWN_ELEVATION;
       framedRadius = DIE_RADIUS;
       frameCamera();
-      await animate([toEntry(themed.object, themed.final, 0, 1, true, { heads, turns })], context);
+      await animate(
+        [toEntry(themed.object, themed.final, 0, 1, true, { flip: { heads, turns } })],
+        context,
+      );
       return true;
     },
     setVisible(visible: boolean) {
