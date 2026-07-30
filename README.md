@@ -79,7 +79,7 @@ npm run demo:react   # the same, inside React — swap presenters while it runs
 
 **0.6.0** is on npm — the engine [`@diceforge-sdk/core`](https://www.npmjs.com/package/@diceforge-sdk/core), the browser presenter [`@diceforge-sdk/renderer-web`](https://www.npmjs.com/package/@diceforge-sdk/renderer-web), and three optional packages: the dice themselves in [`@diceforge-sdk/assets-forge`](https://www.npmjs.com/package/@diceforge-sdk/assets-forge), the plugin conformance suite in [`@diceforge-sdk/testing`](https://www.npmjs.com/package/@diceforge-sdk/testing), and physics motion in [`@diceforge-sdk/presenter-physics`](https://www.npmjs.com/package/@diceforge-sdk/presenter-physics). 0.2.0 completed browser presentation, 0.3.0 made the dice installable, 0.4.0 was the extensibility milestone — custom dice, exploding and reroll notation, replayable sessions, a presenter contract a third party can be held to — 0.5.0 added dice that tumble under real physics and still land on the resolved face, and 0.6.0 flips coins the same way. See the [changelog](CHANGELOG.md), which lists what to check when upgrading.
 
-APIs are experimental before 1.0 and may change between minor versions. Serialized records carry a `schemaVersion` so stored results survive those changes.
+The headless core's contract — notation grammar, event schema, seeded RNG, the presenter interface — is declared stable as of ADR-0022: changes from here are additive only, each carried by its own dated decision record. Presentation packages still iterate freely between minor versions. Serialized records carry a `schemaVersion` so stored results survive additions.
 
 ## Documentation
 

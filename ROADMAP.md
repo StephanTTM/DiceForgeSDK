@@ -50,13 +50,14 @@ implementation to shape them rather than being guessed at in advance.
 ## Engine adapters *(in progress — Godot first)*
 
 - Hold every non-TypeScript port to conformance vectors exported by the core, so identical result semantics are verified mechanically. *(shipped — ADR-0021)*
-- Godot: headless engine as a GDScript addon. *(shipped, 48/48 vectors in Godot 4.7)*
+- Godot: headless engine as a GDScript addon. *(shipped, 57/57 vectors in Godot 4.7)*
 - Godot: presentation — dice in a scene, themes, an end-to-end sample.
 - Unity: C# port against the same vectors, install path, end-to-end sample.
 
 ## 1.0 readiness
 
-- Stabilize public APIs and serialized event schema.
+- Stabilize public APIs and serialized event schema. *(declared — ADR-0022: grammar v1.2, schema v2, the RNG and presenter contracts, and the conformance vectors are frozen; changes are additive-by-ADR from 2026-07-30)*
+- Success-counting pools (`7d10>=8` — World of Darkness, Shadowrun) are deliberately **post-1.0**: the one dice family whose result is not a sum, deferred by decision until a real integration shapes the dialect, and additive when it comes (ADR-0022).
 - Complete supported-platform test matrix and migration policy.
 - Publish security, release, and long-term maintenance policies.
 

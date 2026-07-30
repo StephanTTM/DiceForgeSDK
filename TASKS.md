@@ -85,6 +85,7 @@ Remaining before tagging 0.1.0:
 
 ## Next
 
+- [x] Declare the core stable. (ADR-0022, 2026-07-30: grammar v1.2, event schema v2, the RNG and presenter contracts, and the conformance vectors are frozen — changes are additive-by-ADR only. Success-counting pools deferred by decision, recorded in the ADR, so the Unity port targets a fixed contract)
 - [ ] Harden the six-times-rejected fallback pose in `simulateRoll`/`simulateCoinFlip`. Diagnosis from a one-in-~300 CI flake (2026-07-29): when every retry is rejected, the returned best-effort roll can rest nearly edge-on, where the recorded face wins "highest" by less than the symmetry table's ~1e-5 numeric error — an observer measuring argmax can read the neighbour. The record is never wrong, only near-unreadable. Options: prefer settled throws in the fallback ranking, snap the final frame to the nearest exact face pose when seated is below threshold, or raise MAX_THROWS. Reproduce with unseeded soak (`2,400 local rolls hit 0`; it needs the tail).
 
 - [x] Guarantee the coin tumbles on entry. (the diagnosis held — isotropic spin reads as a drop 51 times in 60 — but flooring the diameter spin only got it to 40/60: the real lever was air time, so the coin is now *tossed* upward as well. `PhysicsCoin.turnovers` counts horizon crossings, the retry rejects fewer than two, and a rim-spinner longer than 3 s is re-thrown instead of watched. Measured: 120/120 seeds at ≥2 turnovers, worst duration 1.5 s, ~5.5 ms per flip)
@@ -100,6 +101,7 @@ Remaining before tagging 0.1.0:
 - [x] Even out apparent die sizes. (`modelSilhouetteScale` equalizes each die's on-screen silhouette, measured from the loaded mesh)
 - [x] Give procedural dice beveled edges, or retire them. (retired, along with the KayKit pack — ADR-0012)
 - [ ] Optional multiplayer transport plugin research. (beyond 1.0)
+- [ ] Success-counting pools (`7d10>=8` — count dice that pass a target instead of summing; World of Darkness, Shadowrun, Year Zero). Post-1.0 by decision (ADR-0022): waits for a real integration to shape the dialect, then lands additively — target syntax errors today, per-die success flags and a group success count ride a schema bump, keep/drop rejected in pool groups, vectors grow with it.
 - [x] Browser-based visual regression testing for the renderer. (`npm run vrt`, 17 scenes including six for the physics presenter, Playwright + committed baselines)
 
 ## Task maintenance
