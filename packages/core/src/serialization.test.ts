@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { defineDie, MAX_FACE_LABEL_LENGTH, MAX_FACE_VALUE } from "./dice/definition.js";
+import { createDiceEngine } from "./engine.js";
 import { DiceForgeError } from "./errors.js";
 import { parseDiceNotation } from "./notation/parser.js";
 import { EVENT_SCHEMA_VERSION } from "./records.js";
@@ -9,6 +11,14 @@ import { deserializeEvent, serializeEvent } from "./serialization.js";
 
 function sampleRoll() {
   return resolveRoll(parseDiceNotation("2d20kh1+3-1d4"), createSeededRandomSource("serialize"));
+}
+
+/** A roll of a custom die, for the guards only custom faces can reach. */
+function customRoll() {
+  return createDiceEngine({
+    random: createSeededRandomSource("serialize"),
+    dice: [defineDie({ id: "fate", faces: [-1, 0, 1] })],
+  }).roll("2d{fate}");
 }
 
 function expectFailure(payload: string, code: string, pattern: RegExp): void {
@@ -155,5 +165,112 @@ describe("event serialization", () => {
     ) as Record<string, unknown>;
     raw.outcome = "edge";
     expectFailure(JSON.stringify(raw), "invalid-event", /outcome must be/);
+  });
+});
+
+/**
+ * Every structural guard, exercised one by one. These began as an adversarial
+ * probe of the built package; each case pins a `fail(...)` branch so a guard
+ * cannot be lost in a refactor without a test noticing.
+ */
+describe("tampered and malformed records", () => {
+  /** Valid serialized roll, mutated by `mutate`, expected to fail `pattern`. */
+  function tampered(mutate: (raw: Record<string, unknown>) => void, pattern: RegExp): void {
+    const raw = JSON.parse(serializeEvent(sampleRoll())) as Record<string, unknown>;
+    mutate(raw);
+    expectFailure(JSON.stringify(raw), "invalid-event", pattern);
+  }
+
+  type RawGroup = { sides: number; dice: Record<string, unknown>[] };
+  const firstGroup = (raw: Record<string, unknown>): RawGroup =>
+    (raw.groups as RawGroup[])[0] as RawGroup;
+  const firstDie = (raw: Record<string, unknown>): Record<string, unknown> =>
+    firstGroup(raw).dice[0] as Record<string, unknown>;
+
+  it("rejects a seeded provenance with an unknown algorithm", () => {
+    tampered((raw) => {
+      raw.provenance = { source: "seeded", seed: "x", algorithm: "lcg" };
+    }, /unknown seeded algorithm "lcg"/);
+  });
+
+  it("rejects a system provenance with an unknown algorithm", () => {
+    tampered((raw) => {
+      raw.provenance = { source: "system", algorithm: "dice-o-matic" };
+    }, /unknown system algorithm "dice-o-matic"/);
+  });
+
+  it("rejects an unknown provenance source", () => {
+    tampered((raw) => {
+      raw.provenance = { source: "quantum" };
+    }, /provenance\.source must be/);
+  });
+
+  it("rejects a group with an impossible face count", () => {
+    tampered((raw) => {
+      firstGroup(raw).sides = 1;
+    }, /sides 1 is outside 2\.\./);
+  });
+
+  it("rejects a group with no dice", () => {
+    tampered((raw) => {
+      firstGroup(raw).dice = [];
+    }, /dice must be a non-empty array/);
+  });
+
+  it("rejects a die whose sides disagree with its group", () => {
+    tampered((raw) => {
+      (firstDie(raw) as { sides: number }).sides = 8;
+    }, /sides 8 does not match the group's 20 faces/);
+  });
+
+  it("rejects a die from a different custom die than its group", () => {
+    const raw = JSON.parse(serializeEvent(customRoll())) as Record<string, unknown>;
+    (firstDie(raw) as { die: string }).die = "doom";
+    expectFailure(JSON.stringify(raw), "invalid-event", /"doom" does not match the group's/);
+  });
+
+  it("rejects a custom face value beyond the defined magnitude cap", () => {
+    const raw = JSON.parse(serializeEvent(customRoll())) as Record<string, unknown>;
+    (firstDie(raw) as { value: number }).value = MAX_FACE_VALUE + 1;
+    expectFailure(JSON.stringify(raw), "invalid-event", /exceeds 1000000/);
+  });
+
+  it("rejects an unknown die source", () => {
+    tampered((raw) => {
+      firstDie(raw).source = "gremlin";
+    }, /source must be "reroll" or "explosion"/);
+  });
+
+  it("rejects a non-boolean rerolled flag", () => {
+    tampered((raw) => {
+      firstDie(raw).rerolled = "yes";
+    }, /rerolled must be a boolean/);
+  });
+
+  it("rejects an overlong face label", () => {
+    tampered((raw) => {
+      firstDie(raw).label = "x".repeat(MAX_FACE_LABEL_LENGTH + 1);
+    }, /label exceeds 8 characters/);
+  });
+
+  it("rejects a roll with no groups", () => {
+    tampered((raw) => {
+      raw.groups = [];
+    }, /groups must be a non-empty array/);
+  });
+
+  it("refuses a payload that is not a string", () => {
+    expect(() => deserializeEvent(42 as never)).toThrowError(/event payload must be a string/);
+  });
+
+  it("does not let a __proto__ key pollute anything", () => {
+    // A literal __proto__ key in the JSON text: JSON.parse turns it into a
+    // plain own property, and validation copies only the fields it knows.
+    const json = serializeEvent(sampleRoll());
+    const evil = `${json.slice(0, -1)},"__proto__":{"polluted":true}}`;
+    const restored = deserializeEvent(evil);
+    expect(({} as { polluted?: boolean }).polluted).toBeUndefined();
+    expect("polluted" in restored).toBe(false);
+    expect(Object.getPrototypeOf(restored)).toBe(Object.prototype);
   });
 });

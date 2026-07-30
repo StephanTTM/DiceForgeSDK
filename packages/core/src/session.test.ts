@@ -14,6 +14,7 @@ import { serializeEvent } from "./serialization.js";
 import {
   createSession,
   deserializeSession,
+  MAX_SESSION_EVENTS,
   replaySession,
   serializeSession,
   validateSessionRecord,
@@ -114,6 +115,30 @@ describe("session serialization", () => {
       /events must be an array/,
     );
   });
+
+  it("rejects payloads that are not objects at all", () => {
+    expect(() => deserializeSession("null")).toThrowError(/session must be an object/);
+    expect(() => deserializeSession("[]")).toThrowError(/session must be an object/);
+    expect(() => deserializeSession(42 as never)).toThrowError(/session payload must be a string/);
+  });
+
+  it("refuses to create a session past the event cap", () => {
+    // The cap is checked before any event is validated, so the fill can be
+    // cheap and the failure is immediate rather than 10,001 validations later.
+    const oversized = Array(MAX_SESSION_EVENTS + 1).fill(sampleEvents()[0]) as InteractionEvent[];
+    expect(() => createSession(oversized)).toThrowError(/may not hold more than 10000 events/);
+  });
+
+  it("refuses to validate a stored session past the event cap", () => {
+    const raw = {
+      kind: "session",
+      schemaVersion: 2,
+      events: Array(MAX_SESSION_EVENTS + 1).fill(0),
+    };
+    expect(() => deserializeSession(JSON.stringify(raw))).toThrowError(
+      /may not hold more than 10000 events/,
+    );
+  });
 });
 
 describe("replaySession", () => {
@@ -191,6 +216,33 @@ describe("replaySession", () => {
     ).rejects.toMatchObject({ name: "AbortError" });
     // The first event was shown; the second was in flight when it was cancelled.
     expect(presenter.shown).toHaveLength(1);
+  });
+
+  it("stops at the boundary even when the presenter ignores the signal", async () => {
+    // A presenter that never looks at the signal: the replay loop's own
+    // between-events check is then the only thing that can stop the run.
+    const shown: InteractionEvent[] = [];
+    const oblivious: InteractionPresenter = {
+      capabilities: CAPABILITIES,
+      async present(event) {
+        shown.push(event);
+      },
+    };
+    const signal: AbortSignalLike & { aborted: boolean } = {
+      aborted: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    };
+    await expect(
+      replaySession(sampleEvents(), oblivious, {
+        signal,
+        onEvent: () => {
+          signal.aborted = true;
+        },
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    // The event already in flight completes; the next one is never started.
+    expect(shown).toHaveLength(1);
   });
 
   it("refuses something that is not a presenter", async () => {

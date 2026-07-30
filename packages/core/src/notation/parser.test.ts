@@ -127,6 +127,12 @@ describe("parseDiceNotation — errors", () => {
     expectNotationError("(1d6)", /unexpected character/);
   });
 
+  it("rejects non-ASCII digits, because the grammar is a ports contract", () => {
+    // Three engines parse this grammar; ASCII-only is what keeps "the same
+    // expression" meaning the same thing in all of them (ADR-0021).
+    expectNotationError("４d６", /unexpected character/, 0);
+  });
+
   it("requires at least one die", () => {
     expectNotationError("5", /must include at least one die/);
     expectNotationError("3+4", /must include at least one die/);
