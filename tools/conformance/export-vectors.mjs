@@ -40,7 +40,27 @@ const FATE = {
   ],
 };
 
-const RNG_SEEDS = ["table-42", "", "0", "42", "The quick brown fox", "unicode-é→\u{1f3b2}"];
+const RNG_SEEDS = [
+  "table-42",
+  "",
+  "0",
+  "42",
+  "The quick brown fox",
+  "unicode-é→\u{1f3b2}",
+  // Degenerate seeds are the same contract (they reached the TS suite as
+  // adversarial probes): applications put user text straight into seeds, so
+  // every port must hash these identically too. The astral pair is what
+  // holds every port's UTF-16 code-unit handling to the core.
+  //
+  // A lone surrogate seed ("\uD800") is deliberately NOT here: JSON cannot
+  // carry unpaired surrogates in interchange (RFC 8259 §8.2) — Godot's
+  // parser measurably rejects the whole file, and .NET's would too — so
+  // that behaviour is a JS-level guarantee, locked in the core's own suite
+  // (rng/seeded.test.ts), not part of the cross-port contract.
+  "💀💀",
+  "NaN",
+  "x".repeat(1000),
+];
 
 const PARSE_OK = [
   "1d6",
@@ -75,6 +95,15 @@ const PARSE_ERRORS = [
   "1d6xx2",
   "101d6",
   "1d1001",
+  // From the adversarial probes: structure, caps, and the ASCII-only rule.
+  // A port whose scanner uses a locale-aware "is digit" would accept the
+  // fullwidth digits, which is exactly the divergence a vector catches.
+  "４d６",
+  "1d6+",
+  "1d6 7",
+  "(1d6)",
+  "2000000+1d6",
+  `1d6${" ".repeat(600)}`,
 ];
 
 const ROLLS = [

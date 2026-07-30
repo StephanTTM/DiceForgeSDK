@@ -70,7 +70,7 @@ vectors** exported from the TypeScript core
 ([`packages/testing/vectors/core-vectors.json`](../../packages/testing/vectors/core-vectors.json)):
 seeded RNG streams, normalized parses, error positions, and fully resolved
 records, all compared bit for bit. The test host project in this directory
-runs them; its main scene prints `CONFORMANCE PASS: 48 checks, 0 failures`
+runs them; its main scene prints `CONFORMANCE PASS: 57 checks, 0 failures`
 and exits nonzero on any mismatch. Run it from the repo with:
 
 ```bash

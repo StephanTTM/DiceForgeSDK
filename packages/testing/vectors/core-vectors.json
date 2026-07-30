@@ -128,6 +128,69 @@
         3786908083,
         574262062
       ]
+    },
+    {
+      "seed": "💀💀",
+      "uint32": [
+        718141903,
+        691320689,
+        3106224337,
+        789546969,
+        742243256,
+        3879860252,
+        4187847104,
+        736666915,
+        751730536,
+        2484245314,
+        2681289169,
+        3198849293,
+        438853269,
+        89710115,
+        1437940494,
+        1112417380
+      ]
+    },
+    {
+      "seed": "NaN",
+      "uint32": [
+        4290949258,
+        148262050,
+        61691572,
+        1175420390,
+        3057004886,
+        2215848834,
+        1041950326,
+        1793416476,
+        1372794389,
+        226729125,
+        3514959597,
+        3314096599,
+        675398507,
+        4132129728,
+        1611248558,
+        1416004256
+      ]
+    },
+    {
+      "seed": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "uint32": [
+        2047281816,
+        2367317880,
+        2336866056,
+        1584860940,
+        2268271215,
+        432802077,
+        3411847379,
+        3762266974,
+        1184797340,
+        4040166614,
+        4010581712,
+        2474002574,
+        359234216,
+        3990704662,
+        23394120,
+        57577406
+      ]
     }
   ],
   "faces": [
@@ -340,6 +403,30 @@
     {
       "expression": "1d1001",
       "position": 2
+    },
+    {
+      "expression": "４d６",
+      "position": 0
+    },
+    {
+      "expression": "1d6+",
+      "position": 4
+    },
+    {
+      "expression": "1d6 7",
+      "position": 4
+    },
+    {
+      "expression": "(1d6)",
+      "position": 0
+    },
+    {
+      "expression": "2000000+1d6",
+      "position": 0
+    },
+    {
+      "expression": "1d6                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        ",
+      "position": 500
     }
   ],
   "rolls": [
