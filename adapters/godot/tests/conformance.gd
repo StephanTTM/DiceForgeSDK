@@ -23,8 +23,7 @@ func _ready() -> void:
 			FileAccess.WRITE,
 		)
 		if out != null:
-			out.store_string("CONFORMANCE FAIL: vectors could not be loaded
-")
+			out.store_string("CONFORMANCE FAIL: vectors could not be loaded")
 		get_tree().quit(1)
 		return
 	_run_rng(vectors["rng"])

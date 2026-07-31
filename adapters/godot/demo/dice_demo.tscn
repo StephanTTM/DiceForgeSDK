@@ -1,6 +1,6 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://psyfwqg6jfv0"]
 
-[ext_resource type="Script" path="res://demo/dice_demo.gd" id="1_demo"]
+[ext_resource type="Script" uid="uid://c3a73pdnsjmf2" path="res://demo/dice_demo.gd" id="1_demo"]
 
 [sub_resource type="Environment" id="env_demo"]
 background_mode = 1
@@ -12,19 +12,19 @@ ambient_light_energy = 0.6
 [sub_resource type="PlaneMesh" id="floor_demo"]
 size = Vector2(80, 80)
 
-[node name="DiceDemo" type="Node3D"]
+[node name="DiceDemo" type="Node3D" unique_id=2052506840]
 script = ExtResource("1_demo")
 
-[node name="Camera3D" type="Camera3D" parent="."]
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1126346469]
 transform = Transform3D(1, 0, 0, 0, 0.62, 0.78, 0, -0.78, 0.62, 0, 10, 8)
 environment = SubResource("env_demo")
 fov = 32.0
 
-[node name="Key" type="DirectionalLight3D" parent="."]
+[node name="Key" type="DirectionalLight3D" parent="." unique_id=187322589]
 transform = Transform3D(0.87, -0.35, 0.35, 0, 0.71, 0.71, -0.5, -0.61, 0.61, 5, 12, 6)
 light_energy = 1.6
 shadow_enabled = true
 
-[node name="Floor" type="MeshInstance3D" parent="."]
+[node name="Floor" type="MeshInstance3D" parent="." unique_id=251286866]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.06, 0)
 mesh = SubResource("floor_demo")
