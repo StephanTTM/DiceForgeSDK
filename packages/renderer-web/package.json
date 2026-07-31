@@ -1,6 +1,6 @@
 {
   "name": "@diceforge-sdk/renderer-web",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Browser presenter for DiceForge: Three.js 3D dice with outcome-first animation, DOM fallback, reduced-motion support, and accessible announcements.",
   "license": "MIT",
   "type": "module",
@@ -43,11 +43,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@diceforge-sdk/core": "^0.6.0",
+    "@diceforge-sdk/core": "^0.7.0",
     "three": "^0.182.0"
   },
   "devDependencies": {
-    "@diceforge-sdk/testing": "^0.6.0",
+    "@diceforge-sdk/testing": "^0.7.0",
     "@types/three": "^0.182.0"
   }
 }

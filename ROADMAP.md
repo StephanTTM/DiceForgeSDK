@@ -41,11 +41,14 @@ implementation to shape them rather than being guessed at in advance.
 - Tie every die value to the numeral printed on the shipped model, in CI.
 - Make the pre-publish tarball check a repeatable command.
 
-## Sound — 0.7.0
+## Sound, a second engine, and a stable core — 0.7.0 *(shipped)*
 
-- Impact-driven audio: sounds derived from the recorded trajectory's own collisions, not played on a timer.
+- Impact-driven audio: sounds derived from the recorded trajectory's own collisions, not played on a timer. *(ADR-0020)*
 - Synthesized rather than sampled, so no audio assets need sourcing or licensing to start.
 - No audio plugin contract yet — the first implementation shapes it, a later second one justifies it.
+- DiceForge running natively in Godot, held to the core's own conformance vectors. *(ADR-0021)*
+- Rerolls and explosions presented as stories, on every platform, with the settled stage summing to the record.
+- The headless core declared stable, changes additive-by-ADR. *(ADR-0022)*
 
 ## Engine adapters *(in progress — Godot first)*
 
@@ -56,10 +59,23 @@ implementation to shape them rather than being guessed at in advance.
 
 ## 1.0 readiness
 
-- Stabilize public APIs and serialized event schema. *(declared — ADR-0022: grammar v1.2, schema v2, the RNG and presenter contracts, and the conformance vectors are frozen; changes are additive-by-ADR from 2026-07-30)*
-- Success-counting pools (`7d10>=8` — World of Darkness, Shadowrun) are deliberately **post-1.0**: the one dice family whose result is not a sum, deferred by decision until a real integration shapes the dialect, and additive when it comes (ADR-0022).
-- Complete supported-platform test matrix and migration policy.
-- Publish security, release, and long-term maintenance policies.
+1.0 is earned by a checklist, not declared by a feeling. The core's contract is
+already stable (ADR-0022) and binding regardless of the version number, so the
+0.x line continues until every item below is done — the version lock means a
+`1.0.0` also freezes the presentation packages, and those are still moving.
+
+- [x] Stabilize public APIs and serialized event schema. *(ADR-0022: grammar v1.2, schema v2, the RNG and presenter contracts, and the conformance vectors are frozen; changes are additive-by-ADR from 2026-07-30)*
+- [ ] **Unity C# port passing the same conformance vectors.** The portability claim — same seed, same rolls, every platform — is proven once today. 1.0 should prove it twice.
+- [ ] **Knock voices tuned with the product owner listening.** The one piece of shipped presentation flagged as not-right (reads high pitched, 2026-07-28).
+- [ ] **The near-edge-on fallback pose fixed** in `simulateRoll`/`simulateCoinFlip` — the one known physics blemish, a 1-in-~300 tail.
+- [ ] **Godot Asset Library listing live**, so the second platform's install story is reachable by its audience, not just by a branch URL.
+- [ ] Complete supported-platform test matrix and migration policy.
+- [ ] Publish security, release, and long-term maintenance policies.
+
+Success-counting pools (`7d10>=8` — World of Darkness, Shadowrun) are
+deliberately **post-1.0**: the one dice family whose result is not a sum,
+deferred by decision until a real integration shapes the dialect, and additive
+when it comes (ADR-0022).
 
 ## Explicit non-goals for the first releases
 

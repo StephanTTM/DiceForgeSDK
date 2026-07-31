@@ -57,14 +57,14 @@ Remaining before tagging 0.1.0:
 - [x] Make the pre-publish tarball check repeatable. (`npm run smoke` — packs, installs and uses all five packages, ~20 s)
 - [x] Physics coin flips. (`simulateCoinFlip` — cylinder collider whose faces *are* the outcomes, thrown into the shared tray; the model's calibrated pair seats it and a half-turn symmetry lands the recorded face; radius and thickness measured from the loaded model; rim landings re-thrown. 60/60 seeded flips flat on the recorded outcome at ~5 ms each; the presenter no longer swaps canvases for a coin)
 
-## Sound — 0.7.0 (in progress)
+## Sound, a second engine, and a stable core — 0.7.0 (released 2026-07-31)
 
 - [x] Record impacts in the simulation. (`PhysicsImpact` on `PhysicsRoll`/`PhysicsFlip` from cannon's collide events — time, body, felt/wall/die, closing speed in m/s at real scale; deterministic per seed, asserted)
 - [x] Impact-driven synthesized knocks. (`impactSchedule` — pure, measured thresholds: 0.12 m/s floor, 55 ms per-body merge; Web Audio synthesis from filtered noise, lazy context in the click chain, silent without Web Audio — ADR-0020)
 - [x] `sound` option on the physics presenter, default off, and a demo checkbox. (verified in-browser: sound off schedules nothing; a 3d6 roll schedules 7 knocks on one lazily-created context; a coin flip 2)
-- [ ] Tune the knock voices down. First listen (product owner, 2026-07-28): the sound works but reads a bit high pitched. Fix shape: lower the material bandpass centres in `audio.ts` (`MATERIALS` — felt 950 / wall 2100 / die 3100 Hz today), keeping their order so felt stays dullest and die-on-die brightest; a longer decay would also soften the read. Constants are internal (ADR-0020), so retuning is free — but tune *with* the product owner listening, not ahead of them.
+- [ ] Tune the knock voices down. **1.0 blocker** (ROADMAP's readiness checklist). First listen (product owner, 2026-07-28): the sound works but reads a bit high pitched. Fix shape: lower the material bandpass centres in `audio.ts` (`MATERIALS` — felt 950 / wall 2100 / die 3100 Hz today), keeping their order so felt stays dullest and die-on-die brightest; a longer decay would also soften the read. Constants are internal (ADR-0020), so retuning is free — but tune *with* the product owner listening, not ahead of them.
 
-## Story playback — web parity (0.7.0, in progress)
+## Story playback — web parity (0.7.0, shipped)
 
 - [x] Reroll and explosion stories in both web presenters, matching Godot. (`visualDiceForEvent` returns the settled stage with `rerolledFaces`/`exploded`/`bornOf`; the WebGL renderer's authored story lives in `webgl/story.ts`, the physics presenter's multi-throw plan in `presenter-physics/src/story.ts` — both pure and headlessly tested; three VRT scenes pin the settled stages; the React demo grew one-click story buttons)
 - [ ] Custom-dice stories: a custom die falls back to tiles, which show only the settled stage — its rerolls and explosions have no motion anywhere yet.

@@ -6,9 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-31
+
+Sound, a second engine, and a stable core. The largest release the project has
+had: dice that can be heard, DiceForge running natively inside Godot, rerolls
+and explosions played as stories on every platform, and the headless core
+declared stable.
+
+**Upgrading:** nothing in the core breaks — records, notation, the presenter
+contract, sessions and replay are unchanged, and stored records keep reading.
+Three things behave differently on screen, all of them presentation:
+
+- **Rolls with rerolls or explosions now present as stories.** A rerolled die
+  lands on its doomed value, holds, and re-tosses; a die that explodes
+  celebrates while the die it earned drops in beside it. What ends up on the
+  table is the *settled stage*, which now always sums to the record's total —
+  previously a rerolled value sat there indistinguishable from a dropped die,
+  and explosion dice were missing from the tiles. No API call changes; a plain
+  roll animates exactly as before.
+- **`visualDiceForEvent` returns that stage**, not one entry per record die.
+  Values lost to rerolls collapse into the die that replaced them (carried as
+  `rerolledFaces`), and explosion-born dice gain `exploded`/`bornOf` lineage.
+  Only relevant if you consume this export directly to build your own
+  presenter; the shipped presenters were updated with it.
+- **Coin flips always tumble now** — measured, 51 of 60 used to read as a drop.
+
+New and opt-in: `createPhysicsPresenter({ sound: true })` for impact-driven
+audio (default off), and the Godot addon, which is not an npm package — it
+installs from the `godot-asset` branch or the Asset Library bundle.
+
 ### Added
 
-- **The core is declared stable** (ADR-0022): notation grammar v1.2, event schema v2, the RNG contract, the presenter contract, sessions/replay and the conformance vectors are frozen; every change from here is additive and carried by its own dated ADR — new syntax must be text that errors today, new record fields ride a schema bump with a read path, no vector value may change. Success-counting pools (`7d10>=8`) are deferred **by decision**, recorded in the ADR with their additive landing path, until a real integration shapes the dialect. The next release that publishes this statement is the natural `1.0.0` candidate.
+- **The core is declared stable** (ADR-0022): notation grammar v1.2, event schema v2, the RNG contract, the presenter contract, sessions/replay and the conformance vectors are frozen; every change from here is additive and carried by its own dated ADR — new syntax must be text that errors today, new record fields ride a schema bump with a read path, no vector value may change. Success-counting pools (`7d10>=8`) are deferred **by decision**, recorded in the ADR with their additive landing path, until a real integration shapes the dialect. The version number stays in the 0.x line deliberately: all five packages share one version (ADR-0009), so a `1.0.0` would freeze the presentation packages too — and those are exactly what ADR-0022 left free to iterate. ROADMAP carries the checklist that earns 1.0.
 
 - **Core hardening suite**, grown from an adversarial probe of the built package (45 probes: pathological notation, hostile seeds, tampered records, fairness): every structural guard in `validateEventRecord` and the session validators is now pinned by a test, degenerate seeds — empty, emoji, a lone surrogate, 100k characters, `NaN` — are locked as golden first draws alongside the ADR-0005 sequences, chi-square tests pin the d6 and d20 *distributions* the way the goldens pin the stream, the rejection-sampling redraw is exercised by a scripted source, a `__proto__` key in a record payload is proven inert, and the replay loop's between-events abort boundary is covered. Core coverage: 95% statements / 92% branch, with `serialization.ts`, `session.ts` and `rng/sample.ts` at 100% lines; what remains is the no-`crypto` fallback and defensive lines no input can reach. The portable edges then moved into the **conformance vectors** (48 → 57 checks) so every port inherits them — degenerate seeds and hostile parse errors including non-ASCII digits — and the GDScript port passes all 57 unchanged. One boundary was measured on the way: a lone-surrogate seed cannot be a vector because JSON interchange cannot carry unpaired surrogates (Godot's parser rejects the file outright), so that guarantee is TypeScript-local by documented design (ADR-0021 addendum).
 
