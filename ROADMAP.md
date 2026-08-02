@@ -67,7 +67,7 @@ already stable (ADR-0022) and binding regardless of the version number, so the
 - [x] Stabilize public APIs and serialized event schema. *(ADR-0022: grammar v1.2, schema v2, the RNG and presenter contracts, and the conformance vectors are frozen; changes are additive-by-ADR from 2026-07-30)*
 - [ ] **Unity C# port passing the same conformance vectors.** The portability claim — same seed, same rolls, every platform — is proven once today. 1.0 should prove it twice.
 - [ ] **Knock voices tuned with the product owner listening.** The one piece of shipped presentation flagged as not-right (reads high pitched, 2026-07-28).
-- [ ] **The near-edge-on fallback pose fixed** in `simulateRoll`/`simulateCoinFlip` — the one known physics blemish, a 1-in-~300 tail.
+- [x] **The near-edge-on fallback pose fixed** in `simulateRoll`/`simulateCoinFlip`. *(2026-07-31: settled throws now outrank still-moving ones, and a die left propped up eases onto its resting face — worst up-face margin 7.6e-6 before, 0.238 after)*
 - [ ] **Godot Asset Library listing live**, so the second platform's install story is reachable by its audience, not just by a branch URL.
 - [ ] Complete supported-platform test matrix and migration policy.
 - [ ] Publish security, release, and long-term maintenance policies.

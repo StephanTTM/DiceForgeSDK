@@ -498,6 +498,79 @@ const MIN_SEATED = 0.9995;
  * used if physics is having an unusually bad day.
  */
 const MAX_THROWS = 6;
+/**
+ * Frames spent easing a rejected pose down onto its face. Twelve is a fifth of
+ * a second at the default rate — long enough to read as the die's last
+ * movement, short enough that nothing else is happening by then.
+ */
+const SETTLE_FRAMES = 12;
+
+/**
+ * Lays a die that never settled flat onto the face it came to rest on.
+ *
+ * Only the fallback needs this. When all six throws are rejected the best of
+ * them is shown anyway, and "best" could still be a die propped on an edge —
+ * where the recorded face is up by a hair rather than plainly, and anything
+ * measuring which face is highest is deciding between two near-equal numbers.
+ * That is not a wrong record, but it is an unreadable one, and it produced a
+ * one-in-three-hundred CI flake.
+ *
+ * The correction is the smallest rotation that puts the supporting face
+ * exactly on the table, eased in over the last frames so it reads as the die
+ * finally settling rather than as a jump. Position follows to the height a
+ * flat die rests at, so it neither sinks nor floats. This is authored motion
+ * in ADR-0007's sense and changes nothing about the outcome: the recorded face
+ * was decided before the simulation ran, and a die rotating onto its own
+ * resting face carries whatever numeral the remap already put there.
+ */
+function settleOntoFace(
+  frames: readonly PhysicsFrame[],
+  normals: readonly Vec3[],
+  restHeight: number,
+): PhysicsFrame[] {
+  const settled = [...frames];
+  const last = settled[settled.length - 1];
+  if (!last) return settled;
+  // The face the die is resting on is the one pointing most steeply down.
+  let support = 0;
+  let lowest = Number.POSITIVE_INFINITY;
+  normals.forEach((normal, index) => {
+    const y = rotateY(normal, last.orientation);
+    if (y < lowest) {
+      lowest = y;
+      support = index;
+    }
+  });
+  const direction = rotateVec(normals[support] as Vec3, last.orientation);
+  // Turn that direction onto straight down, about `direction × (0, -1, 0)` —
+  // the axis perpendicular to both, which is horizontal, so the die's heading
+  // is preserved and only its tilt changes. Already flat means nothing to do.
+  const axis: Vec3 = [direction[2], 0, -direction[0]];
+  const axisLength = Math.hypot(axis[0], axis[2]);
+  const angle = Math.acos(Math.min(1, Math.max(-1, -direction[1])));
+  if (axisLength < 1e-9 || angle < 1e-9) return settled;
+  const unit: Vec3 = [axis[0] / axisLength, 0, axis[2] / axisLength];
+
+  const first = Math.max(0, settled.length - SETTLE_FRAMES);
+  for (let index = first; index < settled.length; index++) {
+    const frame = settled[index] as PhysicsFrame;
+    // Ease so the correction starts gently and arrives exactly.
+    const u = (index - first + 1) / (settled.length - first);
+    const eased = u * u * (3 - 2 * u);
+    const half = (angle * eased) / 2;
+    const sin = Math.sin(half);
+    const turn: QuaternionTuple = [unit[0] * sin, 0, unit[2] * sin, Math.cos(half)];
+    settled[index] = {
+      position: [
+        frame.position[0],
+        frame.position[1] + (restHeight - frame.position[1]) * eased,
+        frame.position[2],
+      ],
+      orientation: multiply(turn, frame.orientation),
+    };
+  }
+  return settled;
+}
 
 /**
  * Rolls dice and records where they went — without deciding anything.
@@ -520,17 +593,51 @@ export function simulateRoll(
   options: SimulateOptions = {},
 ): PhysicsRoll {
   let best: PhysicsRoll | undefined;
-  let bestSeating = Number.NEGATIVE_INFINITY;
+  let bestRank = Number.NEGATIVE_INFINITY;
   for (let attempt = 0; attempt < MAX_THROWS; attempt++) {
     const roll = throwOnce(request, options);
     const seating = roll.dice.reduce((low, die) => Math.min(low, die.seated), 1);
     if (roll.settled && seating >= MIN_SEATED) return roll;
-    if (seating > bestSeating) {
-      bestSeating = seating;
+    // Ranking the fallback: a roll that came to rest always beats one still
+    // moving when the recording stopped, however flat that one happened to
+    // look in its last frame. Seating decides between equals.
+    const rank = (roll.settled ? 1 : 0) + seating;
+    if (rank > bestRank) {
+      bestRank = rank;
       best = roll;
     }
   }
-  return best as PhysicsRoll;
+  return layFlat(best as PhysicsRoll, request, options.dieRadius ?? 1);
+}
+
+/** Settles every die of a rejected roll that is still propped up. */
+function layFlat(
+  roll: PhysicsRoll,
+  request: readonly PhysicsDieRequest[],
+  dieRadius: number,
+): PhysicsRoll {
+  if (roll.dice.every((die) => die.seated >= MIN_SEATED)) return roll;
+  const dice = roll.dice.map((die, index) => {
+    if (die.seated >= MIN_SEATED) return die;
+    const source = request[index] as PhysicsDieRequest;
+    const { data } = solidFor(source);
+    const normals = faceDirections(source.faceRotations);
+    // Face planes sit at distance 1 in solid units, so the inradius is the
+    // circumradius divided out — the height a die's centre rests at, flat.
+    const circumradius = Math.max(...data.vertices.map((v) => Math.hypot(v[0], v[1], v[2])));
+    const frames = settleOntoFace(die.frames, normals, dieRadius / circumradius);
+    // Measured from the pose that came back, never assumed: claiming a die is
+    // seated without checking is how a bad settle would ship looking fixed.
+    return { ...die, frames, seated: seatingOf(frames, normals) };
+  });
+  return { ...roll, dice };
+}
+
+/** How flat a recording's last frame actually is, on the same scale as `seated`. */
+function seatingOf(frames: readonly PhysicsFrame[], normals: readonly Vec3[]): number {
+  const last = frames[frames.length - 1];
+  if (!last) return 0;
+  return normals.reduce((best, normal) => Math.max(best, -rotateY(normal, last.orientation)), -1);
 }
 
 /** The coin's two face directions in its collider frame: heads up, tails down. */
@@ -662,7 +769,7 @@ export function simulateCoinFlip(
   options: SimulateOptions = {},
 ): PhysicsFlip {
   let best: PhysicsFlip | undefined;
-  let bestSeating = Number.NEGATIVE_INFINITY;
+  let bestRank = Number.NEGATIVE_INFINITY;
   for (let attempt = 0; attempt < MAX_THROWS; attempt++) {
     const flip = flipOnce(request, options);
     if (
@@ -673,12 +780,22 @@ export function simulateCoinFlip(
     ) {
       return flip;
     }
-    if (flip.coin.seated > bestSeating) {
-      bestSeating = flip.coin.seated;
+    // Same fallback ranking as the dice, plus the thing that makes a flip a
+    // flip: one that tumbled beats one that merely dropped, and a coin still
+    // rolling on its rim beats neither.
+    const rank =
+      (flip.settled ? 2 : 0) + (flip.coin.turnovers >= MIN_TURNOVERS ? 1 : 0) + flip.coin.seated;
+    if (rank > bestRank) {
+      bestRank = rank;
       best = flip;
     }
   }
-  return best as PhysicsFlip;
+  const flip = best as PhysicsFlip;
+  if (flip.coin.seated >= MIN_SEATED) return flip;
+  // A coin left on its rim is the one pose where the outcome cannot be read
+  // at all, so the fallback lays it down like the dice.
+  const frames = settleOntoFace(flip.coin.frames, COIN_NORMALS, request.thickness / 2);
+  return { ...flip, coin: { ...flip.coin, frames, seated: seatingOf(frames, COIN_NORMALS) } };
 }
 
 /** Rotates a vector by a quaternion, for the throw preparation. */
