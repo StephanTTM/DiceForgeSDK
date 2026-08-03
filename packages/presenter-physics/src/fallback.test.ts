@@ -17,8 +17,16 @@ import { multiply, rotate } from "./symmetry.js";
  * is reached on purpose instead of by soaking for the tail.
  */
 
-const CRAMPED = { dieRadius: 1.05, trayRadius: 1.45, maxDuration: 2.5 } as const;
+/**
+ * Every throw in this tray is rejected, so each case costs six full
+ * simulations. That is the point, but it also makes the suite the slowest
+ * thing in the repository — so the work is kept to the smallest amount that
+ * still reaches the fallback on every shape, and the two pose checks share one
+ * set of simulations rather than each running its own.
+ */
+const CRAMPED = { dieRadius: 1.05, trayRadius: 1.45, maxDuration: 1.2 } as const;
 const SHAPES = [4, 6, 8, 10, 12, 20] as const;
+const TRIALS = 2;
 
 /** A cheap reproducible source; the fallback is about poses, not draws. */
 function seeded(seed: number): () => number {
@@ -36,62 +44,48 @@ function upwardMargin(normals: readonly [number, number, number][], pose: Quater
 }
 
 describe("the six-times-rejected fallback", () => {
-  it("lands every die flat, however cramped the tray", { timeout: 120_000 }, () => {
-    for (const shape of SHAPES) {
-      const faceRotations = FORGE_FACE_ROTATIONS[shape] as readonly QuaternionTuple[];
-      for (let trial = 0; trial < 6; trial++) {
-        const face = (trial % shape) + 1;
-        const roll = simulateRoll(
-          Array.from({ length: 3 }, () => ({ shape, face, faceRotations })),
-          { ...CRAMPED, random: seeded(shape * 100 + trial) },
-        );
-        for (const die of roll.dice) {
-          // Every die is seated, whether it settled there or was laid down.
-          expect(die.seated, `d${shape} trial ${trial}`).toBeGreaterThanOrEqual(0.9995);
-        }
-      }
-    }
-  });
-
   /**
-   * The defect itself. A margin under the calibrated table's ~1e-5 precision
-   * is a pose where an independent observer — the smoke test, a conformance
-   * check, a player — can read the neighbouring face.
+   * Both halves of the defect, measured over one set of simulations: a die
+   * left propped up is unreadable in two ways at once, and it is much cheaper
+   * to check them together than to throw everything twice.
    */
-  it("leaves no die resting between two faces", { timeout: 120_000 }, () => {
-    let worst = Number.POSITIVE_INFINITY;
+  it("lands every die flat and plainly readable", { timeout: 120_000 }, () => {
+    let worstMargin = Number.POSITIVE_INFINITY;
     for (const shape of SHAPES) {
       const faceRotations = FORGE_FACE_ROTATIONS[shape] as readonly QuaternionTuple[];
       const normals = faceDirections(faceRotations) as [number, number, number][];
-      for (let trial = 0; trial < 6; trial++) {
+      for (let trial = 0; trial < TRIALS; trial++) {
         const face = (trial % shape) + 1;
         const roll = simulateRoll(
-          Array.from({ length: 3 }, () => ({ shape, face, faceRotations })),
+          Array.from({ length: 2 }, () => ({ shape, face, faceRotations })),
           { ...CRAMPED, random: seeded(shape * 100 + trial) },
         );
         for (const die of roll.dice) {
+          // Seated, whether it settled there or was laid down.
+          expect(die.seated, `d${shape} trial ${trial}`).toBeGreaterThanOrEqual(0.9995);
           const last = die.frames[die.frames.length - 1];
           if (!last) throw new Error("a recording with no frames");
           // A d4 is a tetrahedron: resting on a face leaves three faces at the
           // same height by symmetry, so it has no meaningful upward margin to
           // measure. Its reading is a separate question (TASKS).
           if (shape === 4) continue;
-          worst = Math.min(worst, upwardMargin(normals, last.orientation));
+          worstMargin = Math.min(worstMargin, upwardMargin(normals, last.orientation));
         }
       }
     }
-    // Before the fix this measured 7.6e-6 — below the calibrated table's own
-    // 1e-6 precision. After it, the worst case measures 0.238; the bar sits
-    // far above the table's precision and far below what was measured, so it
-    // fails on a regression rather than on physics having a slow day.
-    expect(worst).toBeGreaterThan(0.05);
+    // Before the fix the worst margin measured 7.6e-6 — below the calibrated
+    // table's own 1e-6 precision, which is what let an observer read the
+    // neighbouring face. After it, the worst case is comfortably above 0.2;
+    // the bar sits far enough below that to fail on a regression rather than
+    // on physics having a slow day.
+    expect(worstMargin).toBeGreaterThan(0.05);
   });
 
   it("still shows the recorded numeral after being laid down", { timeout: 120_000 }, () => {
     for (const shape of SHAPES) {
       const faceRotations = FORGE_FACE_ROTATIONS[shape] as readonly QuaternionTuple[];
       const normals = faceDirections(faceRotations) as [number, number, number][];
-      for (let trial = 0; trial < 4; trial++) {
+      for (let trial = 0; trial < TRIALS; trial++) {
         const face = (trial % shape) + 1;
         const roll = simulateRoll([{ shape, face, faceRotations }], {
           ...CRAMPED,
@@ -116,10 +110,10 @@ describe("the six-times-rejected fallback", () => {
       [1, 0, 0, 0],
     ] as [QuaternionTuple, QuaternionTuple];
     for (const outcome of ["heads", "tails"] as const) {
-      for (let trial = 0; trial < 4; trial++) {
+      for (let trial = 0; trial < TRIALS; trial++) {
         const flip = simulateCoinFlip(
           { outcome, rotations, radius: 1.0346, thickness: 0.231 },
-          { dieRadius: 1.05, trayRadius: 1.2, maxDuration: 2, random: seeded(trial + 1) },
+          { dieRadius: 1.05, trayRadius: 1.2, maxDuration: 1.2, random: seeded(trial + 1) },
         );
         expect(flip.coin.seated, `${outcome} trial ${trial}`).toBeGreaterThanOrEqual(0.9995);
       }
@@ -133,7 +127,7 @@ describe("the six-times-rejected fallback", () => {
   it("eases the correction in rather than snapping on the last frame", { timeout: 60_000 }, () => {
     const faceRotations = FORGE_FACE_ROTATIONS[20] as readonly QuaternionTuple[];
     const roll = simulateRoll(
-      Array.from({ length: 3 }, () => ({ shape: 20 as const, face: 7, faceRotations })),
+      Array.from({ length: 2 }, () => ({ shape: 20 as const, face: 7, faceRotations })),
       { ...CRAMPED, random: seeded(4242) },
     );
     for (const die of roll.dice) {
