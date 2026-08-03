@@ -55,7 +55,7 @@ implementation to shape them rather than being guessed at in advance.
 - Hold every non-TypeScript port to conformance vectors exported by the core, so identical result semantics are verified mechanically. *(shipped — ADR-0021)*
 - Godot: headless engine as a GDScript addon. *(shipped, 57/57 vectors in Godot 4.7)*
 - Godot: presentation — dice in a scene, themes, an end-to-end sample.
-- Unity: C# port against the same vectors, install path, end-to-end sample.
+- Unity: C# port against the same vectors. *(shipped, 57/57)* Install path and end-to-end sample remain.
 
 ## 1.0 readiness
 
@@ -65,7 +65,7 @@ already stable (ADR-0022) and binding regardless of the version number, so the
 `1.0.0` also freezes the presentation packages, and those are still moving.
 
 - [x] Stabilize public APIs and serialized event schema. *(ADR-0022: grammar v1.2, schema v2, the RNG and presenter contracts, and the conformance vectors are frozen; changes are additive-by-ADR from 2026-07-30)*
-- [ ] **Unity C# port passing the same conformance vectors.** The portability claim — same seed, same rolls, every platform — is proven once today. 1.0 should prove it twice.
+- [x] **Unity C# port passing the same conformance vectors.** *(2026-07-31: 57/57 in .NET 10 — the portability claim is now proven twice. Packaging and a sample scene remain, tracked separately.)*
 - [ ] **Knock voices tuned with the product owner listening.** The one piece of shipped presentation flagged as not-right (reads high pitched, 2026-07-28).
 - [x] **The near-edge-on fallback pose fixed** in `simulateRoll`/`simulateCoinFlip`. *(2026-07-31: settled throws now outrank still-moving ones, and a die left propped up eases onto its resting face — worst up-face margin 7.6e-6 before, 0.238 after)*
 - [ ] **Godot Asset Library listing live**, so the second platform's install story is reachable by its audience, not just by a branch URL.

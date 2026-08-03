@@ -81,7 +81,9 @@ Remaining before tagging 0.1.0:
 - [x] Godot: distribution bundle. (`npm run godot:bundle` composes addon + forge dice into the Asset Library layout with a zero-config presenter default; verified by unzipping into a fresh project and rolling the golden-vector record with no configuration. The `Godot bundle` workflow publishes it as an artifact and force-pushes the orphan `godot-asset` branch)
 - [ ] Godot: Asset Library submission. (needs the human owner: an assetlib account, the listing form pointed at the `godot-asset` branch, an icon, and screenshots — the bundle branch is already the exact layout it serves)
 - [ ] Run the Godot conformance scene in CI. (needs a Godot binary on the runner; the scene already exits nonzero on mismatch)
-- [ ] Unity: C# port of the core against the same vectors.
+- [x] Unity: C# port of the core against the same vectors. (`adapters/unity/Runtime` — RNG, grammar v1.2, resolution, custom dice, coin, schema v2 records; **57/57 vectors pass** in .NET 10, and the gate is real: one changed rotate constant fails every RNG vector, and reversing the keep/drop tie-break fails the one record vector with a tie. Pure C#, no `UnityEngine` types, so it is tested headlessly with `dotnet run` — no Unity licence needed)
+- [ ] Unity: package layout and an end-to-end sample scene. (`.asmdef`, UPM `package.json`, and a real import into a Unity project — needs Unity itself and the product owner at the desk. The engine is done and verified; this is the last mile.)
+- [ ] Unity: presentation — the forge models in a scene, posed from the calibrated manifest, as the Godot presenter does.
 
 ## Next
 

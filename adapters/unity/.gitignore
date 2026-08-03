@@ -1,0 +1,6 @@
+# .NET build output. The port ships as source (Unity compiles it directly), so
+# nothing under here belongs in the repository.
+bin/
+obj/
+*.user
+conformance-report.txt

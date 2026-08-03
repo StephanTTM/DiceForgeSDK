@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Runs the core's conformance vectors against the C# port (ADR-0021).
+
+    The port itself ships as plain source under ../../Runtime, which is what
+    Unity compiles; this project links those same files rather than copying
+    them, so there is exactly one copy of the port in the repository and no
+    build artifact that can drift from what Unity sees.
+
+    LangVersion is pinned to what Unity's compiler accepts, so a construct that
+    builds here cannot fail to build there.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>DiceForgeConformance</AssemblyName>
+    <RootNamespace>DiceForge.Conformance</RootNamespace>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../Runtime/**/*.cs" LinkBase="Runtime" />
+  </ItemGroup>
+
+</Project>

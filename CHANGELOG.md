@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **DiceForge for Unity**, the engine as plain C# (`adapters/unity/Runtime`): `DiceForgeEngine.Seeded("table-42").Roll("2d20kh1+3")` produces the same schema v2 record as the TypeScript core and the Godot addon, bit for bit. Grammar v1.2 in full, custom dice, coin flips, position-exact notation errors. Held to the same exported conformance vectors as every other port (ADR-0021) and passing **57 of 57** in .NET 10. No `UnityEngine` types anywhere, so it compiles and is tested outside Unity — `dotnet run` in `Tests/Conformance` gates it, needing no Unity install or licence, and the runner links the same source files Unity compiles rather than copying them. Engine only for now: the UPM package layout, an `.asmdef`, a sample scene and presentation are still to come.
+
 ### Fixed
 
 - **A rejected roll is no longer left propped on an edge.** When all six throws are rejected (ADR-0019's retry loop), `simulateRoll` shows the best of them anyway — and "best" could be a die resting nearly edge-on, where the recorded face is highest by less than the calibrated table's own 1e-6 precision. The die still showed the recorded numeral, but anything measuring which face is up was deciding between two near-equal numbers, which is what produced a one-in-three-hundred flake in the release smoke test. The fallback now ranks a roll that came to rest above one still moving, and a die left propped up eases onto its resting face over the last fifth of a second, its height following so it neither sinks nor floats. Measured in a tray deliberately too small to settle in: worst up-face margin was 7.6e-6, and is now 0.238. `simulateCoinFlip` gets the same treatment, so a coin is never left on its rim. Rolls that settle normally are untouched — every visual regression scene was verified to take the unchanged path.
